@@ -1,0 +1,71 @@
+## ===== SPLUNK =====
+
+spl:
+  type: "detection_language"
+  name: "SPL"
+  description: "Splunk Processing Language"
+  products:
+    - "Splunk Enterprise"
+    - "Splunk Enterprise Security"
+  documentation: "https://docs.splunk.com/Documentation/SplunkCloud/latest/SearchReference/WhatsInThisManual"
+  created: 2020-01-01
+  modified:  2020-01-01
+  created_by: DOGESEC
+  version: 1.0.0
+
+## ===== Sentinel =====
+
+kql:
+  type: "detection_language"
+  name: "KQL"
+  description: "Kusto Query Language"
+  products:
+    - "Microsoft Sentinel"
+  documentation: ""
+  created: 2020-01-01
+  modified:  2020-01-01
+  created_by: DOGESEC
+  version: 1.0.0
+
+## ===== Elastic =====
+
+elastic_dsl:
+  type: "detection_language"
+  name: "Elasticsearch Query DSL"
+  description: "Elasticsearch Query DSL (Domain-Specific Language)"
+  products:
+    - "Elastic"
+    - "Elastic Security"
+  documentation: ""
+  created: 2020-01-01
+  modified:  2020-01-01
+  created_by: DOGESEC
+  version: 1.0.0
+
+## ===== Chronicle =====
+
+cdl:
+  type: "detection_language"
+  name: "Google Chronicle Detection Language (CDL)"
+  description: ""
+  products:
+    - "Google Chronicle"
+  documentation: ""
+  created: 2020-01-01
+  modified:  2020-01-01
+  created_by: DOGESEC
+  version: 1.0.0
+
+## ===== Sigma =====
+
+sigma:
+  type: "detection_language"
+  name: "Sigma"
+  description: ""
+  products:
+    -
+  documentation: ""
+  created: 2020-01-01
+  modified:  2020-01-01
+  created_by: DOGESEC
+  version: 1.0.0
