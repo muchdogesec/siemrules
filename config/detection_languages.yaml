@@ -21,7 +21,7 @@ kql:
   description: "Kusto Query Language"
   products:
     - "Microsoft Sentinel"
-  documentation: ""
+  documentation: "https://learn.microsoft.com/en-us/kusto/query/?view=microsoft-fabric"
   created: 2020-01-01
   modified:  2020-01-01
   created_by: DOGESEC
@@ -36,7 +36,7 @@ elastic_dsl:
   products:
     - "Elastic"
     - "Elastic Security"
-  documentation: ""
+  documentation: "https://www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl.html"
   created: 2020-01-01
   modified:  2020-01-01
   created_by: DOGESEC
@@ -44,13 +44,13 @@ elastic_dsl:
 
 ## ===== Chronicle =====
 
-cdl:
+yara-l-2:
   type: "detection_language"
-  name: "Google Chronicle Detection Language (CDL)"
+  name: "YARA-L 2.0"
   description: ""
   products:
     - "Google Chronicle"
-  documentation: ""
+  documentation: "https://cloud.google.com/chronicle/docs/detection/yara-l-2-0-overview"
   created: 2020-01-01
   modified:  2020-01-01
   created_by: DOGESEC
@@ -61,7 +61,7 @@ cdl:
 sigma:
   type: "detection_language"
   name: "Sigma"
-  description: ""
+  description: "https://sigmahq.io/docs/basics/rules.html"
   products:
     -
   documentation: ""

@@ -6,43 +6,21 @@ We offer a fully hosted web version of SIEM Rules which includes many additional
 
 ## Overview
 
-An API that takes a txt file containing threat intelligence and turns it into a detection rule.
+An API that takes a file containing threat intelligence and turns it into a detection rule.
 
-## The problem
-
-To illustrate the problem, lets walk through the current status quo process a human goes through when going from idea (threat TTP) to detection rule:
-
-1. read and understand threat, maybe from a blog, report or open-source detection content
-  * problem: reports on the same threat can come from multiple sources making it hard to manually collate all relevant intel
-2. understand what logs or security data can be used to detect this threat, for example CloudTrail logs in this case, then understand all the field names, field values, how they are structured, how your logging pipeline structures them, etc.
-  * problem: TTPs often span many logs making it hard to ensure your detection rule has full coverage
-3.  convert the logic in step 1 into a detection rule (SQL/SPL/KQL, whatever) to search logs identified at step 2
-  * problem: it can be hard to convert what has been read into a logical detection rule (in a detection language you may not be familiar with)
-4. modify the detection rule based on new intelligence as it is discovered
-  * problem: this is usually overlooked as people create and forget about rules in their detection tools
-
-## The solution
-
-Use the AI knowledge of threat intelligence, logs, and detection rules to create and keep them updated.
-
-SIEM Rules allows a user to enter some threat intelligence as a file to considered be turned into a detection.
+## How it works
 
 1. User uploads files (Selects products in their stack)
-2. File converted to markdown by [file2txt](https://github.com/muchdogesec/file2txt)
-3. Based on user inputs, AI prompts structured and sent
-4. Rules converted into STIX objects
-5. Rules searchable via API
+2. The file is converted to txt (using [file2txt](https://github.com/muchdogesec/file2txt))
+3. User inputs processed by [txt2detection](https://github.com/muchdogesec/txt2detection)
+4. Objects stored in ArangoDB using [stix2arango](https://github.com/muchdogesec/stix2arango)
+5. Objects exposed via API
 
-Steps 2-3 are all captured in a concept of Jobs.
+Step 2 to 4 are tracked in a concept of a Job.
 
+## Storage of STIX objects in ArangoDB
 
-## AI Prompts
-
-1. Identify the key indicators or behaviors from the threat intelligence input provided
-2. Determine the relevant log sources and fields based on the types of products defined
-3. Write the query using the specified detection language
-4. Include appropriate filtering to reduce false positives
-5. Add comments to explain the logic of the detection
+On build of the app, a database should created in arango_db called `stixify` with 2 collections called `siemrules_vertex_collection` / `siemrules_edge_collection`
 
 ## API
 
@@ -82,6 +60,8 @@ The file mimetype will be validated before file is processed by the server. If m
 
 ```json
 {
+  "name": "<USED FOR STIX REPORT>",
+  "identity": "{<identity.json>}",
   "file": "<path to file>", // path to intel file
   "mode": "<value>", // file2txt setting (this is a secondary validation) // REQUIRED
   "defang": "<boolean>", // file2txt setting // OPTIONAL, DEFAULT IS TRUE
@@ -99,15 +79,22 @@ Will return a 200 response with job info
 {
     "jobs": [
         {
-            "id": "id",
-            "datetime_run": "<TIME STARTED>",
-            "file": "string",
-            "mode": "<mode>",
-            "mimetype": "string",
-            "file_size": "string",
-            "file_download_url": "string",
-            "defang": "<string>",
-            "state": "<state>"
+            "id": "<value>",
+            "report_id": "<value>",
+            "mode": "<value>",
+            "defang": "<boolean>",
+            "extract_text_from_image": "<boolean>",
+            "name": "<value>",
+            "tlp_level": "<value>",
+            "labels": ["<value1","value2"],
+            "identity": "{<identity.json>}",
+            "detection_language_id": "<ID>",
+            "product_ids": [
+              "<IDS>"
+            ],
+            "state": "<STATE>",
+            "run_datetime": "<START TIME>",
+            "info": "string"
         }
     ]
 }
@@ -121,31 +108,41 @@ GET HOST/api/VERSION/files/
 
 Accepts URL parameters
 
-* `report_id` (optional): search by report IDs
+* `report_id` (optional): search by Report ID generated from this file
+* `indicator_id` (optional): search using the Indicator ID from this file
+* `name` (optional): filter by name, is wildcard
 * `page_size` (max is 50, default is 50)
 * `page`
     * default is 0
 * `sort`:
-    * modified_ascending
-    * modified_descending (default)
-    * created_ascending
-    * created_descending
-    * name_ascending
-    * name_descending
-
-A 200 response returns
+    * `created_ascending`
+    * `created_descending` (default)
+    * `name_ascending`
+    * `name_descending`
 
 ```json
 {
-    "page_size": "<value>",
-    "page_number": "<value>",
-    "page_results_count": "<value>",
-    "total_results_count": "<value>",
-    "files": [
-        "MATCHING FILE RECORDS"
-    ]
+  "files": [    
+    {
+      "id": "<ID>",
+      "name": "<NAME>",
+      "job_id": "<JOB ID>",
+      "mimetype": "string",
+      "size_mb": "string",
+      "download_url": "string",
+    },
+    {
+      "id": "<ID>",
+      "name": "<NAME>",
+      "job_id": "<JOB ID>",
+      "mimetype": "string",
+      "size_mb": "string",
+      "download_url": "string",
+    }
+  ]
 }
 ```
+
 ##### GET File by ID
 
 ```shell
@@ -154,15 +151,169 @@ GET HOST/api/VERSION/files/{id}
 
 ```json
 {
-    "files": [
-        "FILE RECORD"
-    ]
+  "files": [    
+    {
+      "id": "<ID>",
+      "name": "<NAME>",
+      "job_id": "<JOB ID>",
+      "mimetype": "string",
+      "size_mb": "string",
+      "download_url": "string",
+    }
+  ]
 }
 ```
 
+##### DELETE a File By ID
 
+```shell
+DELETE HOST/api/VERSION/files/{id}
+```
 
+Will delete the file, and all detection rules / reports created from it.
 
+#### Detection Rules
+
+Files are processed into detection rules.
+
+##### GET Rules
+
+```shell
+GET <HOST>/api/v1/rules/
+```
+
+Returns all Indicator objects that match the criteria.
+
+Returns all Report objects that match the criteria.
+
+* `file_id` (optional): search by Report ID generated from this file
+* `report_id` (optional): search using the Indicator ID from this file
+* `name` (optional): filter by name, is wildcard
+* `tlp_level` (optional)
+* `created_by_ref` (optional)
+* `pattern_type` (optional): must be a valid detection_rule_id (use the detection rule endpoint to lookup)
+* `page_size` (max is 50, default is 50)
+* `page`
+    * default is 0
+* `sort`:
+    * `created_ascending`
+    * `created_descending` (default)
+    * `name_ascending`
+    * `name_descending`
+
+```json
+{
+  "rules": [
+    "<MATCHING INDICATOR OBJECTS>"
+  ]
+}
+```
+
+##### GET Rule by ID
+
+```shell
+GET <HOST>/api/v1/rules/indicator--ID
+```
+
+```json
+{
+  "rules": [
+    "<INDICATOR OBJECT>"
+  ]
+}
+```
+
+#### Reports
+
+Files are processed into detection rules.
+
+##### GET Reports
+
+```shell
+GET <HOST>/api/v1/reports/
+```
+
+Returns all Report objects that match the criteria.
+
+* `file_id` (optional): search by Report ID generated from this file
+* `indicator_id` (optional): search using the Indicator ID from this file
+* `name` (optional): filter by name, is wildcard
+* `tlp_level` (optional)
+* `labels` (optional)
+* `created_by_ref` (optional)
+* `page_size` (max is 50, default is 50)
+* `page`
+    * default is 0
+* `sort`:
+    * `created_ascending`
+    * `created_descending` (default)
+    * `name_ascending`
+    * `name_descending`
+
+```json
+{
+  "objects": [
+    "<REPORT OBJECTS>"
+  ]
+}
+```
+
+##### GET Reports by ID
+
+```shell
+GET <HOST>/api/v1/reports/report--id
+```
+
+Returns all Report objects that match the criteria.
+
+```json
+{
+  "objects": [
+    "<REPORT OBJECT>"
+  ]
+}
+```
+
+##### GET Report Images
+
+```shell
+GET <HOST>/api/v1/reports/report--id/images
+```
+
+```json
+{
+  "images": [
+    {
+      "name": "string",
+      "url": "string"
+    }
+  ]
+}
+```
+
+##### GET Report Markdown
+
+```shell
+GET <HOST>/api/v1/reports/report--id/markdown
+```
+
+Response is markdown only.
+
+##### GET Report Bundle
+
+```shell
+GET <HOST>/api/v1/reports/report--id/bundle
+```
+
+Returns all STIX objects (Report, Indicators, Marking Definitions, Identity)
+
+```json
+{
+  "objects": [
+    "<ALL OBJECTS>"
+  ]
+}
+```
 
 #### Products
 
@@ -175,6 +326,14 @@ All this data returned by this endpoint is sourced from `config/logs.yaml`. User
 ```shell
 GET <HOST>/api/v1/products/
 ```
+
+* `id` (optional): search is wildcard
+* `page_size` (max is 50, default is 50)
+* `page`
+    * default is 0
+* `sort`:
+    * `id_ascending`
+    * `id_descending` (default)
 
 ```json
 {
@@ -219,6 +378,14 @@ GET <HOST>/api/v1/products/:PRODUCT_ID
 ```shell
 GET <HOST>/api/v1/products/:PRODUCT_NAME/logs/
 ```
+
+* `id` (optional): search is wildcard
+* `page_size` (max is 50, default is 50)
+* `page`
+    * default is 0
+* `sort`:
+    * `id_ascending`
+    * `id_descending` (default)
 
 ```json
 {
@@ -296,6 +463,15 @@ All this data returned by this endpoint is sourced from `config/detection_langua
 GET <HOST>/api/v1/detection_languages/
 ```
 
+* `id` (optional): search is wildcard
+* `name` (optional): search is wildcard
+* `page_size` (max is 50, default is 50)
+* `page`
+    * default is 0
+* `sort`:
+    * `id_ascending`
+    * `id_descending` (default)
+
 ```json
 {
   "detection_languages": [
@@ -349,6 +525,103 @@ GET <HOST>/api/v1/detection_languages/:DETECTION_LANG_ID
       "version": "<VERSION>"
     }
   ]
+}
+```
+
+#### Jobs
+
+Jobs track the upload and processing of a file into STIX objects
+
+##### GET jobs
+
+```shell
+GET HOST/api/VERSION/jobs/
+```
+
+Accepts URL parameters:
+
+* `file_id`
+* `report_id`
+* `page_size` (max is 50, default is 50)
+* `page`
+    * default is 0
+* `sort`:
+    * run_datetime_ascending
+    * run_datetime_descending (default)
+    * state_ascending
+    * state_descending
+
+```json
+{
+    "jobs": [
+        {
+            "id": "<value>",
+            "report_id": "<value>",
+            "mode": "<value>",
+            "defang": "<boolean>",
+            "extract_text_from_image": "<boolean>",
+            "name": "<value>",
+            "tlp_level": "<value>",
+            "labels": ["<value1","value2"],
+            "identity": "{<identity.json>}",
+            "detection_language_id": "<ID>",
+            "product_ids": [
+              "<IDS>"
+            ],
+            "state": "<STATE>",
+            "run_datetime": "<START TIME>",
+            "info": "string"
+        },
+        {
+            "id": "<value>",
+            "report_id": "<value>",
+            "mode": "<value>",
+            "defang": "<boolean>",
+            "extract_text_from_image": "<boolean>",
+            "name": "<value>",
+            "tlp_level": "<value>",
+            "labels": ["<value1","value2"],
+            "identity": "{<identity.json>}",
+            "detection_language_id": "<ID>",
+            "product_ids": [
+              "<IDS>"
+            ],
+            "state": "<STATE>",
+            "run_datetime": "<START TIME>",
+            "info": "string"
+        }
+    ]
+}
+```
+
+##### GET job by ID
+
+```shell
+GET HOST/api/VERSION/jobs/{id}/
+```
+
+```json
+{
+    "jobs": [
+        {
+            "id": "<value>",
+            "report_id": "<value>",
+            "mode": "<value>",
+            "defang": "<boolean>",
+            "extract_text_from_image": "<boolean>",
+            "name": "<value>",
+            "tlp_level": "<value>",
+            "labels": ["<value1","value2"],
+            "identity": "{<identity.json>}",
+            "detection_language_id": "<ID>",
+            "product_ids": [
+              "<IDS>"
+            ],
+            "state": "<STATE>",
+            "run_datetime": "<START TIME>",
+            "info": "string"
+        }
+    ]
 }
 ```
 
