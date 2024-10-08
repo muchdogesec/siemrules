@@ -223,6 +223,14 @@ GET <HOST>/api/v1/rules/indicator--ID
 }
 ```
 
+##### GET Raw Rule by ID
+
+```shell
+GET <HOST>/api/v1/rules/indicator--ID/rule
+```
+
+Prints the raw text of the rule (what is in the Indicator `description` property)
+
 #### Reports
 
 Files are processed into detection rules.
