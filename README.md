@@ -213,6 +213,8 @@ Returns all Report objects that match the criteria.
 * `name` (optional): filter by name, is wildcard
 * `description` (optional): filter by description, is wildcard
 * `tlp_level` (optional)
+* `attack_id` (optional)
+* `cve_id` (optional)
 * `created_by_ref` (optional, list)
 * `page_size` (max is 50, default is 50)
 * `page`
