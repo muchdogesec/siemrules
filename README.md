@@ -184,7 +184,7 @@ Same as Stixify
 GET HOST/api/VERSION/files/objects
 ```
 
-Same as Stixify
+Only returns indicators.
 
 ##### DELETE a File By ID
 
@@ -205,8 +205,6 @@ GET <HOST>/api/v1/rules/
 ```
 
 Returns all Indicator objects that match the criteria.
-
-Returns all Report objects that match the criteria.
 
 * `file_id` (optional, list): search by Report ID generated from this file
 * `id` (optional): search using the Indicator ID from this file
@@ -239,6 +237,9 @@ Returns all Report objects that match the criteria.
 GET <HOST>/api/v1/rules/indicator--ID
 ```
 
+* `show_attack` (default is true), can be set to false to remove all relationship/objects related to attack
+* `show_cve` (default is true), can be set to false to remove all relationship/objects related to cve
+
 ```json
 {
   "rules": [
@@ -247,6 +248,8 @@ GET <HOST>/api/v1/rules/indicator--ID
 }
 ```
 
+Also returns all relationship objects and enriched objects (e.g. cve/attack)
+
 ##### GET Raw Rule by ID
 
 ```shell
@@ -254,6 +257,21 @@ GET <HOST>/api/v1/rules/indicator--ID/raw
 ```
 
 Prints the raw text of the rule (what is in the Indicator `pattern` property -- in text format, without JSON escapes)
+
+
+#### Objects (dogesec commons)
+
+##### `/api/v1/object/{object_id}/`
+
+##### `/api/v1/object/{object_id}/indicators`
+
+##### `/api/v1/objects/scos/`
+
+##### `/api/v1/objects/sdos/`
+
+##### `/api/v1/objects/smos/`
+
+##### `/api/v1/objects/sros/`
 
 #### Jobs
 
