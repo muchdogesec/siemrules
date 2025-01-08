@@ -266,7 +266,7 @@ GET HOST/api/VERSION/jobs/
 Accepts URL parameters:
 
 * `file_id`
-* `report_id`
+* `rule_id`
 * `page_size` (max is 50, default is 50)
 * `page`
     * default is 0
