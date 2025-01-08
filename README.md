@@ -198,6 +198,12 @@ Will delete the file, and all detection rules / markdown created from it.
 
 Files are processed into detection rules.
 
+##### POST Rules
+
+A user can manually add a Sigma Rule (in yml format), not associate with a threat report (file). This is processed using sigma2stix in `--mode sigmayaml`.
+
+Response will return a job id.
+
 ##### GET Rules
 
 ```shell
@@ -250,6 +256,21 @@ GET <HOST>/api/v1/rules/indicator--ID
 }
 ```
 
+##### GET Rule versions
+
+```shell
+GET <HOST>/api/v1/rules/indicator--ID/versions
+```
+
+```json
+{
+  "latest": "string",
+  "versions": [
+    "string"
+  ]
+}
+```
+
 ##### GET Raw Rule by ID
 
 ```shell
@@ -258,6 +279,26 @@ GET <HOST>/api/v1/rules/indicator--ID/raw
 
 Prints the raw text of the rule (what is in the Indicator `pattern` property -- in text format, without JSON escapes)
 
+#### Import existing Sigma rules
+
+##### Import external data
+
+```shell
+GET <HOST>/api/v1/import/<MODE>
+```
+
+* only mode in v1 is `sigma2stix`
+
+body contains
+
+```json
+{
+  "version": "string",
+  "ignore_embedded_relationships": "boolean"
+}
+```
+
+Response contains a job.
 
 #### Objects (dogesec commons)
 
@@ -287,6 +328,7 @@ Accepts URL parameters:
 
 * `file_id`
 * `rule_id`
+* `mode`
 * `page_size` (max is 50, default is 50)
 * `page`
     * default is 0
