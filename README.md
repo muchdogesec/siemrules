@@ -233,6 +233,8 @@ Returns all Indicator objects that match the criteria.
 
 ##### GET Rule by ID
 
+Also returns all relationship objects and enriched objects (e.g. cve/attack) over rules search endpoint
+
 ```shell
 GET <HOST>/api/v1/rules/indicator--ID
 ```
@@ -247,8 +249,6 @@ GET <HOST>/api/v1/rules/indicator--ID
   ]
 }
 ```
-
-Also returns all relationship objects and enriched objects (e.g. cve/attack)
 
 ##### GET Raw Rule by ID
 
