@@ -60,16 +60,20 @@ The file mimetype will be validated before file is processed by the server. If m
 
 ```json
 {
-  "name": "<USED FOR STIX REPORT>",
-  "identity": "{<identity.json>}",
+  "name": "<USED FOR STIX REPORT>", // txt2detection setting
+  "description": "USED FOR STIX REPORT>", // txt2detection setting
+  "identity": "{<identity.json>}", // txt2detection setting
+  "labels": ["value"], // txt2detection setting
+  "tlp_level": "<value>", // txt2detection setting
+  "created": "<value>", // txt2detection setting
   "file": "<path to file>", // path to intel file
   "mode": "<value>", // file2txt setting (this is a secondary validation) // REQUIRED
   "defang": "<boolean>", // file2txt setting // OPTIONAL, DEFAULT IS TRUE
-  "extract_text_from_image": "<boolean>" // file2txt setting // OPTIONAL, DEFAULT IS FALSE
+  "extract_text_from_image": "<boolean>", // file2txt setting // OPTIONAL, DEFAULT IS FALSE
+  "ai_provider": "<value>", // txt2detection setting // OPTIONAL, DEFAULT IS FALSE
+  "detection_language": "<value>"
 }
 ```
-
-All rules are stored as Sigma by default.
 
 Will return a 200 response with job info
 
@@ -83,13 +87,11 @@ Will return a 200 response with job info
             "defang": "<boolean>",
             "extract_text_from_image": "<boolean>",
             "name": "<value>",
+            "description": "<value>",
             "tlp_level": "<value>",
             "labels": ["<value1","value2"],
             "identity": "{<identity.json>}",
-            "detection_language_id": "<ID>",
-            "product_ids": [
-              "<IDS>"
-            ],
+            "detection_language": "<ID>",
             "state": "<STATE>",
             "run_datetime": "<START TIME>",
             "info": "string"
