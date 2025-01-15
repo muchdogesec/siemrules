@@ -281,27 +281,6 @@ GET <HOST>/api/v1/rules/indicator--ID/raw
 
 Prints the raw text of the rule (what is in the Indicator `pattern` property -- in text format, without JSON escapes)
 
-#### Import existing Sigma rules
-
-##### Import external data
-
-```shell
-GET <HOST>/api/v1/import/<MODE>
-```
-
-* only mode in v1 is `sigma2stix`
-
-body contains
-
-```json
-{
-  "version": "string",
-  "ignore_embedded_relationships": "boolean"
-}
-```
-
-Response contains a job.
-
 #### Objects (dogesec commons)
 
 ##### `/api/v1/object/{object_id}/`
