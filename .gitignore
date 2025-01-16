@@ -1,2 +1,7 @@
 
 .DS_Store
+env/
+.env
+__pycache__/
+var_www/
+requirements-local.txt
