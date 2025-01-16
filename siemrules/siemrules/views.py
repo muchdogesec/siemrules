@@ -23,20 +23,74 @@ from . import arangodb_helpers
 
 @extend_schema_view(
     create=extend_schema(
-        summary="upload a new file",
-        description="upload a new file",
+        summary="Upload a new File",
+        description=textwrap.dedent(
+            """
+            Upload a file to be processed by Stixify. During processing a file is turned into markdown by [file2txt](https://github.com/muchdogesec/file2txt/), which is then passed to [txt2stix](https://github.com/muchdogesec/txt2stix/) to .
+
+            The following key/values are accepted in the body of the request:
+
+            * `file` (required): Full path to the file to be converted. The mimetype of the file uploaded must match that expected by the `mode` selected. This is a file2txt setting.
+            * `report_id` (optional): Only pass a UUIDv4. It will be use to generate the STIX Report ID, e.g. `report--<UUID>`. If not passed, this file will be randomly generated. This is a txt2detection setting.
+            * `detection_language` (required): the detection language you want the rule to be written in. This is a txt2detection setting. Options are:
+                * `spl`: Splunk
+                * `kql`: Sentinel
+                * `elastic_dsl`: Elastic Security
+                * `yara-l-2`: Chronicle
+                * `sigma`: Sigma (recommended)
+            * `mode` (required): How the File should be processed. This is a file2txt setting. Options are:
+                * `txt`: Filetypes supported (mime-type): `txt` (`text/plain`)
+                * `image`: Filetypes supported (mime-type): `jpg` (`image/jpg`), `.jpeg` (`image/jpeg`), `.png` (`image/png`), `.webp` (`image/webp`)
+                * `csv`: Filetypes supported (mime-type): `csv` (`text/csv`)
+                * `html`: Filetypes supported (mime-type): `html` (`text/html`)
+                * `html_article`: same as `html` but only considers the article on the page, good for blog posts. Filetypes supported (mime-type): `html` (`text/html`)
+                * `word`: Filetypes supported (mime-type): `docx` (`application/vnd.openxmlformats-officedocument.wordprocessingml.document`), `doc` (`application/msword`)
+                * `pdf`: Filetypes supported (mime-type): `pdf` (`application/pdf`)
+                * `powerpoint`: Filetypes supported (mime-type): `ppt` (`application/vnd.ms-powerpoint`), `.jpeg` (`application/vnd.openxmlformats-officedocument.presentationml.presentation`)
+            * `name` (required): This will be used as the name value of the STIX Report object generated. This is a txt2detection setting.
+            * `identity` (optional): This will be used as the `created_by_ref` for all created SDOs and SROs. This is a full STIX Identity JSON. e.g. `{"type":"identity","spec_version":"2.1","id":"identity--b1ae1a15-6f4b-431e-b990-1b9678f35e15","name":"Dummy Identity"}`. If no value is passed, [the Stixify identity object will be used](https://raw.githubusercontent.com/muchdogesec/stix4doge/refs/heads/main/objects/identity/stixify.json). his is a txt2detection setting.
+            * `tlp_level` (optional): This will be assigned to all SDOs and SROs created. Stixify uses TLPv2. This is a txt2detection setting. Options are:
+                    * `red`
+                    * `amber+strict`
+                    * `amber`
+                    * `green`
+                    * `clear`
+            * `confidence` (optional): Will be added to the `confidence` value of the Report SDO created. A value between 0-100. `0` means confidence unknown. `1` is the lowest confidence score, `100` is the highest confidence score.
+            * `labels` (optional): Will be added to the `labels` of the Report SDO created.
+            * `defang` (default `true`): whether to defang the observables in the blog. e.g. turns `1.1.1[.]1` to `1.1.1.1` for extraction. This is a file2txt setting.
+            * `ai_provider` (default `true`):  An AI provider and model to be used for rule generation in format `provider:model` e.g. `openai:gpt-4o`. This is a txt2detection setting.
+
+            Files cannot be modified once uploaded. If you need to reprocess a file, you must upload it again.
+
+            The response will contain the Job information, including the Job `id`. This can be used with the GET Jobs by ID endpoint to monitor the status of the Job.
+            """
+        ),
     ),
     list=extend_schema(
-        summary="list files",
-        description="list files",
+        summary="Search and retrieve a list of uploaded Files",
+        description=textwrap.dedent(
+            """
+            This endpoint allows you to search for Files you've uploaded. This endpoint is particularly useful if you want to download the original File uploaded or find the Report object created for the uploaded File so you can retrieve the objects created for it.
+            """
+        ),
     ),
     destroy=extend_schema(
-        summary="delete a file",
-        description="delete a file",
+        summary="Delete a File by ID",
+        description=textwrap.dedent(
+            """
+            This endpoint will delete a File using its ID. It will also delete the markdown, images and original file stored for this File.
+
+            IMPORTANT: this request does NOT delete the Report SDO created from the file, or any other STIX objects created from this file during extractions. To delete these, use the delete report endpoint.
+            """
+        ),
     ),
     retrieve=extend_schema(
-        summary="get a file by id",
-        description="get a file by id",
+        summary="Get a File by ID",
+        description=textwrap.dedent(
+            """
+            This endpoint will return information for a specific File using its ID.
+            """
+        ),
     ),
     images=extend_schema(
             responses={200: ImageSerializer(many=True), 404: DEFAULT_404_ERROR, 400: DEFAULT_400_ERROR},
@@ -53,7 +107,7 @@ from . import arangodb_helpers
         summary="Get the processed markdown for a File",
         description=textwrap.dedent(
             """
-            Whan a file is uploaded it is converted to markdown using [file2txt](https://github.com/muchdogesec/file2txt/) which is subsequently used to make extractions from. This endpoint will return that output.
+            When a file is uploaded it is converted to markdown using [file2txt](https://github.com/muchdogesec/file2txt/) which is subsequently used to make extractions from. This endpoint will return that output.
             
             This endpoint is useful for debugging issues in extractions when you think there could be an issue with the content being passed to the extractors.
             """
@@ -119,12 +173,20 @@ class FileView(mixins.ListModelMixin, mixins.DestroyModelMixin, mixins.RetrieveM
 
 @extend_schema_view(
     list=extend_schema(
-        summary="list jobs",
-        description="list jobs",
+        summary="Search and retrieve Jobs",
+        description=textwrap.dedent(
+            """
+            Jobs track the status of File upload, conversion of the File into markdown and the extraction of the data from the text. For every new File added a job will be created. The `id` of a Job is printed in the POST responses, but you can use this endpoint to search for the `id` again, if required.
+            """
+        ),
     ),
     retrieve=extend_schema(
-        summary="get a job by id",
-        description="get a job by id",
+        summary="Get a Job by ID",
+        description=textwrap.dedent(
+            """
+            Using a Job ID you can retrieve information about its state via this endpoint. This is useful to see if a Job is still processing, if an error has occurred (and at what stage), or if it has completed.
+            """
+        ),
     ),
 )
 class JobView(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.GenericViewSet):
@@ -144,8 +206,14 @@ class JobView(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.Generic
     
 @extend_schema_view(
     list=extend_schema(
-        summary="list rules",
-        description="list rules",
+        summary="Search and retrieve created Rules",
+        description=textwrap.dedent(
+            """
+            When a file has been processed, 0 or more reports will be created.
+
+            You can use this endpoint to retrieve them.
+            """
+        ),
     ),
     retrieve=extend_schema(
         summary="get a rule by indicator id",
