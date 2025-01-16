@@ -207,7 +207,8 @@ SPECTACULAR_SETTINGS = {
     "TITLE": "SIEM Rules API",
     "DESCRIPTION": dedent(
         """
-        SIEMRules
+        SIEM Rules takes reports containing threat intelligence and turns them into detection rules.\n\n
+        [DOGESEC](https://www.dogesec.com/) offer a fully hosted web version of SIEM Rules which includes many additional features over those in this codebase. [You can find out more about the web version here](https://www.siemrules.com/)
         """
     ),
     "VERSION": "1.0.0",
