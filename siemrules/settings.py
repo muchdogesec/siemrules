@@ -222,7 +222,8 @@ SPECTACULAR_SETTINGS = {
         {"name": "Jobs", "description": "Check the status of data retrieval from files"},
         {"name": "Objects", "description": "Search through STIX object extracted from reports"},
     ],
-    'COMPONENT_SPLIT_REQUEST': True
+    'COMPONENT_SPLIT_REQUEST': True,
+    'ENUM_GENERATE_CHOICE_DESCRIPTION': False,
 }
 
 STIX_NAMESPACE = uuid.UUID("8ef05850-cb0d-51f7-80be-50e4376dbe63")
