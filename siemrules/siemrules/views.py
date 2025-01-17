@@ -73,6 +73,7 @@ from . import arangodb_helpers
             This endpoint allows you to search for Files you've uploaded. This endpoint is particularly useful if you want to download the original File uploaded or find the Report object created for the uploaded File so you can retrieve the objects created for it.
             """
         ),
+        responses={200: FileSerializer, 400: DEFAULT_400_ERROR}
     ),
     destroy=extend_schema(
         summary="Delete a File by ID",
@@ -137,7 +138,7 @@ class FileView(mixins.ListModelMixin, mixins.DestroyModelMixin, mixins.RetrieveM
         tlp_level = ChoiceFilter(help_text="Filter the files by the TLP level selected at input.", choices=arangodb_helpers.TLP_Levels.choices)
         created_by_ref = BaseInFilter(help_text="Filter the result by only the Files created by this identity. Pass the full STIX ID of the Identity object, e.g. `identity--b1ae1a15-6f4b-431e-b990-1b9678f35e15`.")
             
-    @extend_schema(responses={200: serializers.JobSerializer}, request=serializers.FileSerializer)
+    @extend_schema(responses={200: serializers.JobSerializer, 400: DEFAULT_400_ERROR}, request=serializers.FileSerializer)
     def create(self, request, *args, **kwargs):
         serializer = FileSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -179,6 +180,7 @@ class FileView(mixins.ListModelMixin, mixins.DestroyModelMixin, mixins.RetrieveM
             Jobs track the status of File upload, conversion of the File into markdown and the extraction of the data from the text. For every new File added a job will be created. The `id` of a Job is printed in the POST responses, but you can use this endpoint to search for the `id` again, if required.
             """
         ),
+        responses={200: JobSerializer, 400: DEFAULT_400_ERROR}
     ),
     retrieve=extend_schema(
         summary="Get a Job by ID",
@@ -214,6 +216,7 @@ class JobView(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.Generic
             You can use this endpoint to retrieve them.
             """
         ),
+        responses={200: serializers.RuleSerializer, 400: DEFAULT_400_ERROR}
     ),
     retrieve=extend_schema(
         summary="Get a Rule by ID",
