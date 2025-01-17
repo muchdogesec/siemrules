@@ -26,7 +26,7 @@ from . import arangodb_helpers
         summary="Upload a new File",
         description=textwrap.dedent(
             """
-            Upload a file to be processed by Stixify. During processing a file is turned into markdown by [file2txt](https://github.com/muchdogesec/file2txt/), which is then passed to [txt2stix](https://github.com/muchdogesec/txt2stix/) to .
+            Upload a file to be processed by SIEM Rules During processing a file is turned into markdown by [file2txt](https://github.com/muchdogesec/file2txt/), which is then passed to [txt2stix](https://github.com/muchdogesec/txt2stix/) to .
 
             The following key/values are accepted in the body of the request:
 
@@ -132,10 +132,10 @@ class FileView(mixins.ListModelMixin, mixins.DestroyModelMixin, mixins.RetrieveM
     
 
     class filterset_class(FilterSet):
-        report_id = BaseInFilter(help_text="(list): search by Report ID generated from this file")
-        name = CharFilter(help_text="filter by name, is wildcard")
-        tlp_level = ChoiceFilter(help_text="", choices=arangodb_helpers.TLP_Levels.choices)
-        created_by_ref = BaseInFilter(help_text="")
+        report_id = BaseInFilter(help_text="Filter the results by the STIX Report ID generated for this File. Pass the full STIX ID, e.g. `report--3fa85f64-5717-4562-b3fc-2c963f66afa6`.")
+        name = CharFilter(help_text="Filter by the name of the File (entered on input). Search is wildcard so `exploit` will match `exploited`, `exploits`, etc.")
+        tlp_level = ChoiceFilter(help_text="Filter the files by the TLP level selected at input.", choices=arangodb_helpers.TLP_Levels.choices)
+        created_by_ref = BaseInFilter(help_text="Filter the result by only the Files created by this identity. Pass the full STIX ID of the Identity object, e.g. `identity--b1ae1a15-6f4b-431e-b990-1b9678f35e15`.")
             
     @extend_schema(responses={200: serializers.JobSerializer}, request=serializers.FileSerializer)
     def create(self, request, *args, **kwargs):
@@ -209,15 +209,21 @@ class JobView(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.Generic
         summary="Search and retrieve created Rules",
         description=textwrap.dedent(
             """
-            When a file has been processed, 0 or more reports will be created.
+            During processing, txt2detection identifies detection rules from the intelligence described in the content.
 
             You can use this endpoint to retrieve them.
             """
         ),
     ),
     retrieve=extend_schema(
-        summary="get a rule by indicator id",
-        description="get a rule by indicator id",
+        summary="Get a Rule by ID",
+        description=textwrap.dedent(
+            """
+            Use this endpoint to retrieve a rule using its ID.
+
+            If you do not know the ID of the Rule you can use the Search and retrieve created Rules endpoint.
+            """
+        ),
     ),
 )
 class RuleView(viewsets.GenericViewSet):
@@ -228,18 +234,18 @@ class RuleView(viewsets.GenericViewSet):
 
     openapi_path_params = [
         OpenApiParameter(
-            lookup_url_kwarg, location=OpenApiParameter.PATH, type=dict(pattern=r'^indicator--[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'), description="The `id` of the Report. e.g. `report--3fa85f64-5717-4562-b3fc-2c963f66afa6`.",
+            lookup_url_kwarg, location=OpenApiParameter.PATH, type=dict(pattern=r'^indicator--[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'), description="The `id` of the Indicator. e.g. `indicator--3fa85f64-5717-4562-b3fc-2c963f66afa6`.",
         )
     ]
 
     class filterset_class(FilterSet):
         file_id = BaseInFilter(help_text="(list): search by Report ID generated from this file")
         indicator_id = BaseInFilter(help_text="(list): search using the Indicator ID for this rule")
-        name = CharFilter(help_text="filter by name, is wildcard")
+        name = CharFilter(help_text="Filter by the name of the Rule (automatically created by the AI). Search is wildcard so `exploit` will match `exploited`, `exploits`, etc.")
         tlp_level = ChoiceFilter(help_text="", choices=arangodb_helpers.TLP_Levels.choices)
         attack_id = BaseInFilter(help_text="only show rules that reference these attack ids")
-        cve_id = BaseInFilter(help_text="only show rules that reference these cve ids")
-        created_by_ref = BaseInFilter(help_text="Filter the result by only the reports created by this identity. Pass in the format `identity--b1ae1a15-6f4b-431e-b990-1b9678f35e15`")
+        cve_id = BaseInFilter(help_text="Filter the results return rules linked to a particular CVE. Pass the full CVE ID, e.g. `CVE-2024-28374`")
+        created_by_ref = BaseInFilter(help_text="Filter the result by only the reports created by this identity. Pass the full STIX ID of the Identity object, e.g. `identity--b1ae1a15-6f4b-431e-b990-1b9678f35e15`")
 
     def list(self, request, *args, **kwargs):
         return arangodb_helpers.get_rules(request)

@@ -66,7 +66,7 @@ def validate_file(file: InMemoryUploadedFile, mode: str):
 
 class File(models.Model):
     id = models.UUIDField(unique=True, max_length=64, primary_key=True, default=uuid.uuid4)
-    name = models.CharField(max_length=256)
+    name = models.CharField(max_length=256, help_text="This will be assigned to the File and Report object created. Note, the names of each detection rule generated will be automatic. Max 256 characters. This is a txt2detection setting.")
     description = models.TextField()
     identity = models.JSONField(default=default_identity, validators=[validate_identity])
     labels = ArrayField(base_field=models.CharField(max_length=256), default=list)
@@ -74,7 +74,7 @@ class File(models.Model):
     file = models.FileField(max_length=1024, upload_to=upload_to_func)
     mimetype = models.CharField(max_length=512)
     mode = models.CharField(max_length=256)
-    defang = models.BooleanField(default=True)
+    defang = models.BooleanField(default=True, help_text="Whether to defang the observables in the blog. e.g. turns 1.1.1[.]1 to 1.1.1.1 for extraction. This is a file2txt setting. This is a file2txt setting. Default is `true`.")
     extract_text_from_image = models.BooleanField(default=True)
     ai_provider = models.CharField(max_length=256)
     detection_language = models.CharField(max_length=256)
