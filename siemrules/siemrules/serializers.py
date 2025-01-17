@@ -1,9 +1,9 @@
 from rest_framework import serializers, validators
-from .models import File, Job, FileImage, TLP_Levels
-from drf_spectacular.utils import extend_schema_field, extend_schema_serializer
+from siemrules.siemrules.models import File, Job, FileImage, TLP_Levels
+from drf_spectacular.utils import extend_schema_field
 from txt2detection.utils import load_detection_languages
 import file2txt.parsers.core as f2t_core
-from txt2detection.utils import validate_token_count, parse_model as parse_ai_model
+from txt2detection.utils import parse_model as parse_ai_model
 
 DETECTION_LANGUAGES = [(k, v.name) for k, v in load_detection_languages().items()]
 

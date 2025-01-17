@@ -12,15 +12,11 @@ from django.core.files.uploadedfile import InMemoryUploadedFile
 import stix2
 # from file2txt.parsers.core import BaseParser
 # from dogesec_commons.stixifier.models import Profile
-from .arangodb_helpers import remove_report
 
 # Create your models here.
 
 def validate_extractor(types, name):
     pass
-
-
-
 
 class TLP_Levels(models.TextChoices):
     RED = "red"
@@ -99,6 +95,7 @@ class File(models.Model):
 
 @receiver(post_delete, sender=File)
 def remove_reports_on_delete(sender, instance: File, **kwargs):
+    from .reports import remove_report
     remove_report(instance.report_id)
 
 

@@ -2,55 +2,18 @@ from rest_framework import request
 from django.http import HttpRequest
 from django.conf import settings
 import typing
-from django.db.models import TextChoices
 
 if typing.TYPE_CHECKING:
     from .. import settings
 
-
-import typing
+from siemrules.siemrules.reports import fix_report_id
+from siemrules.siemrules.models import TLP_LEVEL_STIX_ID_MAPPING
 from dogesec_commons.objects.helpers import ArangoDBHelper
 
 if typing.TYPE_CHECKING:
     from siemrules import settings
 
 
-def fix_report_id(report_id: str):
-    if report_id.startswith('report--'):
-        return report_id
-    return "report--"+report_id
-
-def remove_report(report_id: str):
-    helper = ArangoDBHelper(settings.VIEW_NAME, request.Request(HttpRequest()))
-    report_id = fix_report_id(report_id)
-    bind_vars = {
-            "@collection": helper.collection,
-            'report_id': report_id,
-    }
-    query = """
-        FOR doc in @@collection
-        FILTER doc._stixify_report_id == @report_id
-        RETURN doc._id
-    """
-    collections: dict[str, list] = {}
-    out = helper.execute_query(query, bind_vars=bind_vars, paginate=False)
-    for key in out:
-        collection, key = key.split('/', 2)
-        collections[collection] = collections.get(collection, [])
-        collections[collection].append(key)
-
-    deletion_query = """
-        FOR _key in @objects
-        REMOVE {_key} IN @@collection
-        RETURN _key
-    """
-
-    for collection, objects in collections.items():
-        bind_vars = {
-            "@collection": collection,
-            "objects": objects,
-        }
-        helper.execute_query(deletion_query, bind_vars, paginate=False)
 
 RULES_SORT_FIELDS = [
     "created_ascending",
@@ -58,19 +21,7 @@ RULES_SORT_FIELDS = [
     "name_ascending",
     "name_descending",
 ]
-class TLP_Levels(TextChoices):
-    RED = "red"
-    AMBER_STRICT = "amber+strict"
-    AMBER = "amber"
-    GREEN = "green"
-    CLEAR = "clear"
-TLP_LEVEL_STIX_ID_MAPPING = {
-    TLP_Levels.RED: "marking-definition--e828b379-4e03-4974-9ac4-e53a884c97c1",
-    TLP_Levels.CLEAR: "marking-definition--94868c89-83c2-464b-929b-a1a8aa3c8487",
-    TLP_Levels.GREEN: "marking-definition--bab4a63c-aed9-4cf5-a766-dfca5abac2bb",
-    TLP_Levels.AMBER: "marking-definition--55d920b0-5e8b-4f79-9ee9-91f868d9b421",
-    TLP_Levels.AMBER_STRICT: "marking-definition--939a9414-2ddd-4d32-a0cd-375ea402b003",
-}
+
 def get_rules(request):
     helper = ArangoDBHelper(settings.VIEW_NAME, request, result_key="rules")
     binds = {}

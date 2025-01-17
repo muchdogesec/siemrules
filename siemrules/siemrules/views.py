@@ -1,25 +1,22 @@
-from django.shortcuts import render
 
 from rest_framework import viewsets, parsers, decorators, mixins
-from . import models
-from .import serializers
-from .serializers import FileSerializer, ImageSerializer, JobSerializer
-from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter, OpenApiExample
-from drf_spectacular.types import OpenApiTypes
+from siemrules.siemrules import models
+from siemrules.siemrules import serializers
+from siemrules.siemrules.serializers import FileSerializer, ImageSerializer, JobSerializer
+from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter
 import textwrap
 import typing
 from dogesec_commons.utils import Pagination, Ordering
-from .md_helper import MarkdownImageReplacer, mistune
+from siemrules.siemrules.md_helper import MarkdownImageReplacer, mistune
 from siemrules.worker import tasks
 from rest_framework.response import Response
-from django_filters.rest_framework import FilterSet, Filter, DjangoFilterBackend, ChoiceFilter, CharFilter, BooleanFilter, MultipleChoiceFilter, NumberFilter, NumericRangeFilter, DateTimeFilter, BaseInFilter, BaseCSVFilter
-
+from django_filters.rest_framework import FilterSet, DjangoFilterBackend, ChoiceFilter, CharFilter, BaseInFilter
 
 from siemrules.siemrules.autoschema import DEFAULT_400_ERROR, DEFAULT_404_ERROR
 if typing.TYPE_CHECKING:
     from siemrules import settings
-from django.http import FileResponse, HttpRequest, HttpResponseNotFound
-from . import arangodb_helpers
+from django.http import FileResponse, HttpResponseNotFound
+from siemrules.siemrules import arangodb_helpers
 
 @extend_schema_view(
     create=extend_schema(
