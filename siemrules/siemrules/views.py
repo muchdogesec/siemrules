@@ -35,15 +35,7 @@ from siemrules.siemrules import arangodb_helpers
                 * `elastic_dsl`: Elastic Security
                 * `yara-l-2`: Chronicle
                 * `sigma`: Sigma (recommended)
-            * `mode` (required): How the File should be processed. This is a file2txt setting. Options are:
-                * `txt`: Filetypes supported (mime-type): `txt` (`text/plain`)
-                * `image`: Filetypes supported (mime-type): `jpg` (`image/jpg`), `.jpeg` (`image/jpeg`), `.png` (`image/png`), `.webp` (`image/webp`)
-                * `csv`: Filetypes supported (mime-type): `csv` (`text/csv`)
-                * `html`: Filetypes supported (mime-type): `html` (`text/html`)
-                * `html_article`: same as `html` but only considers the article on the page, good for blog posts. Filetypes supported (mime-type): `html` (`text/html`)
-                * `word`: Filetypes supported (mime-type): `docx` (`application/vnd.openxmlformats-officedocument.wordprocessingml.document`), `doc` (`application/msword`)
-                * `pdf`: Filetypes supported (mime-type): `pdf` (`application/pdf`)
-                * `powerpoint`: Filetypes supported (mime-type): `ppt` (`application/vnd.ms-powerpoint`), `.jpeg` (`application/vnd.openxmlformats-officedocument.presentationml.presentation`)
+
             * `name` (required): This will be used as the name value of the STIX Report object generated. This is a txt2detection setting.
             * `identity` (optional): This will be used as the `created_by_ref` for all created SDOs and SROs. This is a full STIX Identity JSON. e.g. `{"type":"identity","spec_version":"2.1","id":"identity--b1ae1a15-6f4b-431e-b990-1b9678f35e15","name":"Dummy Identity"}`. If no value is passed, [the Stixify identity object will be used](https://raw.githubusercontent.com/muchdogesec/stix4doge/refs/heads/main/objects/identity/stixify.json). his is a txt2detection setting.
             * `tlp_level` (optional): This will be assigned to all SDOs and SROs created. Stixify uses TLPv2. This is a txt2detection setting. Options are:
@@ -199,8 +191,7 @@ class JobView(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.Generic
     lookup_url_kwarg = 'job_id'    
 
     class filterset_class(FilterSet):
-        file_id = BaseInFilter(help_text="(list): search jobs by file's id")
-
+        file_id = BaseInFilter(help_text="Filter the result by the ID of the File the Job was created from, e.g. `2632fd7a-ae33-4d35-9652-425e488c97af`.")
     filter_backends = [DjangoFilterBackend, Ordering]
     ordering_fields = ["run_datetime", "state"]
     ordering = "run_datetime_descending"
@@ -244,13 +235,14 @@ class RuleView(viewsets.GenericViewSet):
     ]
 
     class filterset_class(FilterSet):
-        file_id = BaseInFilter(help_text="(list): search by Report ID generated from this file")
-        indicator_id = BaseInFilter(help_text="(list): search using the Indicator ID for this rule")
+        file_id = BaseInFilter(help_text="Filter the result by the ID of the File, e.g. `2632fd7a-ae33-4d35-9652-425e488c97af`.")
+        indicator_id = BaseInFilter(help_text="Filter the result by the ID of the Rule. Pass the full STIX ID of the Indicator object, e.g. `indicator--3fa85f64-5717-4562-b3fc-2c963f66afa6`.")
         name = CharFilter(help_text="Filter by the name of the Rule (automatically created by the AI). Search is wildcard so `exploit` will match `exploited`, `exploits`, etc.")
-        tlp_level = ChoiceFilter(help_text="", choices=models.TLP_Levels.choices)
-        attack_id = BaseInFilter(help_text="only show rules that reference these attack ids")
-        cve_id = BaseInFilter(help_text="Filter the results return rules linked to a particular CVE. Pass the full CVE ID, e.g. `CVE-2024-28374`")
-        created_by_ref = BaseInFilter(help_text="Filter the result by only the reports created by this identity. Pass the full STIX ID of the Identity object, e.g. `identity--b1ae1a15-6f4b-431e-b990-1b9678f35e15`")
+        tlp_level = ChoiceFilter(help_text="Filter the Rules by the TLP level of the File they were generated from.", choices=arangodb_helpers.TLP_Levels.choices)
+        attack_id = BaseInFilter(help_text="Filter the results return rules linked to a particular ATT&CK Technique. Pass the full ATT&CK ID, e.g. `T1047`.")
+        cve_id = BaseInFilter(help_text="Filter the results return rules linked to a particular CVE. Pass the full CVE ID, e.g. `CVE-2024-28374`.")
+        created_by_ref = BaseInFilter(help_text="Filter the result by only the reports created by this identity. Pass the full STIX ID of the Identity object, e.g. `identity--b1ae1a15-6f4b-431e-b990-1b9678f35e15`.")
+
 
     def list(self, request, *args, **kwargs):
         return arangodb_helpers.get_rules(request)
