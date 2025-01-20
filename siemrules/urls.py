@@ -21,6 +21,15 @@ from .siemrules import views, reports
 from drf_spectacular.views import SpectacularAPIView, SpectacularRedocView, SpectacularSwaggerView
 from dogesec_commons.objects import views as arango_views
 
+
+from django.http import JsonResponse
+def handler404(*args, **kwargs):
+    return JsonResponse(dict(code=404, message='non-existent page'), status=404)
+
+def handler500(*args, **kwargs):
+    return JsonResponse(dict(code=500, message='internal server error'), status=500)
+
+
 router = routers.SimpleRouter()
 router.register('files', views.FileView, 'files')
 router.register('jobs', views.JobView, 'jobs')

@@ -1,6 +1,6 @@
 
 from rest_framework import viewsets, parsers, decorators, mixins
-from siemrules.siemrules import models
+from siemrules.siemrules import models, reports
 from siemrules.siemrules import serializers
 from siemrules.siemrules.serializers import FileSerializer, ImageSerializer, JobSerializer
 from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter
@@ -130,10 +130,14 @@ class FileView(mixins.ListModelMixin, mixins.DestroyModelMixin, mixins.RetrieveM
     
 
     class filterset_class(FilterSet):
-        report_id = BaseInFilter(help_text="Filter the results by the STIX Report ID generated for this File. Pass the full STIX ID, e.g. `report--3fa85f64-5717-4562-b3fc-2c963f66afa6`.")
+        report_id = BaseInFilter(method='filter_report_id', help_text="Filter the results by the STIX Report ID generated for this File. Pass the full STIX ID, e.g. `report--3fa85f64-5717-4562-b3fc-2c963f66afa6`.")
         name = CharFilter(help_text="Filter by the name of the File (entered on input). Search is wildcard so `exploit` will match `exploited`, `exploits`, etc.")
-        tlp_level = ChoiceFilter(help_text="Filter the files by the TLP level selected at input.", choices=arangodb_helpers.TLP_Levels.choices)
-        created_by_ref = BaseInFilter(help_text="Filter the result by only the Files created by this identity. Pass the full STIX ID of the Identity object, e.g. `identity--b1ae1a15-6f4b-431e-b990-1b9678f35e15`.")
+        tlp_level = ChoiceFilter(help_text="Filter the files by the TLP level selected at input.", choices=models.TLP_Levels.choices)
+        created_by_ref = BaseInFilter('identity__id', help_text="Filter the result by only the Files created by this identity. Pass the full STIX ID of the Identity object, e.g. `identity--b1ae1a15-6f4b-431e-b990-1b9678f35e15`.")
+        
+        def filter_report_id(self, qs, field_name, value: str):
+            file_id = [reports.report_id_as_id(v) for v in value]
+            return qs.filter(pk__in=file_id)
             
     @extend_schema(responses={200: serializers.JobSerializer, 400: DEFAULT_400_ERROR}, request=serializers.FileSerializer)
     def create(self, request, *args, **kwargs):
@@ -224,6 +228,7 @@ class JobView(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.Generic
             If you do not know the ID of the Rule you can use the Search and retrieve created Rules endpoint.
             """
         ),
+        responses={200: serializers.RuleSerializer(many=True)}
     ),
 )
 class RuleView(viewsets.GenericViewSet):
@@ -242,7 +247,7 @@ class RuleView(viewsets.GenericViewSet):
         file_id = BaseInFilter(help_text="(list): search by Report ID generated from this file")
         indicator_id = BaseInFilter(help_text="(list): search using the Indicator ID for this rule")
         name = CharFilter(help_text="Filter by the name of the Rule (automatically created by the AI). Search is wildcard so `exploit` will match `exploited`, `exploits`, etc.")
-        tlp_level = ChoiceFilter(help_text="", choices=arangodb_helpers.TLP_Levels.choices)
+        tlp_level = ChoiceFilter(help_text="", choices=models.TLP_Levels.choices)
         attack_id = BaseInFilter(help_text="only show rules that reference these attack ids")
         cve_id = BaseInFilter(help_text="Filter the results return rules linked to a particular CVE. Pass the full CVE ID, e.g. `CVE-2024-28374`")
         created_by_ref = BaseInFilter(help_text="Filter the result by only the reports created by this identity. Pass the full STIX ID of the Identity object, e.g. `identity--b1ae1a15-6f4b-431e-b990-1b9678f35e15`")

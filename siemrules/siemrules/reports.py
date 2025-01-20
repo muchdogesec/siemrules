@@ -40,6 +40,9 @@ def fix_report_id(report_id: str):
         return report_id
     return "report--"+report_id
 
+def report_id_as_id(report_id):
+    return ReportView.validate_report_id(report_id).removeprefix('report--')
+
 def remove_report(report_id: str):
     helper = ArangoDBHelper(settings.VIEW_NAME, request.Request(HttpRequest()))
     report_id = fix_report_id(report_id)
