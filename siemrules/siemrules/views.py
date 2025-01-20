@@ -238,7 +238,7 @@ class RuleView(viewsets.GenericViewSet):
         file_id = BaseInFilter(help_text="Filter the result by the ID of the File, e.g. `2632fd7a-ae33-4d35-9652-425e488c97af`.")
         indicator_id = BaseInFilter(help_text="Filter the result by the ID of the Rule. Pass the full STIX ID of the Indicator object, e.g. `indicator--3fa85f64-5717-4562-b3fc-2c963f66afa6`.")
         name = CharFilter(help_text="Filter by the name of the Rule (automatically created by the AI). Search is wildcard so `exploit` will match `exploited`, `exploits`, etc.")
-        tlp_level = ChoiceFilter(help_text="Filter the Rules by the TLP level of the File they were generated from.", choices=arangodb_helpers.TLP_Levels.choices)
+        tlp_level = ChoiceFilter(help_text="Filter the Rules by the TLP level of the File they were generated from.", choices=models.TLP_Levels.choices)
         attack_id = BaseInFilter(help_text="Filter the results return rules linked to a particular ATT&CK Technique. Pass the full ATT&CK ID, e.g. `T1047`.")
         cve_id = BaseInFilter(help_text="Filter the results return rules linked to a particular CVE. Pass the full CVE ID, e.g. `CVE-2024-28374`.")
         created_by_ref = BaseInFilter(help_text="Filter the result by only the reports created by this identity. Pass the full STIX ID of the Identity object, e.g. `identity--b1ae1a15-6f4b-431e-b990-1b9678f35e15`.")
