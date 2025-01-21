@@ -179,7 +179,7 @@ class JobView(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.Generic
         summary="Search and retrieve created Rules",
         description=textwrap.dedent(
             """
-            During processing, txt2detection identifies detection rules from the intelligence described in the content.
+            During processing, txt2detection identifies detection rules from the intelligence described in the content. Each rule identified is converted into a STIX 2.1 Indicator object containing the rule.
 
             You can use this endpoint to retrieve them.
             """
@@ -190,7 +190,7 @@ class JobView(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.Generic
         summary="Get a Rule by ID",
         description=textwrap.dedent(
             """
-            Use this endpoint to retrieve a rule using its ID.
+            Use this endpoint to retrieve a rule using its STIX Indicator ID.
 
             If you do not know the ID of the Rule you can use the Search and retrieve created Rules endpoint.
             """

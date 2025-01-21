@@ -78,18 +78,22 @@ def remove_report(report_id: str):
 
 @extend_schema_view(
     list=extend_schema(
-        summary="Search for Report objects created from Files",
+        summary="Search for retrieve created Reports",
         description=textwrap.dedent(
             """
-            Search for Report objects created from Files
+            During processing, txt2detection creates a STIX Report object to represent the file uploaded. The Report object contains the text the report, and also references all the Rules (STIX Indicator Objects) created from it based on the intelligence it contains.
+
+            You can use this endpoint to retrieve them.
             """
         ),
     ),
     retrieve=extend_schema(
-        summary="Get a Report object using its ID",
+        summary="Get a Report by ID",
         description=textwrap.dedent(
             """
-            Get a Report object using its ID
+            Use this endpoint to retrieve a Report using its ID.
+
+            If you do not know the ID of the Report you can use the Search and retrieve Reports endpoint to find it.
             """
         ),
     ),
@@ -97,7 +101,7 @@ def remove_report(report_id: str):
         summary="Get all objects linked to a Report ID",
         description=textwrap.dedent(
             """
-            This endpoint returns all STIX objects that were extracted and created for the File linked to this report.
+            This endpoint returns all STIX objects that are linked to the report. This includes the Report itself, the Rules created from it, MITRE ATT&CK, and NVD CVE objects, as well as the STIX Relationship objects that link them.
             """
         ),
     ),
@@ -105,7 +109,7 @@ def remove_report(report_id: str):
         summary="Delete all STIX objects for a Report ID",
         description=textwrap.dedent(
             """
-            This endpoint will delete a Report using its ID. It will also delete all the STIX objects extracted from the Report.
+            This endpoint will delete a Report using its ID. It will also delete all the STIX objects (Rules) extracted from the Report.
 
             IMPORTANT: this request does NOT delete the file this Report was generated from. To delete the file, use the delete file endpoint.
             """
