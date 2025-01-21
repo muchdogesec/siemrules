@@ -5,3 +5,5 @@ env/
 __pycache__/
 var_www/
 requirements-local.txt
+.hypothesis
+siemrules-venv

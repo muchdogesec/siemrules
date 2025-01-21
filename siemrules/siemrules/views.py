@@ -25,30 +25,6 @@ from siemrules.siemrules import arangodb_helpers
             """
             Upload a file to be processed by SIEM Rules During processing a file is turned into markdown by [file2txt](https://github.com/muchdogesec/file2txt/), which is then passed to [txt2stix](https://github.com/muchdogesec/txt2stix/) to .
 
-            The following key/values are accepted in the body of the request:
-
-            * `file` (required): Full path to the file to be converted. The mimetype of the file uploaded must match that expected by the `mode` selected. This is a file2txt setting.
-            * `report_id` (optional): Only pass a UUIDv4. It will be use to generate the STIX Report ID, e.g. `report--<UUID>`. If not passed, this file will be randomly generated. This is a txt2detection setting.
-            * `detection_language` (required): the detection language you want the rule to be written in. This is a txt2detection setting. Options are:
-                * `spl`: Splunk
-                * `kql`: Sentinel
-                * `elastic_dsl`: Elastic Security
-                * `yara-l-2`: Chronicle
-                * `sigma`: Sigma (recommended)
-
-            * `name` (required): This will be used as the name value of the STIX Report object generated. This is a txt2detection setting.
-            * `identity` (optional): This will be used as the `created_by_ref` for all created SDOs and SROs. This is a full STIX Identity JSON. e.g. `{"type":"identity","spec_version":"2.1","id":"identity--b1ae1a15-6f4b-431e-b990-1b9678f35e15","name":"Dummy Identity"}`. If no value is passed, [the Stixify identity object will be used](https://raw.githubusercontent.com/muchdogesec/stix4doge/refs/heads/main/objects/identity/stixify.json). his is a txt2detection setting.
-            * `tlp_level` (optional): This will be assigned to all SDOs and SROs created. Stixify uses TLPv2. This is a txt2detection setting. Options are:
-                    * `red`
-                    * `amber+strict`
-                    * `amber`
-                    * `green`
-                    * `clear`
-            * `confidence` (optional): Will be added to the `confidence` value of the Report SDO created. A value between 0-100. `0` means confidence unknown. `1` is the lowest confidence score, `100` is the highest confidence score.
-            * `labels` (optional): Will be added to the `labels` of the Report SDO created.
-            * `defang` (default `true`): whether to defang the observables in the blog. e.g. turns `1.1.1[.]1` to `1.1.1.1` for extraction. This is a file2txt setting.
-            * `ai_provider` (default `true`):  An AI provider and model to be used for rule generation in format `provider:model` e.g. `openai:gpt-4o`. This is a txt2detection setting.
-
             Files cannot be modified once uploaded. If you need to reprocess a file, you must upload it again.
 
             The response will contain the Job information, including the Job `id`. This can be used with the GET Jobs by ID endpoint to monitor the status of the Job.
