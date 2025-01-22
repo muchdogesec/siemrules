@@ -95,10 +95,10 @@ def upload_to_arango(job: models.Job, bundle: dict):
             database=settings.ARANGODB_DATABASE,
             collection=settings.ARANGODB_COLLECTION,
             stix2arango_note=f"stixify-job--{job.id}",
-            ignore_embedded_relationships=False,
             host_url=settings.ARANGODB_HOST_URL,
             username=settings.ARANGODB_USERNAME,
             password=settings.ARANGODB_PASSWORD,
+            ignore_embedded_relationships=job.file.ignore_embedded_relationships,
         )
         db_view_creator.link_one_collection(s2a.arango.db, settings.VIEW_NAME, f"{settings.ARANGODB_COLLECTION}_edge_collection")
         db_view_creator.link_one_collection(s2a.arango.db, settings.VIEW_NAME, f"{settings.ARANGODB_COLLECTION}_vertex_collection")
