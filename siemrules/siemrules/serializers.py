@@ -46,6 +46,7 @@ class FileSerializer(serializers.ModelSerializer):
     defang = serializers.BooleanField(default=True, help_text="whether to defang the observables in the blog. e.g. turns `1.1.1[.]1` to `1.1.1.1` for extraction. This is a file2txt setting.")
     ai_provider = serializers.CharField(required=True, validators=[validate_model], help_text="An AI provider and model to be used for rule generation in format `provider:model` e.g. `openai:gpt-4o`. This is a txt2detection setting.")
     extract_text_from_image = serializers.BooleanField(required=False, default=True, help_text="whether to extract text from file's images. This is a file2txt setting.")
+    ignore_embedded_relationships = serializers.BooleanField(default=False, help_text="Default is `false`. Setting this to `true` will stop stix2arango creating relationship objects for the embedded relationships found in objects created by txt2detection.")
     class Meta:
         model = File
         exclude = ['markdown_file']
