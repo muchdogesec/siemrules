@@ -41,11 +41,11 @@ def fix_report_id(report_id: str):
     return "report--"+report_id
 
 def report_id_as_id(report_id):
-    return ReportView.validate_report_id(report_id).removeprefix('report--')
+    return ReportView.path_param_as_uuid(report_id).removeprefix('report--')
 
 def remove_report(report_id: str):
     helper = ArangoDBHelper(settings.VIEW_NAME, request.Request(HttpRequest()))
-    report_id = fix_report_id(report_id)
+    report_id = ReportView.path_param_as_report_id(report_id)
     bind_vars = {
             "@collection": helper.collection,
             'report_id': report_id,
@@ -130,9 +130,9 @@ class ReportView(viewsets.ViewSet):
     @extend_schema()
     def retrieve(self, request, *args, **kwargs):
         report_id = kwargs.get(self.lookup_url_kwarg)
-        report_id = self.validate_report_id(report_id)
+        report_uuid = self.path_param_as_uuid(report_id)
         reports: Response = ArangoDBHelper(settings.VIEW_NAME, request).get_objects_by_id(
-            fix_report_id(report_id)
+            self.path_param_as_report_id(report_id)
         )
         if not reports.data:
             raise exceptions.NotFound(
@@ -162,32 +162,32 @@ class ReportView(viewsets.ViewSet):
     )
     @decorators.action(methods=["GET"], detail=True)
     def objects(self, request, *args, report_id=..., **kwargs):
-        report_id = self.validate_report_id(report_id)
-        return self.get_report_objects(fix_report_id(report_id))
+        report_id = self.path_param_as_uuid(report_id)
+        return self.get_report_objects(self.path_param_as_report_id(report_id))
     
     @classmethod
-    def fix_report_id(self, report_id):
+    def path_param_as_report_id(self, report_id):
         if report_id.startswith('report--'):
             return report_id
         return "report--"+report_id
     
     @classmethod
-    def validate_report_id(self, report_id:str):
-        if not report_id.startswith('report--'):
+    def path_param_as_uuid(self, report_id:str, type='report'):
+        type_part, _, uuid_part = report_id.partition('--')
+        if type_part != 'report':
             raise validators.ValidationError({self.lookup_url_kwarg: f'`{report_id}`: must be a valid STIX report id'})
-        report_uuid = report_id.replace('report--', '')
         try:
-            uuid.UUID(report_uuid)
+            uuid.UUID(uuid_part)
         except Exception as e:
             raise validators.ValidationError({self.lookup_url_kwarg: f'`{report_id}`: {e}'})
-        return report_uuid
+        return uuid_part
 
     @extend_schema()
     def destroy(self, request, *args, **kwargs):
         report_id = kwargs.get(self.lookup_url_kwarg)
-        report_id = self.validate_report_id(report_id)
+        report_uuid = self.path_param_as_uuid(report_id)
 
-        File.objects.filter(id=report_id).delete()
+        File.objects.filter(id=report_uuid).delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     def get_reports(self, id=None):
@@ -236,10 +236,13 @@ class ReportView(viewsets.ViewSet):
             // <other filters>
             @filters
             // </other filters>
+            SORT doc.modified DESC
             LIMIT @offset, @count
             RETURN KEEP(doc, KEYS(doc, true))
         """
-        return helper.execute_query(query.replace('@filters', '\n'.join(filters)), bind_vars=bind_vars)
+        resp = helper.execute_query(query.replace('@filters', '\n'.join(filters)), bind_vars=bind_vars)
+        resp.data['objects'] = list(resp.data['objects'])
+        return resp
 
     def get_report_objects(self, report_id):
         helper = ArangoDBHelper(settings.VIEW_NAME, self.request)
@@ -254,5 +257,7 @@ class ReportView(viewsets.ViewSet):
             LIMIT @offset, @count
             RETURN KEEP(doc, KEYS(doc, TRUE))
         """
-        return helper.execute_query(query, bind_vars=bind_vars)
+        resp = helper.execute_query(query, bind_vars=bind_vars)
+        resp.data['objects'] = list(resp.data['objects'])
+        return resp
     

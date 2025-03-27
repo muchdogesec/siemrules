@@ -8,6 +8,7 @@ from siemrules.siemrules import models
 from celery import shared_task
 from txt2detection.utils import validate_token_count, parse_model as parse_ai_model
 from txt2detection.bundler import Bundler as txt2detectionBundler
+import txt2detection
 from file2txt.converter import Fanger, get_parser_class
 from file2txt.parsers.core import BaseParser
 from django.conf import settings
@@ -45,20 +46,9 @@ def save_file(file: InMemoryUploadedFile):
 
 def run_txt2detection(file: models.File):
     provider = parse_ai_model(file.ai_provider)
-    confidence = 0
     input_str = file.markdown_file.read().decode()
-    validate_token_count(settings.INPUT_TOKEN_LIMIT, input_str, provider)
-    detections = provider.get_detections(input_str, detection_language=file.detection_language)
-    bundler = txt2detectionBundler(file.name, file.detection_language, parse_stix(file.identity),  file.tlp_level, input_str, confidence, file.labels, report_id=file.id)
-    bundler.bundle_detections(detections)
-
-    bundle = json.loads(bundler.to_json())
-
-    for obj in bundle['objects']:
-        obj["_stixify_report_id"] = file.report_id
-    
-
-    return bundle
+    bundler: txt2detectionBundler = txt2detection.run_txt2detection(name=file.name, identity=parse_stix(file.identity), tlp_level=file.tlp_level, confidence=file.confidence, report_id=file.id, ai_provider=provider, input_text=input_str)    
+    return bundler.bundle_dict
 
 def run_file2txt(file: models.File):
     with tempfile.NamedTemporaryFile('rb+') as f:
@@ -100,6 +90,7 @@ def upload_to_arango(job: models.Job, bundle: dict):
             password=settings.ARANGODB_PASSWORD,
             ignore_embedded_relationships=job.file.ignore_embedded_relationships,
         )
+        s2a.arangodb_extra_data = dict(_stixify_report_id=job.file.report_id)
         db_view_creator.link_one_collection(s2a.arango.db, settings.VIEW_NAME, f"{settings.ARANGODB_COLLECTION}_edge_collection")
         db_view_creator.link_one_collection(s2a.arango.db, settings.VIEW_NAME, f"{settings.ARANGODB_COLLECTION}_vertex_collection")
         s2a.run()

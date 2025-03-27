@@ -50,7 +50,7 @@ INSTALLED_APPS = [
 
     "corsheaders",
     "rest_framework",
-    'dogesec_commons.objects.app.ArangoObjectsViewApp',
+    'dogesec_commons.objects',
     "drf_spectacular",
     'django.contrib.postgres',
     "siemrules.siemrules",

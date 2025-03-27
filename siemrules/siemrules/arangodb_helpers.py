@@ -1,5 +1,6 @@
+import json
 from rest_framework import request
-from django.http import HttpRequest
+from django.http import HttpRequest, HttpResponse
 from django.conf import settings
 import typing
 
@@ -60,8 +61,20 @@ def get_rules(request):
         filters.append('''
             FILTER LENGTH(
                 FOR d IN siemrules_edge_collection
-                    FILTER doc._id == d._from AND d.relationship_type == 'mitre-attack' AND NOT doc._is_ref AND d.external_references
-                    FILTER @attack_ids[? ANY FILTER CURRENT IN d.description]
+                    FILTER doc._id == d._from AND d.relationship_type == 'mitre-attack'
+                    FILTER @attack_ids[? ANY FILTER CONTAINS(d.description, CURRENT)]
+                    LIMIT 1
+                    RETURN TRUE
+                ) > 0
+            ''')
+        
+    if q := helper.query_as_array('cve_id'):
+        binds['cve_ids'] = [r.upper() for r in q]
+        filters.append('''
+            FILTER LENGTH(
+                FOR d IN siemrules_edge_collection
+                    FILTER doc._id == d._from AND d.relationship_type == 'nvd-cve'
+                    FILTER @cve_ids[? ANY FILTER CONTAINS(d.description, CURRENT)]
                     LIMIT 1
                     RETURN TRUE
                 ) > 0
@@ -84,7 +97,7 @@ RETURN KEEP(doc, KEYS(doc, true))
             RULES_SORT_FIELDS,
         ),
     )
-    # return Response([query, binds])
+    # return HttpResponse(f"{query}\n\n//"+json.dumps(binds))
     return helper.execute_query(query, bind_vars=binds)
 
 def get_single_rule(indicator_id):
