@@ -56,7 +56,6 @@ jobs:
       - name: test all endpoints 1
         id: test-endpoints
         run: |
-          sleep 15; exit 0
           pip install -r tests/requirements.txt -r requirements.txt
           set -a; source .env; source tests/src/env.env; set +a
 
