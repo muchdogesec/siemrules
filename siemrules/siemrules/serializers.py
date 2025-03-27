@@ -22,8 +22,10 @@ def validate_model(model):
 })
 class ReportIDField(serializers.CharField):
     def to_internal_value(self, data: str):
-        # if not data.startswith('report--'):
-        #     raise validators.ValidationError("invalid STIX Report ID, must be in format `report--{UUID}`")
+        if not isinstance(data, str):
+            raise validators.ValidationError("string expected")
+        if not data.startswith('report--'):
+            raise validators.ValidationError("invalid STIX Report ID, must be in format `report--{UUID}`")
         data = data.replace("report--", "")
         return serializers.UUIDField().to_internal_value(data)
     
