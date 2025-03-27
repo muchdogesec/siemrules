@@ -50,7 +50,7 @@ INSTALLED_APPS = [
 
     "corsheaders",
     "rest_framework",
-    'dogesec_commons.objects.app.ArangoObjectsViewApp',
+    'dogesec_commons.objects',
     "drf_spectacular",
     'django.contrib.postgres',
     "siemrules.siemrules",
@@ -140,10 +140,12 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.0/howto/static-files/
 
-STATIC_URL = "static/"
-STATIC_ROOT = "/var/www/staticfiles/"
+WWW_PATH = os.getenv('DJANGO_WWW_PATH', '/var/www/')
 
-MEDIA_ROOT = "/var/www/mediafiles/"
+STATIC_URL = "static/"
+STATIC_ROOT = os.path.join(WWW_PATH, "staticfiles/")
+
+MEDIA_ROOT = os.path.join(WWW_PATH, "mediafiles/")
 MEDIA_URL = "uploads/"
 
 # cache

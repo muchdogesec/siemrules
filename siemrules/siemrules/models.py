@@ -73,7 +73,6 @@ class File(models.Model):
     extract_text_from_image = models.BooleanField(default=True)
     ignore_embedded_relationships = models.BooleanField(default=False)
     ai_provider = models.CharField(max_length=256)
-    detection_language = models.CharField(max_length=256)
     markdown_file = models.FileField(max_length=256, upload_to=upload_to_func, null=True)
 
     confidence = models.IntegerField(default=0)

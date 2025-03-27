@@ -1,11 +1,12 @@
+import io
+from django.core.files.uploadedfile import InMemoryUploadedFile, SimpleUploadedFile
 from rest_framework import serializers, validators
 from siemrules.siemrules.models import File, Job, FileImage, TLP_Levels
-from drf_spectacular.utils import extend_schema_field
-from txt2detection.utils import load_detection_languages
+from drf_spectacular.utils import extend_schema_field, extend_schema_serializer
 import file2txt.parsers.core as f2t_core
 from txt2detection.utils import parse_model as parse_ai_model
+from django.template.defaultfilters import slugify
 
-DETECTION_LANGUAGES = [(k, v.name) for k, v in load_detection_languages().items()]
 
 def validate_model(model):
     if not model:
@@ -21,8 +22,10 @@ def validate_model(model):
 })
 class ReportIDField(serializers.CharField):
     def to_internal_value(self, data: str):
-        # if not data.startswith('report--'):
-        #     raise validators.ValidationError("invalid STIX Report ID, must be in format `report--{UUID}`")
+        if not isinstance(data, str):
+            raise validators.ValidationError("string expected")
+        if not data.startswith('report--'):
+            raise validators.ValidationError("invalid STIX Report ID, must be in format `report--{UUID}`")
         data = data.replace("report--", "")
         return serializers.UUIDField().to_internal_value(data)
     
@@ -34,7 +37,6 @@ class FileSerializer(serializers.ModelSerializer):
     mimetype = serializers.CharField(read_only=True)
     download_url = serializers.FileField(source='file', read_only=True, allow_null=True)
     file = serializers.FileField(write_only=True, help_text="Full path to the file to be converted. The mimetype of the file uploaded must match that expected by the `mode` selected. This is a file2txt setting.")
-    detection_language = serializers.ChoiceField(choices=DETECTION_LANGUAGES, help_text="the detection language you want the rule to be written in. This is a txt2detection setting.")
     report_id = ReportIDField(source='id', help_text="Only pass a UUIDv4. It will be use to generate the STIX Report ID, e.g. `report--<UUID>`. If not passed, this value will be randomly generated for this file. This is a txt2detection setting.", validators=[
         validators.UniqueValidator(queryset=File.objects.all(), message="File with report id already exists"),
     ], required=False)
@@ -51,6 +53,16 @@ class FileSerializer(serializers.ModelSerializer):
         model = File
         exclude = ['markdown_file']
         read_only_fields = ['id']
+
+
+class FileTextSerializer(FileSerializer):
+    file = serializers.HiddenField(default='')
+    text = serializers.CharField(write_only=True)
+    mode = serializers.HiddenField(default="txt")
+    identity = serializers.DictField(write_only=True, required=False, help_text='This will be used as the `created_by_ref` for all created SDOs and SROs. This is a full STIX Identity JSON. e.g. `{"type":"identity","spec_version":"2.1","id":"identity--b1ae1a15-6f4b-431e-b990-1b9678f35e15","name":"Dummy Identity"}`. If no value is passed, [the Stixify identity object will be used](https://raw.githubusercontent.com/muchdogesec/stix4doge/refs/heads/main/objects/identity/stixify.json). his is a txt2detection setting.')
+    def create(self, validated_data):
+        validated_data['file'] = SimpleUploadedFile("text-input--"+slugify(validated_data['name'])+'.txt', validated_data.pop('text', '').encode(), "text/plain")
+        return super().create(validated_data)
 
 class ImageSerializer(serializers.ModelSerializer):
     url = serializers.SerializerMethodField()

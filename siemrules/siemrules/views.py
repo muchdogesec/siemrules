@@ -117,6 +117,17 @@ class FileView(mixins.ListModelMixin, mixins.DestroyModelMixin, mixins.RetrieveM
         job_serializer = JobSerializer(job_instance)
         tasks.new_task(job_instance, file_instance)
         return Response(job_serializer.data)
+            
+    @extend_schema(responses={200: serializers.JobSerializer, 400: DEFAULT_400_ERROR}, request=serializers.FileTextSerializer)
+    @decorators.action(methods=['POST'], detail=False, parser_classes=[parsers.JSONParser])
+    def text(self, request, *args, **kwargs):
+        serializer = serializers.FileTextSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        file_instance = serializer.save(mimetype="text/plain")
+        job_instance =  models.Job.objects.create(file=file_instance)
+        job_serializer = JobSerializer(job_instance)
+        tasks.new_task(job_instance, file_instance)
+        return Response(job_serializer.data)
     
 
     @decorators.action(detail=True, methods=["GET"])
@@ -218,6 +229,7 @@ class RuleView(viewsets.GenericViewSet):
         attack_id = BaseInFilter(help_text="Filter the results return rules linked to a particular ATT&CK Technique. Pass the full ATT&CK ID, e.g. `T1047`.")
         cve_id = BaseInFilter(help_text="Filter the results return rules linked to a particular CVE. Pass the full CVE ID, e.g. `CVE-2024-28374`.")
         created_by_ref = BaseInFilter(help_text="Filter the result by only the reports created by this identity. Pass the full STIX ID of the Identity object, e.g. `identity--b1ae1a15-6f4b-431e-b990-1b9678f35e15`.")
+        sort = ChoiceFilter(help_text='Sort by value', choices=[(f, f) for f in arangodb_helpers.RULES_SORT_FIELDS])
 
 
     def list(self, request, *args, **kwargs):
