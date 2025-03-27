@@ -58,7 +58,8 @@ jobs:
         run: |
           pip install -r tests/requirements.txt -r requirements.txt
           set -a; source .env; source tests/src/env.env; set +a
-
+          export DJANGO_WWW_PATH=$PWD/django_www_path/
+          mkdir -p $DJANGO_WWW_PATH
           export POSTGRES_HOST="${{ steps.get_ip.outputs.IP_ADDRESS }}"
           export ARANGODB_HOST_URL="http://${{ steps.get_ip.outputs.IP_ADDRESS }}:18529"
           export PYTHONPATH=.
