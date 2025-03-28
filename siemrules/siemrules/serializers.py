@@ -94,3 +94,7 @@ class RuleSigmaSerializer(serializers.Serializer):
     id = serializers.UUIDField()
     name = serializers.CharField(default='Sigma Rule')
     description = serializers.CharField(default='Description for Sigma Rule')
+
+class AIModifySerializer(serializers.Serializer):
+    prompt = serializers.CharField(help_text='prompt to send to the AI processor')
+    ai_provider = serializers.CharField(required=True, validators=[validate_model], help_text="An AI provider and model to be used for rule generation in format `provider:model` e.g. `openai:gpt-4o`. This is a txt2detection setting.")

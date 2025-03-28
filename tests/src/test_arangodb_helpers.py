@@ -114,7 +114,7 @@ def test_get_single_rule():
         get_single_rule(indicator_id)
         mock_get_rules.assert_called_once()
         request = mock_get_rules.mock_calls[0].args[0]
-        mock_get_rules.assert_called_once_with(request, paginate=False)
+        mock_get_rules.assert_called_once_with(request, paginate=False, keep=False)
         assert isinstance(request, Request)
         assert request.query_params.get("indicator_id") == indicator_id
 

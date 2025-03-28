@@ -1,14 +1,16 @@
 import json
 from rest_framework import request
 from django.http import HttpRequest, HttpResponse
-from django.conf import settings
+# from django.conf import settings
+from siemrules import settings
 import typing
 
-if typing.TYPE_CHECKING:
-    from .. import settings
+from siemrules.siemrules.utils import TLP_LEVEL_STIX_ID_MAPPING
+from siemrules.worker.tasks import upload_to_arango
 
-from siemrules.siemrules.reports import fix_report_id
-from siemrules.siemrules.models import TLP_LEVEL_STIX_ID_MAPPING
+if typing.TYPE_CHECKING:
+    from siemrules import settings
+
 from dogesec_commons.objects.helpers import ArangoDBHelper
 
 if typing.TYPE_CHECKING:
@@ -24,6 +26,11 @@ RULES_SORT_FIELDS = [
     "name_ascending",
     "name_descending",
 ]
+
+def fix_report_id(report_id: str):
+    if report_id.startswith('report--'):
+        return report_id
+    return "report--"+report_id
 
 def get_rules(request, paginate=True):
     helper = ArangoDBHelper(settings.VIEW_NAME, request, result_key="rules")
@@ -100,5 +107,87 @@ def get_single_rule(indicator_id):
     rules = get_rules(r, paginate=False)
     if not rules:
         raise NotFound(f"no rule with id `{indicator_id}`")
-    print(rules)
     return Response(rules[0])
+
+
+def get_objects_by_id(indicator_id):
+    helper = ArangoDBHelper(settings.VIEW_NAME, request.Request(HttpRequest()))
+    objects = helper.execute_query('''
+            FOR doc IN siemrules_vertex_collection
+            FILTER doc.type IN ['report', 'indicator']
+            FILTER doc.id == @stix_id OR (doc.type == 'report' AND @stix_id IN doc.object_refs)
+            FILTER doc._is_latest == TRUE
+            RETURN doc
+    ''', bind_vars=dict(stix_id=indicator_id), paginate=False)
+    report = [obj for obj in objects if obj['type'] == 'report'][0]
+    obj = [obj for obj in objects if obj['id'] == indicator_id][0]
+
+    rels = helper.execute_query('''
+            FOR doc IN siemrules_edge_collection
+            FILTER doc._from == @stix_id_key
+            RETURN doc
+    ''', bind_vars=dict(stix_id_key=obj['_id']), paginate=False)
+
+    all_objs = [obj] + rels
+    # for ref in all_objs:
+    #     report['object_refs'].remove(ref['id'])
+    return report, obj, all_objs
+
+from stix2arango.stix2arango import Stix2Arango
+
+def make_upload(report_id, bundle):
+    file_id = report_id.removeprefix('report--')
+    s2a = Stix2Arango(
+        file=None,
+        database=settings.ARANGODB_DATABASE,
+        collection=settings.ARANGODB_COLLECTION,
+        stix2arango_note=f"siemrules-file--{file_id}",
+        host_url=settings.ARANGODB_HOST_URL,
+        username=settings.ARANGODB_USERNAME,
+        password=settings.ARANGODB_PASSWORD,
+        ignore_embedded_relationships=False,
+        )
+    s2a.arangodb_extra_data = dict(_stixify_report_id=report_id)
+    s2a.run(data=bundle)
+
+
+def modify_rule(indicator_id, old_modified, new_modified, new_objects):
+    report, obj, all_objs = get_objects_by_id(indicator_id)
+    object_refs: list = report['object_refs'] + [obj['id'] for obj in new_objects]
+    for ref in all_objs:
+        try:
+            object_refs.remove(ref['id'])
+        except Exception as e:
+            print(e)
+            pass
+
+    if obj['modified'] != old_modified:
+        raise Exception('object modified on db after modification job started')
+    helper = ArangoDBHelper(settings.VIEW_NAME, request.Request(HttpRequest()))
+    helper.execute_query('''
+            LET vertex_deletions = (
+                        FOR doc IN siemrules_vertex_collection
+                        FILTER doc._key IN @keys
+                        UPDATE doc WITH {_is_latest: FALSE} IN siemrules_vertex_collection
+                        RETURN doc.id
+            )
+
+            LET edge_deletions = (
+                        FOR doc IN siemrules_edge_collection
+                        FILTER doc._key IN @keys
+                        UPDATE doc WITH {_is_latest: FALSE} IN siemrules_edge_collection
+                        RETURN doc.id
+            )
+            RETURN {vertex_deletions, edge_deletions}
+            
+    ''', bind_vars=dict(keys=[obj['_key'] for obj in all_objs]), paginate=False)
+
+    make_upload(report['id'], {'objects': new_objects, 'type': 'bundle', 'id': f'bundle--{report["id"][8:]}'})
+
+    helper.execute_query('UPDATE {_key: @report_key} WITH @report_update IN siemrules_vertex_collection', 
+                        bind_vars=dict(report_key=report['_key'], report_update=dict(object_refs=object_refs, modified=new_modified)), paginate=False)
+    
+    
+    
+    
+    
