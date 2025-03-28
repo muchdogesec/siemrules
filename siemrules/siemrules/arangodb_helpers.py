@@ -13,6 +13,8 @@ from dogesec_commons.objects.helpers import ArangoDBHelper
 
 if typing.TYPE_CHECKING:
     from siemrules import settings
+from rest_framework.exceptions import NotFound
+from rest_framework.response import Response
 
 
 
@@ -23,7 +25,7 @@ RULES_SORT_FIELDS = [
     "name_descending",
 ]
 
-def get_rules(request):
+def get_rules(request, paginate=True):
     helper = ArangoDBHelper(settings.VIEW_NAME, request, result_key="rules")
     binds = {}
     filters = []
@@ -87,7 +89,7 @@ FILTER doc.type == 'indicator' AND doc._is_latest
 
 @filters
 @sort_stmt
-LIMIT @offset, @count
+#LIMIT
 RETURN KEEP(doc, KEYS(doc, true))
 """.replace(
         "@filters", "\n".join(filters)
@@ -97,10 +99,18 @@ RETURN KEEP(doc, KEYS(doc, true))
             RULES_SORT_FIELDS,
         ),
     )
+    limit_str = ''
+    if paginate:
+        limit_str = 'LIMIT @offset, @count'
+    query = query.replace('#LIMIT', limit_str)
     # return HttpResponse(f"{query}\n\n//"+json.dumps(binds))
-    return helper.execute_query(query, bind_vars=binds)
+    return helper.execute_query(query, bind_vars=binds, paginate=paginate)
 
 def get_single_rule(indicator_id):
     r = request.Request(HttpRequest())
     r.query_params.update(indicator_id=indicator_id)
-    return get_rules(r)
+    rules = get_rules(r, paginate=False)
+    if not rules:
+        raise NotFound(f"no rule with id `{indicator_id}`")
+    print(rules)
+    return Response(rules[0])

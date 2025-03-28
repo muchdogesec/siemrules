@@ -17,6 +17,7 @@ from rest_framework.response import Response
 from rest_framework.validators import ValidationError
 
 from siemrules.siemrules.arangodb_helpers import RULES_SORT_FIELDS, get_rules, get_single_rule
+from rest_framework.exceptions import NotFound
 from rest_framework.request import Request
 
 from tests.src.utils import is_sorted
@@ -113,5 +114,13 @@ def test_get_single_rule():
         get_single_rule(indicator_id)
         mock_get_rules.assert_called_once()
         request = mock_get_rules.mock_calls[0].args[0]
+        mock_get_rules.assert_called_once_with(request, paginate=False)
         assert isinstance(request, Request)
         assert request.query_params.get("indicator_id") == indicator_id
+
+def test_get_single_rule_404():
+    indicator_id = "indicator--a4d70b75-6f4a-5d19-9137-da863edd33d7"
+    with pytest.raises(NotFound), patch("siemrules.siemrules.arangodb_helpers.get_rules") as mock_get_rules:
+        mock_get_rules.return_value = []
+        get_single_rule(indicator_id)
+        mock_get_rules.assert_called_once()

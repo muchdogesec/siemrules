@@ -1,5 +1,5 @@
 
-from rest_framework import viewsets, parsers, decorators, mixins
+from rest_framework import viewsets, parsers, decorators, mixins, renderers
 from siemrules.siemrules import models, reports
 from siemrules.siemrules import serializers
 from siemrules.siemrules.serializers import FileSerializer, ImageSerializer, JobSerializer
@@ -8,6 +8,7 @@ import textwrap
 import typing
 from dogesec_commons.utils import Pagination, Ordering
 from siemrules.siemrules.md_helper import MarkdownImageReplacer, mistune
+from siemrules.siemrules.utils import SigmaRuleRenderer
 from siemrules.worker import tasks
 from rest_framework.response import Response
 from django_filters.rest_framework import FilterSet, DjangoFilterBackend, ChoiceFilter, CharFilter, BaseInFilter
@@ -206,7 +207,7 @@ class JobView(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.Generic
             If you do not know the ID of the Rule you can use the Search and retrieve created Rules endpoint.
             """
         ),
-        responses={200: serializers.RuleSerializer(many=True)}
+        responses={200: serializers.RuleSerializer, (200, "application/sigma+yaml"): serializers.RuleSigmaSerializer}
     ),
 )
 class RuleView(viewsets.GenericViewSet):
@@ -214,6 +215,8 @@ class RuleView(viewsets.GenericViewSet):
     pagination_class = Pagination("rules")
     serializer_class = serializers.RuleSerializer
     lookup_url_kwarg = 'indicator_id'
+
+    
 
     openapi_path_params = [
         OpenApiParameter(
@@ -231,6 +234,10 @@ class RuleView(viewsets.GenericViewSet):
         created_by_ref = BaseInFilter(help_text="Filter the result by only the reports created by this identity. Pass the full STIX ID of the Identity object, e.g. `identity--b1ae1a15-6f4b-431e-b990-1b9678f35e15`.")
         sort = ChoiceFilter(help_text='Sort by value', choices=[(f, f) for f in arangodb_helpers.RULES_SORT_FIELDS])
 
+    def get_renderers(self):
+        if self.action == 'retrieve':
+            return [renderers.JSONRenderer(), SigmaRuleRenderer()]
+        return super().get_renderers()
 
     def list(self, request, *args, **kwargs):
         return arangodb_helpers.get_rules(request)

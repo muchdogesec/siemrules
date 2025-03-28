@@ -79,3 +79,26 @@ class TestRuleView:
             mock_get.return_value = Response()
             response = client.get(f"{self.url}{self.rule_id}/")
             mock_get.assert_called_once()
+        
+    @pytest.mark.parametrize(
+            ["format", "expected_content_type"],
+            [
+                (None, "application/json"), # default
+                ("json", "application/json"),
+                ("sigma", "application/sigma+yaml"),
+            ]
+
+    )
+    def test_retrieve_rule_with_format(self, client, format, expected_content_type):
+        rule_url = f"{self.url}{self.rule_id}/"
+        with patch("siemrules.siemrules.arangodb_helpers.get_rules") as mock_queryset:
+            params = None
+            if format:
+                params = dict(format=format)
+            mock_sigma_rule_pattern = 'sigma rule here'
+            mock_queryset.return_value = [dict(pattern=mock_sigma_rule_pattern)]
+            response = client.get(rule_url, query_params=params)
+            mock_queryset.assert_called_once()
+            assert response.headers['content-type'] == expected_content_type
+            if format == 'sigma':
+                assert response.content.decode() == mock_sigma_rule_pattern

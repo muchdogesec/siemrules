@@ -87,4 +87,10 @@ class JobSerializer(serializers.ModelSerializer):
 
 class RuleSerializer(serializers.Serializer):
     id = serializers.CharField(default="indicator--3fa85f64-5717-4562-b3fc-2c963f66afa6")
+    pattern_type = serializers.CharField(default='sigma')
     type = serializers.ChoiceField(choices=[("indicator", "SIEM Rule")])
+
+class RuleSigmaSerializer(serializers.Serializer):
+    id = serializers.UUIDField()
+    name = serializers.CharField(default='Sigma Rule')
+    description = serializers.CharField(default='Description for Sigma Rule')
