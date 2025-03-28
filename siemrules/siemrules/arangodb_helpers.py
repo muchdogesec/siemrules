@@ -61,25 +61,13 @@ def get_rules(request, paginate=True):
     if q := helper.query_as_array('attack_id'):
         binds['attack_ids'] = [r.upper() for r in q]
         filters.append('''
-            FILTER LENGTH(
-                FOR d IN siemrules_edge_collection
-                    FILTER doc._id == d._from AND d.relationship_type == 'mitre-attack'
-                    FILTER @attack_ids[? ANY FILTER CONTAINS(d.description, CURRENT)]
-                    LIMIT 1
-                    RETURN TRUE
-                ) > 0
+                FILTER doc.external_references[? ANY FILTER CURRENT.source_name == 'mitre-attack' AND CURRENT.external_id IN @attack_ids]
             ''')
         
     if q := helper.query_as_array('cve_id'):
         binds['cve_ids'] = [r.upper() for r in q]
         filters.append('''
-            FILTER LENGTH(
-                FOR d IN siemrules_edge_collection
-                    FILTER doc._id == d._from AND d.relationship_type == 'nvd-cve'
-                    FILTER @cve_ids[? ANY FILTER CONTAINS(d.description, CURRENT)]
-                    LIMIT 1
-                    RETURN TRUE
-                ) > 0
+                FILTER doc.external_references[? ANY FILTER CURRENT.source_name == 'cve' AND CURRENT.external_id IN @cve_ids]
             ''')
 
     query = """
