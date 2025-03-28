@@ -1,13 +1,18 @@
 
-from rest_framework import viewsets, parsers, decorators, mixins
+import io
+from rest_framework import viewsets, parsers, decorators, mixins, renderers, exceptions
+from txt2detection.utils import parse_model
+import yaml
 from siemrules.siemrules import models, reports
 from siemrules.siemrules import serializers
+from siemrules.siemrules.modifier import DRFDetection, get_modification, modify_indicator, yaml_to_detection
 from siemrules.siemrules.serializers import FileSerializer, ImageSerializer, JobSerializer
 from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter
 import textwrap
 import typing
 from dogesec_commons.utils import Pagination, Ordering
 from siemrules.siemrules.md_helper import MarkdownImageReplacer, mistune
+from siemrules.siemrules.utils import SigmaRuleParser, SigmaRuleRenderer
 from siemrules.worker import tasks
 from rest_framework.response import Response
 from django_filters.rest_framework import FilterSet, DjangoFilterBackend, ChoiceFilter, CharFilter, BaseInFilter
@@ -206,7 +211,7 @@ class JobView(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.Generic
             If you do not know the ID of the Rule you can use the Search and retrieve created Rules endpoint.
             """
         ),
-        responses={200: serializers.RuleSerializer(many=True)}
+        responses={200: serializers.RuleSerializer, (200, "application/sigma+yaml"): serializers.RuleSigmaSerializer}
     ),
 )
 class RuleView(viewsets.GenericViewSet):
@@ -214,6 +219,8 @@ class RuleView(viewsets.GenericViewSet):
     pagination_class = Pagination("rules")
     serializer_class = serializers.RuleSerializer
     lookup_url_kwarg = 'indicator_id'
+
+    
 
     openapi_path_params = [
         OpenApiParameter(
@@ -231,10 +238,60 @@ class RuleView(viewsets.GenericViewSet):
         created_by_ref = BaseInFilter(help_text="Filter the result by only the reports created by this identity. Pass the full STIX ID of the Identity object, e.g. `identity--b1ae1a15-6f4b-431e-b990-1b9678f35e15`.")
         sort = ChoiceFilter(help_text='Sort by value', choices=[(f, f) for f in arangodb_helpers.RULES_SORT_FIELDS])
 
+    def get_renderers(self):
+        if self.action == 'retrieve':
+            return [renderers.JSONRenderer(), SigmaRuleRenderer()]
+        return super().get_renderers()
+    
+    def get_parsers(self):
+        if getattr(self, 'action', '') == 'modify':
+            return [SigmaRuleParser()]
+        return super().get_parsers()
 
     def list(self, request, *args, **kwargs):
         return arangodb_helpers.get_rules(request)
     
     def retrieve(self, request, *args, indicator_id=None, **kwargs):
         return arangodb_helpers.get_single_rule(indicator_id)
+    
+    
+    @extend_schema(request=DRFDetection.drf_serializer, summary="takes sigma rule as input", description="modify sigma rule by providing (partial modification, only sent item are modified)")
+    @decorators.action(methods=['POST'], detail=True, parser_classes = [SigmaRuleParser])
+    def modify(self, request, *args, indicator_id=None, **kwargs):
+        report, indicator, all_objs = arangodb_helpers.get_objects_by_id(indicator_id)
+        data = {**yaml.safe_load(io.StringIO(indicator['pattern'])), **request.data}
+        s = DRFDetection.drf_serializer(data=data)
+        s.is_valid(raise_exception=True)
+        detection = DRFDetection.model_validate(s.data)
+        detection.id = indicator_id.split('--')[-1]
+
+    
+        return self.modify_resp(request, indicator_id, report, indicator, detection)
+
+    def modify_resp(self, request, indicator_id, report, indicator, detection):
+        new_objects = modify_indicator(report, indicator, detection)
+        file_id = report['id'].removeprefix('report--')
+        print(file_id, report['id'])
+        arangodb_helpers.modify_rule(indicator['id'], indicator['modified'], new_objects[0]['modified'], new_objects)
+
+        return self.retrieve(request, indicator_id=indicator_id)
+    
+    @extend_schema(request=serializers.AIModifySerializer, summary="takes prompt and delegates modification to AI provider", description="takes prompt and delegates modification to AI provider")
+    @decorators.action(methods=['POST'], detail=True)
+    def modify_ai(self, request, *args, indicator_id=None, **kwargs):
+        report, indicator, all_objs = arangodb_helpers.get_objects_by_id(indicator_id)
+        s = serializers.AIModifySerializer(data=request.data)
+        s.is_valid(raise_exception=True)
+        old_detection = yaml_to_detection(
+            indicator["pattern"], indicator["indicator_types"]
+        )
+        input_text = report['description']
+        input_text = '<SKIPPED INPUT>'
+        detection_container = get_modification(parse_model(s.data['ai_provider']), input_text, old_detection, s.data['prompt'])
+        if not detection_container.success:
+            raise exceptions.ParseError("txt2detection: failed to execute")
+        
+        return self.modify_resp(request, indicator_id, report, indicator, detection_container.detections[0])
+
+        
 

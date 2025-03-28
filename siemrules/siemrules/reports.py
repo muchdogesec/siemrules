@@ -34,12 +34,6 @@ from dogesec_commons.objects.helpers import ArangoDBHelper
 if typing.TYPE_CHECKING:
     from siemrules import settings
 
-
-def fix_report_id(report_id: str):
-    if report_id.startswith('report--'):
-        return report_id
-    return "report--"+report_id
-
 def report_id_as_id(report_id):
     return ReportView.path_param_as_uuid(report_id).removeprefix('report--')
 

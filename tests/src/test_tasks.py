@@ -130,7 +130,7 @@ def test_upload_to_arango(job):
             file=mock_tempfile_instance.name,
             database=settings.ARANGODB_DATABASE,
             collection=settings.ARANGODB_COLLECTION,
-            stix2arango_note=f"stixify-job--{job.id}",
+            stix2arango_note=f"siemrules-file--{job.file.id}",
             host_url=settings.ARANGODB_HOST_URL,
             username=settings.ARANGODB_USERNAME,
             password=settings.ARANGODB_PASSWORD,
