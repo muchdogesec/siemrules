@@ -1,6 +1,6 @@
 
 import io
-from rest_framework import viewsets, parsers, decorators, mixins, renderers, exceptions
+from rest_framework import viewsets, parsers, decorators, mixins, renderers, exceptions, serializers as drf_serializers
 from txt2detection.utils import parse_model
 import yaml
 from siemrules.siemrules import models, reports
@@ -224,7 +224,10 @@ class JobView(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.Generic
             If you do not know the ID of the Rule you can use the Search and retrieve created Rules endpoint.
             """
         ),
-        responses={200: serializers.RuleSerializer, (200, "application/sigma+yaml"): serializers.RuleSigmaSerializer}
+        responses={200: serializers.RuleSerializer, (200, "application/sigma+yaml"): serializers.RuleSigmaSerializer},
+        parameters=[
+            OpenApiParameter('version', description='version of rule to pull')
+        ]
     ),
 )
 class RuleView(viewsets.GenericViewSet):
@@ -265,14 +268,23 @@ class RuleView(viewsets.GenericViewSet):
         return arangodb_helpers.get_rules(request)
     
     def retrieve(self, request, *args, indicator_id=None, **kwargs):
-        return arangodb_helpers.get_single_rule(indicator_id)
+        return arangodb_helpers.get_single_rule(indicator_id, version=request.query_params.get('version'))
+    
+    @extend_schema(summary="get versions", description="retrieve rule's versions, ordered from latest to oldest", responses={200: {"type": "array","items": {"type": "string", "format": "date-time"}}})
+    @decorators.action(methods=['GET'], detail=True, pagination_class = None)
+    def versions(self, request, *args, indicator_id=None, **kwargs):
+        return arangodb_helpers.get_single_rule_versions(indicator_id)
+
     
     
     @extend_schema(request=DRFDetection.drf_serializer, summary="takes sigma rule as input", description="modify sigma rule by providing (partial modification, only sent item are modified)")
     @decorators.action(methods=['POST'], detail=True, parser_classes = [SigmaRuleParser])
     def modify(self, request, *args, indicator_id=None, **kwargs):
         report, indicator, all_objs = arangodb_helpers.get_objects_by_id(indicator_id)
-        data = {**yaml.safe_load(io.StringIO(indicator['pattern'])), **request.data}
+        old_detection = yaml_to_detection(
+            indicator["pattern"], indicator["indicator_types"]
+        )
+        data = {**old_detection.model_dump(), **request.data}
         s = DRFDetection.drf_serializer(data=data)
         s.is_valid(raise_exception=True)
         detection = DRFDetection.model_validate(s.data)

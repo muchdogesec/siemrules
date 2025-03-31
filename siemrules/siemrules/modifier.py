@@ -25,8 +25,13 @@ def modify_indicator(report, indicator: dict, detection: Detection):
     bundler.report.external_references.extend(report['external_references'])
     detection.id = indicator['id']
     bundler.bundle_detections(DetectionContainer(success=True, detections=[detection]))
-    # return bundler.bundle_dict
-    return [obj for obj in bundler.bundle_dict['objects'] if obj['id'] in report['object_refs']]
+    retval = []
+    for obj in bundler.bundle_dict['objects']:
+        if obj['id'] not in report['object_refs']:
+            continue
+        retval.append(obj)
+        obj['object_marking_refs'] = indicator['object_marking_refs']
+    return retval
 
 
 

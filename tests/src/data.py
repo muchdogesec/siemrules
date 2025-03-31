@@ -1,4 +1,3 @@
-
 false, null, true = False, None, True
 BUNDLE_1 = {
     "type": "bundle",
@@ -173,7 +172,6 @@ BUNDLE_1 = {
         }
     ]
 }
-
 
 
 BUNDLE_2 = {
@@ -778,8 +776,6 @@ BUNDLE_2 = {
 }
 
 
-
-
 BUNDLE_3 = {
     "type": "bundle",
     "id": "bundle--cc297329-2c8d-55f3-bef9-3137bb9d87a7",
@@ -1148,3 +1144,16 @@ BUNDLE_3 = {
 }
 
 
+MODIFY_1 = {
+    "rule_id": "indicator--815e3b87-d1e1-52fb-aa44-0dc7a9b55116",
+    "sigma": """
+description: This description was modified
+        """,
+}
+
+MODIFY_2 = {
+    "rule_id": "indicator--815e3b87-d1e1-52fb-aa44-0dc7a9b55116",
+    "sigma": """
+description: This description has been modified twice
+        """,
+}

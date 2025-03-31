@@ -23,7 +23,6 @@ from rest_framework.request import Request
 from tests.src.utils import is_sorted
 
 
-from .test_reports import upload_bundles
 
 
 @pytest.mark.parametrize(
@@ -80,12 +79,11 @@ from .test_reports import upload_bundles
             'indicator--4d374788-a139-5e3e-bd85-5edb209d8c16',
             'indicator--881e6846-697c-5ec9-a353-32c448827930'
         ], id='tlp level green'),
-        pytest.param(dict(tlp_level='amber'), ['indicator--815e3b87-d1e1-52fb-aa44-0dc7a9b55116'], id='tlp level amber'),
-        pytest.param(dict(tlp_level='clear'), [], id='tlp level amber'),
+        pytest.param(dict(tlp_level='amber'), ['indicator--815e3b87-d1e1-52fb-aa44-0dc7a9b55116'], id='tlp level amber 1'),
+        pytest.param(dict(tlp_level='clear'), [], id='tlp level clear'),
     ],
 )
 def test_get_rules(params, expected_ids):
-    upload_bundles()
     expected_ids = set(expected_ids)
     request = Request(HttpRequest())
     request.query_params.update(params)
@@ -98,7 +96,6 @@ def test_get_rules(params, expected_ids):
         RULES_SORT_FIELDS
 )
 def test_get_rules_sort(sort_param):
-    upload_bundles()
     request = Request(HttpRequest())
     request.query_params.update(sort=sort_param)
     result = get_rules(request)

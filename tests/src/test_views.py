@@ -1,3 +1,4 @@
+from itertools import chain
 import django
 import pytest
 
@@ -11,49 +12,67 @@ from siemrules.worker import tasks
 from tests.src.data import BUNDLE_1
 from rest_framework.response import Response
 
+from tests.src.utils import is_sorted
+
+
 @pytest.mark.django_db
 class TestFileView:
     @pytest.fixture(autouse=True)
     def setup(self):
-        self.file = models.File.objects.create(name="test_file.txt", mimetype="text/plain")
+        self.file = models.File.objects.create(
+            name="test_file.txt", mimetype="text/plain"
+        )
         self.url = "/api/v1/files/"
 
     def test_list_files(self, client):
         response = client.get(self.url)
         assert response.status_code == status.HTTP_200_OK
-        assert isinstance(response.data['files'], list)
-        assert len(response.data['files']) == 1
+        assert isinstance(response.data["files"], list)
+        assert len(response.data["files"]) == 1
 
     def test_file_upload(self, client):
         mock_file_content = b"dummy content"
-        file_data = dict(file=SimpleUploadedFile("test.txt", b"dummy content", content_type="text/plain"), mode="txt", ai_provider="openai", name='dummy name')
+        file_data = dict(
+            file=SimpleUploadedFile(
+                "test.txt", b"dummy content", content_type="text/plain"
+            ),
+            mode="txt",
+            ai_provider="openai",
+            name="dummy name",
+        )
         with patch("siemrules.worker.tasks.new_task") as mock_task:
-            response = client.post(self.url+'upload/', data=file_data, format='multipart')
+            response = client.post(
+                self.url + "upload/", data=file_data, format="multipart"
+            )
             assert response.status_code == status.HTTP_200_OK, response.content
             mock_task.assert_called_once()
-            file : models.File = mock_task.mock_calls[0].args[1]
+            file: models.File = mock_task.mock_calls[0].args[1]
             assert file.file.read() == mock_file_content
-            assert file.mode == file_data['mode']
-            assert file.name == file_data['name']
-            assert file.ai_provider == file_data['ai_provider']
+            assert file.mode == file_data["mode"]
+            assert file.name == file_data["name"]
+            assert file.ai_provider == file_data["ai_provider"]
 
     def test_file_prompt(self, client: django.test.Client):
         mock_file_content = b"dummy content"
-        file_data = dict(prompt=mock_file_content.decode(), ai_provider="openai", name='dummy name')
+        file_data = dict(
+            prompt=mock_file_content.decode(), ai_provider="openai", name="dummy name"
+        )
         with patch("siemrules.worker.tasks.new_task") as mock_task:
-            response = client.post(self.url+'prompt/', data=file_data, content_type='application/json')
+            response = client.post(
+                self.url + "prompt/", data=file_data, content_type="application/json"
+            )
             assert response.status_code == status.HTTP_200_OK, response.content
             mock_task.assert_called_once()
-            file : models.File = mock_task.mock_calls[0].args[1]
+            file: models.File = mock_task.mock_calls[0].args[1]
             assert file.file.read() == mock_file_content
-            assert file.mode == 'txt'
-            assert file.name == file_data['name']
-            assert file.ai_provider == file_data['ai_provider']
+            assert file.mode == "txt"
+            assert file.name == file_data["name"]
+            assert file.ai_provider == file_data["ai_provider"]
 
     def test_retrieve_file(self, client):
         response = client.get(f"{self.url}{self.file.id}/")
         assert response.status_code == status.HTTP_200_OK
-        assert response.data['id'] == str(self.file.id)
+        assert response.data["id"] == str(self.file.id)
 
     def test_delete_file(self, client):
         with patch("siemrules.siemrules.models.File.delete") as mock_delete:
@@ -61,25 +80,30 @@ class TestFileView:
             assert response.status_code == status.HTTP_204_NO_CONTENT
             mock_delete.assert_called_once()
 
+
 @pytest.mark.django_db
 class TestJobView:
     @pytest.fixture(autouse=True)
     def setup(self):
-        self.file = models.File.objects.create(name="test_file.txt", mimetype="text/plain")
+        self.file = models.File.objects.create(
+            name="test_file.txt", mimetype="text/plain"
+        )
         self.job = models.Job.objects.create(file=self.file)
         self.url = "/api/v1/jobs/"
 
     def test_list_jobs(self, client):
         response = client.get(self.url)
         assert response.status_code == status.HTTP_200_OK
-        assert isinstance(response.data['jobs'], list)
-        assert len(response.data['jobs']) == 1
+        assert isinstance(response.data["jobs"], list)
+        assert len(response.data["jobs"]) == 1
 
     def test_retrieve_job(self, client):
         response = client.get(f"{self.url}{self.job.id}/")
         assert response.status_code == status.HTTP_200_OK
-        assert response.data['id'] == str(self.job.id)
+        assert response.data["id"] == str(self.job.id)
 
+
+@pytest.mark.django_db
 class TestRuleView:
     @pytest.fixture(autouse=True)
     def setup(self):
@@ -98,15 +122,14 @@ class TestRuleView:
             mock_get.return_value = Response()
             response = client.get(f"{self.url}{self.rule_id}/")
             mock_get.assert_called_once()
-        
-    @pytest.mark.parametrize(
-            ["format", "expected_content_type"],
-            [
-                (None, "application/json"), # default
-                ("json", "application/json"),
-                ("sigma", "application/sigma+yaml"),
-            ]
 
+    @pytest.mark.parametrize(
+        ["format", "expected_content_type"],
+        [
+            (None, "application/json"),  # default
+            ("json", "application/json"),
+            ("sigma", "application/sigma+yaml"),
+        ],
     )
     def test_retrieve_rule_with_format(self, client, format, expected_content_type):
         rule_url = f"{self.url}{self.rule_id}/"
@@ -114,10 +137,36 @@ class TestRuleView:
             params = None
             if format:
                 params = dict(format=format)
-            mock_sigma_rule_pattern = 'sigma rule here'
+            mock_sigma_rule_pattern = "sigma rule here"
             mock_queryset.return_value = [dict(pattern=mock_sigma_rule_pattern)]
             response = client.get(rule_url, query_params=params)
             mock_queryset.assert_called_once()
-            assert response.headers['content-type'] == expected_content_type
-            if format == 'sigma':
+            assert response.headers["content-type"] == expected_content_type
+            if format == "sigma":
                 assert response.content.decode() == mock_sigma_rule_pattern
+
+    @pytest.mark.parametrize(
+        ["rule_id", "expected_version_count"],
+        [
+            ["indicator--815e3b87-d1e1-52fb-aa44-0dc7a9b55116", 3],
+            ["indicator--4d374788-a139-5e3e-bd85-5edb209d8c16", 1],
+            ["indicator--881e6846-697c-5ec9-a353-32c448827930", 1],
+        ],
+    )
+    def test_versions(
+        self, client: django.test.Client, rule_id, expected_version_count, subtests
+    ):
+        rule_url = f"{self.url}{rule_id}/"
+        response = client.get(rule_url + "versions/")
+        assert is_sorted(response.data, reverse=True), "versions must be sorted in descending order"
+        assert len(response.data) == expected_version_count
+        for version in chain([None], response.data):
+            with subtests.test(
+                "test_retrieve_with_version_param", rule_id=rule_id, version=version
+            ):
+                params = None
+                if version:
+                    params = dict(version=version)
+                rule_resp = client.get(rule_url, query_params=params)
+                assert rule_resp.data['id'] == rule_id
+                assert rule_resp.data["modified"] == version or response.data[0]

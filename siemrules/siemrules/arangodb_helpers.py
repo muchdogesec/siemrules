@@ -33,10 +33,18 @@ def fix_report_id(report_id: str):
         return report_id
     return "report--"+report_id
 
-def get_rules(request, paginate=True):
+def get_rules(request, paginate=True, all_versions=False):
     helper = ArangoDBHelper(settings.VIEW_NAME, request, result_key="rules")
     binds = {}
     filters = []
+
+    version_filter = 'doc._is_latest'
+    if version := helper.query.get('version'):
+        binds['version'] = version
+        version_filter = 'doc.modified == @version'
+    if all_versions:
+        version_filter = 'TRUE'
+
 
     report_ids = helper.query_as_array('report_id')
     if file_ids := helper.query_as_array('file_id'):
@@ -78,23 +86,27 @@ def get_rules(request, paginate=True):
                 FILTER doc.external_references[? ANY FILTER CURRENT.source_name == 'cve' AND CURRENT.external_id IN @cve_ids]
             ''')
 
+
     query = """
 
 FOR doc IN siemrules_vertex_collection
-FILTER doc.type == 'indicator' AND doc._is_latest
+FILTER doc.type == 'indicator' AND #version
 
 @filters
 @sort_stmt
 #LIMIT
 RETURN KEEP(doc, KEYS(doc, true))
-""".replace(
-        "@filters", "\n".join(filters)
-    ).replace(
-        "@sort_stmt",
-        helper.get_sort_stmt(
-            RULES_SORT_FIELDS,
-        ),
-    )
+""" \
+        .replace('#version', version_filter) \
+        .replace(
+            "@filters", "\n".join(filters)
+        ) \
+        .replace(
+            "@sort_stmt",
+            helper.get_sort_stmt(
+                RULES_SORT_FIELDS,
+            ),
+        )
     limit_str = ''
     if paginate:
         limit_str = 'LIMIT @offset, @count'
@@ -102,13 +114,21 @@ RETURN KEEP(doc, KEYS(doc, true))
     # return HttpResponse(f"{query}\n\n//"+json.dumps(binds))
     return helper.execute_query(query, bind_vars=binds, paginate=paginate)
 
-def get_single_rule(indicator_id):
+def get_single_rule(indicator_id, version=None):
     r = request.Request(HttpRequest())
-    r.query_params.update(indicator_id=indicator_id)
+    r.query_params.update(indicator_id=indicator_id, version=version)
     rules = get_rules(r, paginate=False)
     if not rules:
         raise NotFound(f"no rule with id `{indicator_id}`")
     return Response(rules[0])
+
+def get_single_rule_versions(indicator_id):
+    r = request.Request(HttpRequest())
+    r.query_params.update(indicator_id=indicator_id)
+    rules = get_rules(r, paginate=False, all_versions=True)
+    if not rules:
+        raise NotFound(f"no rule with id `{indicator_id}`")
+    return Response(sorted([rule['modified'] for rule in rules], reverse=True))
 
 
 def get_objects_by_id(indicator_id):
@@ -137,8 +157,6 @@ def get_objects_by_id(indicator_id):
     ''', bind_vars=dict(stix_id_key=obj['_id']), paginate=False)
 
     all_objs = [obj] + rels
-    # for ref in all_objs:
-    #     report['object_refs'].remove(ref['id'])
     return report, obj, all_objs
 
 from stix2arango.stix2arango import Stix2Arango
