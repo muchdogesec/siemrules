@@ -121,7 +121,7 @@ def get_objects_by_id(indicator_id):
             RETURN doc
     ''', bind_vars=dict(stix_id=indicator_id), paginate=False)
     report = obj = None
-    with contextlib.suppress(KeyError):
+    with contextlib.suppress(IndexError):
         report = [obj for obj in objects if obj['type'] == 'report'][0]
         obj = [obj for obj in objects if obj['id'] == indicator_id][0]
     if not obj:
