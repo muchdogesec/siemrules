@@ -21,7 +21,6 @@ from tests.src.utils import is_sorted
 @pytest.mark.django_db
 @lru_cache
 def upload_bundles():
-    return
     for bundle in [test_data.BUNDLE_1, test_data.BUNDLE_2, test_data.BUNDLE_3]:
         file = models.File.objects.create(
             name="test_file.txt",
