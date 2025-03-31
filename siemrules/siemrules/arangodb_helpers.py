@@ -1,3 +1,4 @@
+import contextlib
 import json
 from rest_framework import request
 from django.http import HttpRequest, HttpResponse
@@ -15,7 +16,7 @@ from dogesec_commons.objects.helpers import ArangoDBHelper
 
 if typing.TYPE_CHECKING:
     from siemrules import settings
-from rest_framework.exceptions import NotFound
+from rest_framework.exceptions import NotFound, ParseError
 from rest_framework.response import Response
 
 
@@ -119,8 +120,15 @@ def get_objects_by_id(indicator_id):
             FILTER doc._is_latest == TRUE
             RETURN doc
     ''', bind_vars=dict(stix_id=indicator_id), paginate=False)
-    report = [obj for obj in objects if obj['type'] == 'report'][0]
-    obj = [obj for obj in objects if obj['id'] == indicator_id][0]
+    report = obj = None
+    with contextlib.suppress(KeyError):
+        report = [obj for obj in objects if obj['type'] == 'report'][0]
+        obj = [obj for obj in objects if obj['id'] == indicator_id][0]
+    if not obj:
+        raise NotFound(f"no rule with id `{indicator_id}`")
+    if not report:
+        raise ParseError(f"cannot find report associated with rule `{indicator_id}`")
+
 
     rels = helper.execute_query('''
             FOR doc IN siemrules_edge_collection

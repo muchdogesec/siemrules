@@ -31,6 +31,10 @@ class ReportIDField(serializers.CharField):
     
     def to_representation(self, value):
         return "report--"+serializers.UUIDField().to_representation(value)
+    
+@extend_schema_field(dict)
+class STIXIdentityField(serializers.JSONField):
+    pass
 
 class FileSerializer(serializers.ModelSerializer):
     job_id = serializers.UUIDField(source='job.id', read_only=True)
@@ -41,7 +45,7 @@ class FileSerializer(serializers.ModelSerializer):
         validators.UniqueValidator(queryset=File.objects.all(), message="File with report id already exists"),
     ], required=False)
     mode = serializers.ChoiceField(choices=list(f2t_core.BaseParser.PARSERS.keys()), help_text="How the File should be processed. This is a file2txt setting.")
-    identity = serializers.JSONField(write_only=True, required=False, help_text='This will be used as the `created_by_ref` for all created SDOs and SROs. This is a full STIX Identity JSON. e.g. `{"type":"identity","spec_version":"2.1","id":"identity--b1ae1a15-6f4b-431e-b990-1b9678f35e15","name":"Dummy Identity"}`. If no value is passed, [the Stixify identity object will be used](https://raw.githubusercontent.com/muchdogesec/stix4doge/refs/heads/main/objects/identity/stixify.json). his is a txt2detection setting.')
+    identity = STIXIdentityField(write_only=True, required=False, help_text='This will be used as the `created_by_ref` for all created SDOs and SROs. This is a full STIX Identity JSON. e.g. `{"type":"identity","spec_version":"2.1","id":"identity--b1ae1a15-6f4b-431e-b990-1b9678f35e15","name":"Dummy Identity"}`. If no value is passed, [the Stixify identity object will be used](https://raw.githubusercontent.com/muchdogesec/stix4doge/refs/heads/main/objects/identity/stixify.json). his is a txt2detection setting.')
     tlp_level = serializers.ChoiceField(choices=TLP_Levels.choices, default=TLP_Levels.RED, help_text='This will be assigned to all SDOs and SROs created. Stixify uses TLPv2. This is a txt2detection setting.')
     confidence = serializers.IntegerField(max_value=100, min_value=0, required=False, help_text="Will be added to the `confidence` value of the Report SDO created. A value between 0-100. `0` means confidence unknown. `1` is the lowest confidence score, `100` is the highest confidence score.")
     labels = serializers.ListField(child=serializers.CharField(), required=False, help_text="Will be added to the `labels` of the Report SDO created.")
@@ -55,13 +59,12 @@ class FileSerializer(serializers.ModelSerializer):
         read_only_fields = ['id']
 
 
-class FileTextSerializer(FileSerializer):
+class FilePromptSerializer(FileSerializer):
     file = serializers.HiddenField(default='')
-    text = serializers.CharField(write_only=True)
+    prompt = serializers.CharField(write_only=True)
     mode = serializers.HiddenField(default="txt")
-    identity = serializers.DictField(write_only=True, required=False, help_text='This will be used as the `created_by_ref` for all created SDOs and SROs. This is a full STIX Identity JSON. e.g. `{"type":"identity","spec_version":"2.1","id":"identity--b1ae1a15-6f4b-431e-b990-1b9678f35e15","name":"Dummy Identity"}`. If no value is passed, [the Stixify identity object will be used](https://raw.githubusercontent.com/muchdogesec/stix4doge/refs/heads/main/objects/identity/stixify.json). his is a txt2detection setting.')
     def create(self, validated_data):
-        validated_data['file'] = SimpleUploadedFile("text-input--"+slugify(validated_data['name'])+'.txt', validated_data.pop('text', '').encode(), "text/plain")
+        validated_data['file'] = SimpleUploadedFile("text-input--"+slugify(validated_data['name'])+'.txt', validated_data.pop('prompt', '').encode(), "text/plain")
         return super().create(validated_data)
 
 class ImageSerializer(serializers.ModelSerializer):

@@ -24,11 +24,23 @@ from django.http import FileResponse, HttpResponseNotFound
 from siemrules.siemrules import arangodb_helpers
 
 @extend_schema_view(
-    create=extend_schema(
+    upload=extend_schema(
         summary="Upload a new File",
         description=textwrap.dedent(
             """
             Upload a file to be processed by SIEM Rules During processing a file is turned into markdown by [file2txt](https://github.com/muchdogesec/file2txt/), which is then passed to [txt2stix](https://github.com/muchdogesec/txt2stix/) to .
+
+            Files cannot be modified once uploaded. If you need to reprocess a file, you must upload it again.
+
+            The response will contain the Job information, including the Job `id`. This can be used with the GET Jobs by ID endpoint to monitor the status of the Job.
+            """
+        ),
+    ),
+    prompt=extend_schema(
+        summary="Create a new File from prompt",
+        description=textwrap.dedent(
+            """
+            Create a file from prompt, this prompt is to be processed by SIEM Rules During processing a file is turned into markdown by [file2txt](https://github.com/muchdogesec/file2txt/), which is then passed to [txt2stix](https://github.com/muchdogesec/txt2stix/) to .
 
             Files cannot be modified once uploaded. If you need to reprocess a file, you must upload it again.
 
@@ -113,7 +125,8 @@ class FileView(mixins.ListModelMixin, mixins.DestroyModelMixin, mixins.RetrieveM
             return qs.filter(pk__in=file_id)
             
     @extend_schema(responses={200: serializers.JobSerializer, 400: DEFAULT_400_ERROR}, request=serializers.FileSerializer)
-    def create(self, request, *args, **kwargs):
+    @decorators.action(methods=['POST'], detail=False)
+    def upload(self, request, *args, **kwargs):
         serializer = FileSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         temp_file = request.FILES['file']
@@ -123,10 +136,10 @@ class FileView(mixins.ListModelMixin, mixins.DestroyModelMixin, mixins.RetrieveM
         tasks.new_task(job_instance, file_instance)
         return Response(job_serializer.data)
             
-    @extend_schema(responses={200: serializers.JobSerializer, 400: DEFAULT_400_ERROR}, request=serializers.FileTextSerializer)
+    @extend_schema(responses={200: serializers.JobSerializer, 400: DEFAULT_400_ERROR}, request=serializers.FilePromptSerializer)
     @decorators.action(methods=['POST'], detail=False, parser_classes=[parsers.JSONParser])
-    def text(self, request, *args, **kwargs):
-        serializer = serializers.FileTextSerializer(data=request.data)
+    def prompt(self, request, *args, **kwargs):
+        serializer = serializers.FilePromptSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         file_instance = serializer.save(mimetype="text/plain")
         job_instance =  models.Job.objects.create(file=file_instance)

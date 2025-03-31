@@ -24,12 +24,31 @@ class TestFileView:
         assert isinstance(response.data['files'], list)
         assert len(response.data['files']) == 1
 
-    def test_upload_file(self, client):
+    def test_file_upload(self, client):
+        mock_file_content = b"dummy content"
         file_data = dict(file=SimpleUploadedFile("test.txt", b"dummy content", content_type="text/plain"), mode="txt", ai_provider="openai", name='dummy name')
         with patch("siemrules.worker.tasks.new_task") as mock_task:
-            response = client.post(self.url, data=file_data, format='multipart')
+            response = client.post(self.url+'upload/', data=file_data, format='multipart')
             assert response.status_code == status.HTTP_200_OK, response.content
             mock_task.assert_called_once()
+            file : models.File = mock_task.mock_calls[0].args[1]
+            assert file.file.read() == mock_file_content
+            assert file.mode == file_data['mode']
+            assert file.name == file_data['name']
+            assert file.ai_provider == file_data['ai_provider']
+
+    def test_file_prompt(self, client: django.test.Client):
+        mock_file_content = b"dummy content"
+        file_data = dict(prompt=mock_file_content.decode(), ai_provider="openai", name='dummy name')
+        with patch("siemrules.worker.tasks.new_task") as mock_task:
+            response = client.post(self.url+'prompt/', data=file_data, content_type='application/json')
+            assert response.status_code == status.HTTP_200_OK, response.content
+            mock_task.assert_called_once()
+            file : models.File = mock_task.mock_calls[0].args[1]
+            assert file.file.read() == mock_file_content
+            assert file.mode == 'txt'
+            assert file.name == file_data['name']
+            assert file.ai_provider == file_data['ai_provider']
 
     def test_retrieve_file(self, client):
         response = client.get(f"{self.url}{self.file.id}/")
