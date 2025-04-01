@@ -216,9 +216,9 @@ def modify_rule(indicator_id, old_modified, new_modified, new_objects):
     helper.execute_query('UPDATE {_key: @report_key} WITH @report_update IN siemrules_vertex_collection', 
                         bind_vars=dict(report_key=report['_key'], report_update=dict(object_refs=object_refs, modified=new_modified)), paginate=False)
     
+
     
-    
-def delete_rule(indicator_id, rule_date):
+def delete_rule(indicator_id, rule_date=''):
     helper = ArangoDBHelper(settings.VIEW_NAME, request.Request(HttpRequest()))
     new_modified = format_datetime(datetime.now(UTC))
     objects = helper.execute_query('''
