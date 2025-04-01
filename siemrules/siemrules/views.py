@@ -1,13 +1,18 @@
 
-from rest_framework import viewsets, parsers, decorators, mixins
+import io
+from rest_framework import viewsets, parsers, decorators, mixins, renderers, exceptions, serializers as drf_serializers, status
+from txt2detection.utils import parse_model
+import yaml
 from siemrules.siemrules import models, reports
 from siemrules.siemrules import serializers
+from siemrules.siemrules.modifier import DRFDetection, get_modification, modify_indicator, yaml_to_detection
 from siemrules.siemrules.serializers import FileSerializer, ImageSerializer, JobSerializer
 from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter
 import textwrap
 import typing
 from dogesec_commons.utils import Pagination, Ordering
 from siemrules.siemrules.md_helper import MarkdownImageReplacer, mistune
+from siemrules.siemrules.utils import SigmaRuleParser, SigmaRuleRenderer
 from siemrules.worker import tasks
 from rest_framework.response import Response
 from django_filters.rest_framework import FilterSet, DjangoFilterBackend, ChoiceFilter, CharFilter, BaseInFilter
@@ -19,11 +24,23 @@ from django.http import FileResponse, HttpResponseNotFound
 from siemrules.siemrules import arangodb_helpers
 
 @extend_schema_view(
-    create=extend_schema(
+    upload=extend_schema(
         summary="Upload a new File",
         description=textwrap.dedent(
             """
             Upload a file to be processed by SIEM Rules During processing a file is turned into markdown by [file2txt](https://github.com/muchdogesec/file2txt/), which is then passed to [txt2stix](https://github.com/muchdogesec/txt2stix/) to .
+
+            Files cannot be modified once uploaded. If you need to reprocess a file, you must upload it again.
+
+            The response will contain the Job information, including the Job `id`. This can be used with the GET Jobs by ID endpoint to monitor the status of the Job.
+            """
+        ),
+    ),
+    prompt=extend_schema(
+        summary="Create a new File from prompt",
+        description=textwrap.dedent(
+            """
+            Create a file from prompt, this prompt is to be processed by SIEM Rules During processing a file is turned into markdown by [file2txt](https://github.com/muchdogesec/file2txt/), which is then passed to [txt2stix](https://github.com/muchdogesec/txt2stix/) to .
 
             Files cannot be modified once uploaded. If you need to reprocess a file, you must upload it again.
 
@@ -108,7 +125,8 @@ class FileView(mixins.ListModelMixin, mixins.DestroyModelMixin, mixins.RetrieveM
             return qs.filter(pk__in=file_id)
             
     @extend_schema(responses={200: serializers.JobSerializer, 400: DEFAULT_400_ERROR}, request=serializers.FileSerializer)
-    def create(self, request, *args, **kwargs):
+    @decorators.action(methods=['POST'], detail=False)
+    def upload(self, request, *args, **kwargs):
         serializer = FileSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         temp_file = request.FILES['file']
@@ -118,10 +136,10 @@ class FileView(mixins.ListModelMixin, mixins.DestroyModelMixin, mixins.RetrieveM
         tasks.new_task(job_instance, file_instance)
         return Response(job_serializer.data)
             
-    @extend_schema(responses={200: serializers.JobSerializer, 400: DEFAULT_400_ERROR}, request=serializers.FileTextSerializer)
+    @extend_schema(responses={200: serializers.JobSerializer, 400: DEFAULT_400_ERROR}, request=serializers.FilePromptSerializer)
     @decorators.action(methods=['POST'], detail=False, parser_classes=[parsers.JSONParser])
-    def text(self, request, *args, **kwargs):
-        serializer = serializers.FileTextSerializer(data=request.data)
+    def prompt(self, request, *args, **kwargs):
+        serializer = serializers.FilePromptSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         file_instance = serializer.save(mimetype="text/plain")
         job_instance =  models.Job.objects.create(file=file_instance)
@@ -206,7 +224,14 @@ class JobView(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.Generic
             If you do not know the ID of the Rule you can use the Search and retrieve created Rules endpoint.
             """
         ),
-        responses={200: serializers.RuleSerializer(many=True)}
+        responses={200: serializers.RuleSerializer, (200, "application/sigma+yaml"): serializers.RuleSigmaSerializer},
+        parameters=[
+            OpenApiParameter('version', description='version of rule to pull')
+        ]
+    ),
+    destroy=extend_schema(
+        summary="delete a rule",
+        description="remove a rule from database",
     ),
 )
 class RuleView(viewsets.GenericViewSet):
@@ -214,6 +239,8 @@ class RuleView(viewsets.GenericViewSet):
     pagination_class = Pagination("rules")
     serializer_class = serializers.RuleSerializer
     lookup_url_kwarg = 'indicator_id'
+
+    
 
     openapi_path_params = [
         OpenApiParameter(
@@ -231,10 +258,73 @@ class RuleView(viewsets.GenericViewSet):
         created_by_ref = BaseInFilter(help_text="Filter the result by only the reports created by this identity. Pass the full STIX ID of the Identity object, e.g. `identity--b1ae1a15-6f4b-431e-b990-1b9678f35e15`.")
         sort = ChoiceFilter(help_text='Sort by value', choices=[(f, f) for f in arangodb_helpers.RULES_SORT_FIELDS])
 
+    def get_renderers(self):
+        if self.action == 'retrieve':
+            return [renderers.JSONRenderer(), SigmaRuleRenderer()]
+        return super().get_renderers()
+    
+    def get_parsers(self):
+        if getattr(self, 'action', '') == 'modify':
+            return [SigmaRuleParser()]
+        return super().get_parsers()
 
     def list(self, request, *args, **kwargs):
         return arangodb_helpers.get_rules(request)
     
     def retrieve(self, request, *args, indicator_id=None, **kwargs):
-        return arangodb_helpers.get_single_rule(indicator_id)
+        return arangodb_helpers.get_single_rule(indicator_id, version=request.query_params.get('version'))
+    
+    @extend_schema(summary="get versions", description="retrieve rule's versions, ordered from latest to oldest", responses={200: {"type": "array","items": {"type": "string", "format": "date-time"}}})
+    @decorators.action(methods=['GET'], detail=True, pagination_class = None)
+    def versions(self, request, *args, indicator_id=None, **kwargs):
+        return arangodb_helpers.get_single_rule_versions(indicator_id)
+
+    
+    
+    @extend_schema(request=DRFDetection.drf_serializer, summary="takes sigma rule as input", description="modify sigma rule by providing (partial modification, only sent item are modified)")
+    @decorators.action(methods=['POST'], detail=True, parser_classes = [SigmaRuleParser])
+    def modify(self, request, *args, indicator_id=None, **kwargs):
+        report, indicator, all_objs = arangodb_helpers.get_objects_by_id(indicator_id)
+        old_detection = yaml_to_detection(
+            indicator["pattern"], indicator["indicator_types"]
+        )
+        data = {**old_detection.model_dump(), **request.data}
+        s = DRFDetection.drf_serializer(data=data)
+        s.is_valid(raise_exception=True)
+        detection = DRFDetection.model_validate(s.data)
+        detection.id = indicator_id.split('--')[-1]
+
+    
+        return self.modify_resp(request, indicator_id, report, indicator, detection)
+
+    def modify_resp(self, request, indicator_id, report, indicator, detection):
+        new_objects = modify_indicator(report, indicator, detection)
+        file_id = report['id'].removeprefix('report--')
+        print(file_id, report['id'])
+        arangodb_helpers.modify_rule(indicator['id'], indicator['modified'], new_objects[0]['modified'], new_objects)
+
+        return self.retrieve(request, indicator_id=indicator_id)
+    
+    @extend_schema(request=serializers.AIModifySerializer, summary="takes prompt and delegates modification to AI provider", description="takes prompt and delegates modification to AI provider")
+    @decorators.action(methods=['POST'], detail=True)
+    def modify_ai(self, request, *args, indicator_id=None, **kwargs):
+        report, indicator, all_objs = arangodb_helpers.get_objects_by_id(indicator_id)
+        s = serializers.AIModifySerializer(data=request.data)
+        s.is_valid(raise_exception=True)
+        old_detection = yaml_to_detection(
+            indicator["pattern"], indicator["indicator_types"]
+        )
+        input_text = report['description']
+        input_text = '<SKIPPED INPUT>'
+        detection_container = get_modification(parse_model(s.data['ai_provider']), input_text, old_detection, s.data['prompt'])
+        if not detection_container.success:
+            raise exceptions.ParseError("txt2detection: failed to execute")
+        
+        return self.modify_resp(request, indicator_id, report, indicator, detection_container.detections[0])
+    
+    def destroy(self, request, *args, indicator_id=None, **kwargs):
+        arangodb_helpers.delete_rule(indicator_id, '')
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+        
 

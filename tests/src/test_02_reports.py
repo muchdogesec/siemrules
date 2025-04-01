@@ -19,20 +19,6 @@ from tests.src.utils import is_sorted
 
 
 @pytest.mark.django_db
-@lru_cache
-def upload_bundles():
-    for bundle in [test_data.BUNDLE_1, test_data.BUNDLE_2, test_data.BUNDLE_3]:
-        file = models.File.objects.create(
-            name="test_file.txt",
-            mimetype="text/plain",
-            id=bundle["id"].replace("bundle--", ""),
-        )
-        job = models.Job.objects.create(file=file, id=file.id)
-        tasks.upload_to_arango(job, bundle)
-    time.sleep(10)
-
-
-@pytest.mark.django_db
 class TestReportsView:
     @pytest.fixture(autouse=True)
     def setup(self):
@@ -264,7 +250,6 @@ class TestReportsView:
     )
     def test_get_reports(self, client: django.test.Client, filters, expected_ids):
         expected_ids_set = set(expected_ids)
-        upload_bundles()
         response = client.get(self.url, query_params=filters)
         assert response.status_code == status.HTTP_200_OK
         assert {obj["id"] for obj in response.data["objects"]} == expected_ids_set
@@ -278,7 +263,6 @@ class TestReportsView:
     )
     def test_get_report_objects(self, client, report_id, expected_ids, subtests):
         expected_ids_set = set(expected_ids)
-        upload_bundles()
         response = client.get(f"{self.url}{report_id}/objects/")
         assert response.status_code == status.HTTP_200_OK
         objects = response.data["objects"]

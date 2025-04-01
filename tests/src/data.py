@@ -1,4 +1,3 @@
-
 false, null, true = False, None, True
 BUNDLE_1 = {
     "type": "bundle",
@@ -57,14 +56,14 @@ BUNDLE_1 = {
             "id": "report--bc14a07a-5189-5f64-85c3-33161b923627",
             "created_by_ref": "identity--a4d70b75-6f4a-5d19-9137-da863edd33d7",
             "created": "2024-05-01T08:53:31.000Z",
-            "modified": "2025-03-26T14:26:53.398103Z",
+            "modified": "2025-03-28T08:43:13.104763Z",
             "name": "fake python vulnerability report",
             "description": "requirements.txt file that contains pypotr version 5.1.1. the version was uploaded by a state agent",
-            "published": "2025-03-26T15:26:53.398081Z",
+            "published": "2025-03-28T09:43:13.104727Z",
             "object_refs": [
-                "indicator--6d97794b-c2d8-5e32-9ec0-1b952ff91c8b",
+                "indicator--4d374788-a139-5e3e-bd85-5edb209d8c16",
                 "x-mitre-tactic--ffd5bcee-6e16-4dd2-8eca-7b3beedf33ca",
-                "relationship--13ee4cbb-988f-54c4-bbf4-1a45d3317977"
+                "relationship--5e3611ef-e761-5037-af18-5c4541db0724"
             ],
             "labels": [
                 "fake",
@@ -90,22 +89,35 @@ BUNDLE_1 = {
         },
         {
             "type": "indicator",
-            "id": "indicator--6d97794b-c2d8-5e32-9ec0-1b952ff91c8b",
+            "id": "indicator--4d374788-a139-5e3e-bd85-5edb209d8c16",
             "spec_version": "2.1",
             "created_by_ref": "identity--a4d70b75-6f4a-5d19-9137-da863edd33d7",
             "created": "2024-05-01T08:53:31.000Z",
-            "modified": "2025-03-26T14:26:53.398103Z",
+            "modified": "2025-03-28T08:43:13.104763Z",
             "indicator_types": [
                 "malicious-activity",
-                "anomalous-activity"
+                "compromised"
             ],
             "name": "Suspicious PyPI Package Version Upload",
+            "labels": [
+                "fake",
+                "hand-written",
+                "pypotr",
+                "python"
+            ],
             "pattern_type": "sigma",
-            "pattern": "title: Suspicious PyPI Package Version Upload\ndescription: Detects the presence of a specific version of the 'pypotr' package (version\n    5.1.1) in a requirements.txt file, which was reportedly uploaded by a state agent.\ndetection:\n    selection:\n        file_content: '*pypotr==5.1.1*'\n    condition: selection\nlogsource:\n    category: file\n    product: application\nfalsepositives:\n- Legitimate use of the pypotr package version 5.1.1 by developers unaware of its\n    origin.\n- Testing environments where this version is used for compatibility checks.\ntags:\n- attack.supply-chain\n- attack.initial-access\nstatus: experimental\nlicense: Apache-2.0\nreferences: https://github.com/muchdogesec/txt2detection/\n",
+            "pattern": "id: 4d374788-a139-5e3e-bd85-5edb209d8c16\ntitle: Suspicious PyPI Package Version Upload\ndescription: Detects the upload of a specific version of the 'pypotr' package, which\n    was uploaded by a state agent, indicating potential supply chain compromise.\ndetection:\n    selection:\n        event_id: package_upload\n        package_name: pypotr\n        version: 5.1.1\n    condition: selection\nlogsource:\n    category: package-management\n    product: pypi\nfalsepositives:\n- Legitimate upload by a trusted developer\n- Testing or development purposes\ntags:\n- attack.supply-chain\n- attack.initial-access\n- fake\n- hand-written\n- pypotr\n- python\nstatus: experimental\nlicense: Apache-2.0\nreferences: https://github.com/muchdogesec/txt2detection/\n",
             "valid_from": "2024-05-01T08:53:31.000Z",
             "object_marking_refs": [
                 "marking-definition--bab4a63c-aed9-4cf5-a766-dfca5abac2bb",
                 "marking-definition--a4d70b75-6f4a-5d19-9137-da863edd33d7"
+            ],
+            "external_references": [
+                {
+                    "external_id": "TA0001",
+                    "url": "https://attack.mitre.org/tactics/TA0001",
+                    "source_name": "mitre-attack"
+                }
             ]
         },
         {
@@ -138,14 +150,21 @@ BUNDLE_1 = {
         {
             "type": "relationship",
             "spec_version": "2.1",
-            "id": "relationship--13ee4cbb-988f-54c4-bbf4-1a45d3317977",
+            "id": "relationship--5e3611ef-e761-5037-af18-5c4541db0724",
             "created_by_ref": "identity--a4d70b75-6f4a-5d19-9137-da863edd33d7",
             "created": "2024-05-01T08:53:31.000Z",
-            "modified": "2025-03-26T14:26:53.398103Z",
+            "modified": "2025-03-28T08:43:13.104763Z",
             "relationship_type": "mitre-attack",
             "description": "Suspicious PyPI Package Version Upload is linked to  TA0001 (Initial Access)",
-            "source_ref": "indicator--6d97794b-c2d8-5e32-9ec0-1b952ff91c8b",
+            "source_ref": "indicator--4d374788-a139-5e3e-bd85-5edb209d8c16",
             "target_ref": "x-mitre-tactic--ffd5bcee-6e16-4dd2-8eca-7b3beedf33ca",
+            "external_references": [
+                {
+                    "source_name": "mitre-attack",
+                    "url": "https://attack.mitre.org/tactics/TA0001",
+                    "external_id": "TA0001"
+                }
+            ],
             "object_marking_refs": [
                 "marking-definition--bab4a63c-aed9-4cf5-a766-dfca5abac2bb",
                 "marking-definition--a4d70b75-6f4a-5d19-9137-da863edd33d7"
@@ -153,7 +172,6 @@ BUNDLE_1 = {
         }
     ]
 }
-
 
 
 BUNDLE_2 = {
@@ -213,18 +231,18 @@ BUNDLE_2 = {
             "id": "report--60915f4c-fa2d-5bf1-b7d1-d7ecab167560",
             "created_by_ref": "identity--a4d70b75-6f4a-5d19-9137-da863edd33d7",
             "created": "2025-01-23T17:31:01.000Z",
-            "modified": "2025-03-26T14:25:19.134272Z",
+            "modified": "2025-03-28T09:58:26.83359Z",
             "name": "CVE-2024-3094",
             "description": "[CVE-2024-3094] Malicious code was discovered in the upstream tarballs of xz, starting with version 5.6.0. Through a series of complex obfuscations, the liblzma build process extracts a prebuilt object file from a disguised test file existing in the source code, which is then used to modify specific functions in the liblzma code. This results in a modified liblzma library that can be used by any software linked against this library, intercepting and modifying the data interaction with this library.",
-            "published": "2025-03-26T15:25:19.134245Z",
+            "published": "2025-03-28T10:58:26.833566Z",
             "object_refs": [
-                "indicator--b18fc815-94c5-5dab-813b-2ad96c102fd7",
+                "indicator--881e6846-697c-5ec9-a353-32c448827930",
                 "x-mitre-tactic--78b23412-0651-46d7-a540-170a1ce8bd5a",
-                "relationship--0aac7741-af5b-5c3f-9e2e-6744b4908529",
+                "relationship--65126580-9937-5e0e-b65c-fc4b80850828",
                 "x-mitre-tactic--4ca45d45-df4d-4613-8980-bac22d278fa5",
-                "relationship--54a2c080-fa4c-5bc1-b754-b484e2eac31d",
+                "relationship--6c1ff097-3171-5b2d-9fd9-5c239fcdcc83",
                 "vulnerability--cf670f2c-81ff-5d1d-a3d6-abb4d6f25d15",
-                "relationship--3ec091b0-2470-5bb9-ac59-77455ab9f3de"
+                "relationship--8c10e5c6-222c-5d15-b457-8fe6ddd1b9bb"
             ],
             "labels": [
                 "downloaded",
@@ -248,22 +266,47 @@ BUNDLE_2 = {
         },
         {
             "type": "indicator",
-            "id": "indicator--b18fc815-94c5-5dab-813b-2ad96c102fd7",
+            "id": "indicator--881e6846-697c-5ec9-a353-32c448827930",
             "spec_version": "2.1",
             "created_by_ref": "identity--a4d70b75-6f4a-5d19-9137-da863edd33d7",
             "created": "2025-01-23T17:31:01.000Z",
-            "modified": "2025-03-26T14:25:19.134272Z",
+            "modified": "2025-03-28T09:58:26.83359Z",
             "indicator_types": [
                 "malicious-activity",
                 "compromised"
             ],
             "name": "Detection of Malicious Code in xz Tarballs",
+            "labels": [
+                "downloaded",
+                "nvd",
+                "cve-2024-3094",
+                "xz",
+                "liblzma",
+                "linux"
+            ],
             "pattern_type": "sigma",
-            "pattern": "title: Detection of Malicious Code in xz Tarballs\ndescription: Detects the presence of malicious code in the upstream tarballs of xz,\n    starting with version 5.6.0, which modifies the liblzma library to intercept and\n    modify data interactions.\ndetection:\n    selection:\n        EventID: '4104'\n        CommandLine: '*xz*5.6.0*'\n    condition: selection\nlogsource:\n    category: process_creation\n    product: windows\nfalsepositives:\n- Legitimate use of xz version 5.6.0 for non-malicious purposes\n- Testing environments where xz is used for development\ntags:\n- cve.2024-3094\n- attack.execution\n- attack.defense-evasion\nstatus: experimental\nlicense: Apache-2.0\nreferences: https://github.com/muchdogesec/txt2detection/\n",
+            "pattern": "id: 881e6846-697c-5ec9-a353-32c448827930\ntitle: Detection of Malicious Code in xz Tarballs\ndescription: Detects the presence of malicious code in the upstream tarballs of xz,\n    starting with version 5.6.0, which modifies the liblzma library to intercept and\n    modify data interactions.\ndetection:\n    selection:\n        file: xz-5.6.0.tar.gz\n        content: prebuilt object file\n    condition: selection\nlogsource:\n    category: file\n    product: linux\nfalsepositives:\n- Legitimate updates or patches to the xz library that include prebuilt object files\n    for performance reasons.\n- Custom builds of xz that include additional test files not related to malicious\n    activity.\ntags:\n- cve.2024-3094\n- attack.execution\n- attack.defense-evasion\n- downloaded\n- nvd\n- cve-2024-3094\n- xz\n- liblzma\n- linux\nstatus: experimental\nlicense: Apache-2.0\nreferences: https://github.com/muchdogesec/txt2detection/\n",
             "valid_from": "2025-01-23T17:31:01.000Z",
             "object_marking_refs": [
                 "marking-definition--bab4a63c-aed9-4cf5-a766-dfca5abac2bb",
                 "marking-definition--a4d70b75-6f4a-5d19-9137-da863edd33d7"
+            ],
+            "external_references": [
+                {
+                    "external_id": "TA0005",
+                    "url": "https://attack.mitre.org/tactics/TA0005",
+                    "source_name": "mitre-attack"
+                },
+                {
+                    "external_id": "TA0002",
+                    "url": "https://attack.mitre.org/tactics/TA0002",
+                    "source_name": "mitre-attack"
+                },
+                {
+                    "source_name": "cve",
+                    "url": "https://nvd.nist.gov/vuln/detail/CVE-2024-3094",
+                    "external_id": "CVE-2024-3094"
+                }
             ]
         },
         {
@@ -296,14 +339,21 @@ BUNDLE_2 = {
         {
             "type": "relationship",
             "spec_version": "2.1",
-            "id": "relationship--0aac7741-af5b-5c3f-9e2e-6744b4908529",
+            "id": "relationship--65126580-9937-5e0e-b65c-fc4b80850828",
             "created_by_ref": "identity--a4d70b75-6f4a-5d19-9137-da863edd33d7",
             "created": "2025-01-23T17:31:01.000Z",
-            "modified": "2025-03-26T14:25:19.134272Z",
+            "modified": "2025-03-28T09:58:26.83359Z",
             "relationship_type": "mitre-attack",
             "description": "Detection of Malicious Code in xz Tarballs is linked to  TA0005 (Defense Evasion)",
-            "source_ref": "indicator--b18fc815-94c5-5dab-813b-2ad96c102fd7",
+            "source_ref": "indicator--881e6846-697c-5ec9-a353-32c448827930",
             "target_ref": "x-mitre-tactic--78b23412-0651-46d7-a540-170a1ce8bd5a",
+            "external_references": [
+                {
+                    "source_name": "mitre-attack",
+                    "url": "https://attack.mitre.org/tactics/TA0005",
+                    "external_id": "TA0005"
+                }
+            ],
             "object_marking_refs": [
                 "marking-definition--bab4a63c-aed9-4cf5-a766-dfca5abac2bb",
                 "marking-definition--a4d70b75-6f4a-5d19-9137-da863edd33d7"
@@ -339,14 +389,21 @@ BUNDLE_2 = {
         {
             "type": "relationship",
             "spec_version": "2.1",
-            "id": "relationship--54a2c080-fa4c-5bc1-b754-b484e2eac31d",
+            "id": "relationship--6c1ff097-3171-5b2d-9fd9-5c239fcdcc83",
             "created_by_ref": "identity--a4d70b75-6f4a-5d19-9137-da863edd33d7",
             "created": "2025-01-23T17:31:01.000Z",
-            "modified": "2025-03-26T14:25:19.134272Z",
+            "modified": "2025-03-28T09:58:26.83359Z",
             "relationship_type": "mitre-attack",
             "description": "Detection of Malicious Code in xz Tarballs is linked to  TA0002 (Execution)",
-            "source_ref": "indicator--b18fc815-94c5-5dab-813b-2ad96c102fd7",
+            "source_ref": "indicator--881e6846-697c-5ec9-a353-32c448827930",
             "target_ref": "x-mitre-tactic--4ca45d45-df4d-4613-8980-bac22d278fa5",
+            "external_references": [
+                {
+                    "source_name": "mitre-attack",
+                    "url": "https://attack.mitre.org/tactics/TA0002",
+                    "external_id": "TA0002"
+                }
+            ],
             "object_marking_refs": [
                 "marking-definition--bab4a63c-aed9-4cf5-a766-dfca5abac2bb",
                 "marking-definition--a4d70b75-6f4a-5d19-9137-da863edd33d7"
@@ -695,14 +752,21 @@ BUNDLE_2 = {
         {
             "type": "relationship",
             "spec_version": "2.1",
-            "id": "relationship--3ec091b0-2470-5bb9-ac59-77455ab9f3de",
+            "id": "relationship--8c10e5c6-222c-5d15-b457-8fe6ddd1b9bb",
             "created_by_ref": "identity--a4d70b75-6f4a-5d19-9137-da863edd33d7",
             "created": "2025-01-23T17:31:01.000Z",
-            "modified": "2025-03-26T14:25:19.134272Z",
+            "modified": "2025-03-28T09:58:26.83359Z",
             "relationship_type": "nvd-cve",
             "description": "Detection of Malicious Code in xz Tarballs is linked to  CVE-2024-3094 (CVE-2024-3094)",
-            "source_ref": "indicator--b18fc815-94c5-5dab-813b-2ad96c102fd7",
+            "source_ref": "indicator--881e6846-697c-5ec9-a353-32c448827930",
             "target_ref": "vulnerability--cf670f2c-81ff-5d1d-a3d6-abb4d6f25d15",
+            "external_references": [
+                {
+                    "source_name": "cve",
+                    "url": "https://nvd.nist.gov/vuln/detail/CVE-2024-3094",
+                    "external_id": "CVE-2024-3094"
+                }
+            ],
             "object_marking_refs": [
                 "marking-definition--bab4a63c-aed9-4cf5-a766-dfca5abac2bb",
                 "marking-definition--a4d70b75-6f4a-5d19-9137-da863edd33d7"
@@ -710,8 +774,6 @@ BUNDLE_2 = {
         }
     ]
 }
-
-
 
 
 BUNDLE_3 = {
@@ -771,18 +833,18 @@ BUNDLE_3 = {
             "id": "report--cc297329-2c8d-55f3-bef9-3137bb9d87a7",
             "created_by_ref": "identity--a4d70b75-6f4a-5d19-9137-da863edd33d7",
             "created": "2025-03-01T00:00:01.000Z",
-            "modified": "2025-03-26T14:22:02.036245Z",
+            "modified": "2025-03-28T10:01:08.019151Z",
             "name": "Downloaded Description for CVE-2024-1234",
             "description": "In CVE-2024-1234, The Exclusive Addons for Elementor plugin for WordPress is vulnerable to Stored Cross-Site Scripting via data attribute in all versions up to, and including, 2.6.9 due to insufficient input sanitization and output escaping. This makes it possible for authenticated attackers, with contributor access or higher, to inject arbitrary web scripts in pages that will execute whenever a user accesses an injected page.",
-            "published": "2025-03-26T15:22:02.036227Z",
+            "published": "2025-03-28T11:01:08.019123Z",
             "object_refs": [
-                "indicator--7ff1540b-5f76-57ea-84ef-533ad474e854",
+                "indicator--815e3b87-d1e1-52fb-aa44-0dc7a9b55116",
                 "attack-pattern--7385dfaf-6886-4229-9ecd-6fd678040830",
-                "relationship--01874224-8917-53fe-ab39-a7c2a688b39d",
+                "relationship--b8042746-631f-5007-bebe-33bd9a76ec27",
                 "x-mitre-tactic--4ca45d45-df4d-4613-8980-bac22d278fa5",
-                "relationship--84475c14-16ed-5eca-9f40-9fc32994678f",
+                "relationship--a7d86e04-0400-57d1-8714-2a4e6d4a9ee6",
                 "vulnerability--a99faefb-377e-585b-9890-70f73d75ffee",
-                "relationship--20afaf9f-eb11-57a8-868b-dfdc49c432b5"
+                "relationship--b70ae89a-b0ca-5ce7-92c9-9bf8a5ae2bfc"
             ],
             "labels": [
                 "downloaded",
@@ -804,21 +866,44 @@ BUNDLE_3 = {
         },
         {
             "type": "indicator",
-            "id": "indicator--7ff1540b-5f76-57ea-84ef-533ad474e854",
+            "id": "indicator--815e3b87-d1e1-52fb-aa44-0dc7a9b55116",
             "spec_version": "2.1",
             "created_by_ref": "identity--a4d70b75-6f4a-5d19-9137-da863edd33d7",
             "created": "2025-03-01T00:00:01.000Z",
-            "modified": "2025-03-26T14:22:02.036245Z",
+            "modified": "2025-03-28T10:01:08.019151Z",
             "indicator_types": [
                 "malicious-activity"
             ],
             "name": "Detection of Stored Cross-Site Scripting in Exclusive Addons for Elementor",
+            "labels": [
+                "downloaded",
+                "nvd",
+                "cve-2024-1234",
+                "something else"
+            ],
             "pattern_type": "sigma",
-            "pattern": "title: Detection of Stored Cross-Site Scripting in Exclusive Addons for Elementor\ndescription: Detects attempts to exploit the stored XSS vulnerability in the Exclusive\n    Addons for Elementor plugin for WordPress, allowing authenticated users with contributor\n    access or higher to inject arbitrary scripts.\ndetection:\n    selection:\n        event_id: wordpress_plugin_event\n        plugin_name: Exclusive Addons for Elementor\n        version:\n            lte: 2.6.9\n        action: inject_script\n    condition: selection\nlogsource:\n    product: wordpress\n    service: plugin\nfalsepositives:\n- Legitimate use of data attributes by authorized users for non-malicious purposes.\n- Custom scripts added by site administrators for site functionality.\ntags:\n- attack.execution\n- attack.t1059\n- cve.2024-1234\nstatus: experimental\nlicense: Apache-2.0\nreferences: https://github.com/muchdogesec/txt2detection/\n",
+            "pattern": "id: 815e3b87-d1e1-52fb-aa44-0dc7a9b55116\ntitle: Detection of Stored Cross-Site Scripting in Exclusive Addons for Elementor\ndescription: Detects attempts to exploit CVE-2024-1234, a stored XSS vulnerability\n    in the Exclusive Addons for Elementor plugin for WordPress, allowing authenticated\n    users with contributor access or higher to inject arbitrary scripts.\ndetection:\n    selection:\n        EventID: '4104'\n        ScriptBlockText: '*Exclusive Addons for Elementor*'\n    condition: selection\nlogsource:\n    product: webserver\n    service: http\n    definition: logs from web server access or application logs\nfalsepositives:\n- Legitimate use of the Exclusive Addons for Elementor plugin by authorized users.\n- Non-malicious scripts added by developers for testing purposes.\ntags:\n- attack.execution\n- attack.t1059\n- cve.2024-1234\n- downloaded\n- nvd\n- cve-2024-1234\n- something else\nstatus: experimental\nlicense: Apache-2.0\nreferences: https://github.com/muchdogesec/txt2detection/\n",
             "valid_from": "2025-03-01T00:00:01.000Z",
             "object_marking_refs": [
                 "marking-definition--55d920b0-5e8b-4f79-9ee9-91f868d9b421",
                 "marking-definition--a4d70b75-6f4a-5d19-9137-da863edd33d7"
+            ],
+            "external_references": [
+                {
+                    "source_name": "mitre-attack",
+                    "url": "https://attack.mitre.org/techniques/T1059",
+                    "external_id": "T1059"
+                },
+                {
+                    "external_id": "TA0002",
+                    "url": "https://attack.mitre.org/tactics/TA0002",
+                    "source_name": "mitre-attack"
+                },
+                {
+                    "source_name": "cve",
+                    "url": "https://nvd.nist.gov/vuln/detail/CVE-2024-1234",
+                    "external_id": "CVE-2024-1234"
+                }
             ]
         },
         {
@@ -892,14 +977,21 @@ BUNDLE_3 = {
         {
             "type": "relationship",
             "spec_version": "2.1",
-            "id": "relationship--01874224-8917-53fe-ab39-a7c2a688b39d",
+            "id": "relationship--b8042746-631f-5007-bebe-33bd9a76ec27",
             "created_by_ref": "identity--a4d70b75-6f4a-5d19-9137-da863edd33d7",
             "created": "2025-03-01T00:00:01.000Z",
-            "modified": "2025-03-26T14:22:02.036245Z",
+            "modified": "2025-03-28T10:01:08.019151Z",
             "relationship_type": "mitre-attack",
             "description": "Detection of Stored Cross-Site Scripting in Exclusive Addons for Elementor is linked to  T1059 (Command and Scripting Interpreter)",
-            "source_ref": "indicator--7ff1540b-5f76-57ea-84ef-533ad474e854",
+            "source_ref": "indicator--815e3b87-d1e1-52fb-aa44-0dc7a9b55116",
             "target_ref": "attack-pattern--7385dfaf-6886-4229-9ecd-6fd678040830",
+            "external_references": [
+                {
+                    "source_name": "mitre-attack",
+                    "url": "https://attack.mitre.org/techniques/T1059",
+                    "external_id": "T1059"
+                }
+            ],
             "object_marking_refs": [
                 "marking-definition--55d920b0-5e8b-4f79-9ee9-91f868d9b421",
                 "marking-definition--a4d70b75-6f4a-5d19-9137-da863edd33d7"
@@ -935,14 +1027,21 @@ BUNDLE_3 = {
         {
             "type": "relationship",
             "spec_version": "2.1",
-            "id": "relationship--84475c14-16ed-5eca-9f40-9fc32994678f",
+            "id": "relationship--a7d86e04-0400-57d1-8714-2a4e6d4a9ee6",
             "created_by_ref": "identity--a4d70b75-6f4a-5d19-9137-da863edd33d7",
             "created": "2025-03-01T00:00:01.000Z",
-            "modified": "2025-03-26T14:22:02.036245Z",
+            "modified": "2025-03-28T10:01:08.019151Z",
             "relationship_type": "mitre-attack",
             "description": "Detection of Stored Cross-Site Scripting in Exclusive Addons for Elementor is linked to  TA0002 (Execution)",
-            "source_ref": "indicator--7ff1540b-5f76-57ea-84ef-533ad474e854",
+            "source_ref": "indicator--815e3b87-d1e1-52fb-aa44-0dc7a9b55116",
             "target_ref": "x-mitre-tactic--4ca45d45-df4d-4613-8980-bac22d278fa5",
+            "external_references": [
+                {
+                    "source_name": "mitre-attack",
+                    "url": "https://attack.mitre.org/tactics/TA0002",
+                    "external_id": "TA0002"
+                }
+            ],
             "object_marking_refs": [
                 "marking-definition--55d920b0-5e8b-4f79-9ee9-91f868d9b421",
                 "marking-definition--a4d70b75-6f4a-5d19-9137-da863edd33d7"
@@ -1021,18 +1120,40 @@ BUNDLE_3 = {
         {
             "type": "relationship",
             "spec_version": "2.1",
-            "id": "relationship--20afaf9f-eb11-57a8-868b-dfdc49c432b5",
+            "id": "relationship--b70ae89a-b0ca-5ce7-92c9-9bf8a5ae2bfc",
             "created_by_ref": "identity--a4d70b75-6f4a-5d19-9137-da863edd33d7",
             "created": "2025-03-01T00:00:01.000Z",
-            "modified": "2025-03-26T14:22:02.036245Z",
+            "modified": "2025-03-28T10:01:08.019151Z",
             "relationship_type": "nvd-cve",
             "description": "Detection of Stored Cross-Site Scripting in Exclusive Addons for Elementor is linked to  CVE-2024-1234 (CVE-2024-1234)",
-            "source_ref": "indicator--7ff1540b-5f76-57ea-84ef-533ad474e854",
+            "source_ref": "indicator--815e3b87-d1e1-52fb-aa44-0dc7a9b55116",
             "target_ref": "vulnerability--a99faefb-377e-585b-9890-70f73d75ffee",
+            "external_references": [
+                {
+                    "source_name": "cve",
+                    "url": "https://nvd.nist.gov/vuln/detail/CVE-2024-1234",
+                    "external_id": "CVE-2024-1234"
+                }
+            ],
             "object_marking_refs": [
                 "marking-definition--55d920b0-5e8b-4f79-9ee9-91f868d9b421",
                 "marking-definition--a4d70b75-6f4a-5d19-9137-da863edd33d7"
             ]
         }
     ]
+}
+
+
+MODIFY_1 = {
+    "rule_id": "indicator--815e3b87-d1e1-52fb-aa44-0dc7a9b55116",
+    "sigma": """
+description: This description was modified
+        """,
+}
+
+MODIFY_2 = {
+    "rule_id": "indicator--815e3b87-d1e1-52fb-aa44-0dc7a9b55116",
+    "sigma": """
+description: This description has been modified twice
+        """,
 }
