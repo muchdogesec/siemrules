@@ -1,5 +1,7 @@
 import contextlib
+from datetime import UTC, datetime
 import json
+from pytz import utc
 from rest_framework import request
 from django.http import HttpRequest, HttpResponse
 # from django.conf import settings
@@ -18,6 +20,7 @@ if typing.TYPE_CHECKING:
     from siemrules import settings
 from rest_framework.exceptions import NotFound, ParseError
 from rest_framework.response import Response
+from stix2.utils import format_datetime
 
 
 
@@ -215,5 +218,57 @@ def modify_rule(indicator_id, old_modified, new_modified, new_objects):
     
     
     
+def delete_rule(indicator_id, rule_date):
+    helper = ArangoDBHelper(settings.VIEW_NAME, request.Request(HttpRequest()))
+    new_modified = format_datetime(datetime.now(UTC))
+    objects = helper.execute_query('''
+            FOR doc IN siemrules_vertex_collection
+            FILTER doc.type IN ['report', 'indicator']
+            FILTER doc.id == @stix_id OR (doc.type == 'report' AND @stix_id IN doc.object_refs)
+            FILTER doc.modified > @rule_date
+            RETURN doc
+    ''', bind_vars=dict(stix_id=indicator_id, rule_date=rule_date), paginate=False)
+
+    report = rules = None
+    with contextlib.suppress(IndexError):
+        report = [obj for obj in objects if obj['type'] == 'report'][0]
+        rules = [obj for obj in objects if obj['id'] == indicator_id]
+    if not rules:
+        raise NotFound(f"no rule with id `{indicator_id}`")
+    if not report:
+        raise ParseError(f"cannot find report associated with rule `{indicator_id}`")
+
+    rels = helper.execute_query('''
+            FOR doc IN siemrules_edge_collection
+            FILTER doc._from IN @stix_id_keys
+            RETURN doc
+    ''', bind_vars=dict(stix_id_keys=[obj['_id'] for obj in rules]), paginate=False)
+    report['object_refs'].remove(indicator_id)
+    for obj in rules:
+        with contextlib.suppress(Exception):
+            report['object_refs'].remove(obj['id'])
+
+    helper.execute_query('UPDATE {_key: @report_key} WITH @report_update IN siemrules_vertex_collection', 
+                        bind_vars=dict(report_key=report['_key'], report_update=dict(object_refs=report['object_refs'], modified=new_modified)), paginate=False)
     
-    
+    helper.execute_query('''
+            LET vertex_deletions = (
+                        FOR doc IN siemrules_vertex_collection
+                        FILTER doc._key IN @keys
+                        REMOVE doc IN siemrules_vertex_collection
+                        RETURN doc.id
+            )
+
+            LET edge_deletions = (
+                        FOR doc IN siemrules_edge_collection
+                        FILTER doc._key IN @keys
+                        REMOVE doc  IN siemrules_edge_collection
+                        RETURN doc.id
+            )
+            RETURN {vertex_deletions, edge_deletions}
+            
+    ''', bind_vars=dict(keys=[obj['_key'] for obj in rules+rels]), paginate=False)
+
+    return True
+
+

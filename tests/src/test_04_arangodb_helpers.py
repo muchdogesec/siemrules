@@ -16,7 +16,7 @@ from tests.src import data as test_data
 from rest_framework.response import Response
 from rest_framework.validators import ValidationError
 
-from siemrules.siemrules.arangodb_helpers import RULES_SORT_FIELDS, get_rules, get_single_rule
+from siemrules.siemrules.arangodb_helpers import RULES_SORT_FIELDS, get_rules, get_single_rule, delete_rule
 from rest_framework.exceptions import NotFound
 from rest_framework.request import Request
 
@@ -121,3 +121,19 @@ def test_get_single_rule_404():
         mock_get_rules.return_value = []
         get_single_rule(indicator_id)
         mock_get_rules.assert_called_once()
+
+
+def test_delete_rules():
+    rule_id = "indicator--815e3b87-d1e1-52fb-aa44-0dc7a9b55116"
+    report_id = 'report--cc297329-2c8d-55f3-bef9-3137bb9d87a7'
+    assert delete_rule(rule_id) == True
+    from rest_framework import request
+    from dogesec_commons.objects.helpers import ArangoDBHelper
+    from siemrules import settings
+    helper = ArangoDBHelper(settings.VIEW_NAME, request.Request(HttpRequest()))
+    for obj in helper.db.collection('siemrules_vertex_collection').all():
+        assert obj['id'] != rule_id, "rule not deleted"
+        if obj['id'] == report_id:
+            assert rule_id not in obj['object_refs'], "rule not removed from report.object_refs"
+    for obj in helper.db.collection('siemrules_edge_collection').all():
+        assert obj['source_ref'] != rule_id, "relationships to rule not deleted"

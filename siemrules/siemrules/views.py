@@ -1,6 +1,6 @@
 
 import io
-from rest_framework import viewsets, parsers, decorators, mixins, renderers, exceptions, serializers as drf_serializers
+from rest_framework import viewsets, parsers, decorators, mixins, renderers, exceptions, serializers as drf_serializers, status
 from txt2detection.utils import parse_model
 import yaml
 from siemrules.siemrules import models, reports
@@ -229,6 +229,10 @@ class JobView(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.Generic
             OpenApiParameter('version', description='version of rule to pull')
         ]
     ),
+    destroy=extend_schema(
+        summary="delete a rule",
+        description="remove a rule from database",
+    ),
 )
 class RuleView(viewsets.GenericViewSet):
     openapi_tags = ["Rules"]
@@ -317,6 +321,10 @@ class RuleView(viewsets.GenericViewSet):
             raise exceptions.ParseError("txt2detection: failed to execute")
         
         return self.modify_resp(request, indicator_id, report, indicator, detection_container.detections[0])
+    
+    def destroy(self, request, *args, indicator_id=None, **kwargs):
+        arangodb_helpers.delete_rule(indicator_id, '')
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
         
 
