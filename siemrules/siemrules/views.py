@@ -28,7 +28,7 @@ from siemrules.siemrules import arangodb_helpers
         summary="Upload a new File",
         description=textwrap.dedent(
             """
-            Upload a file to be processed by SIEM Rules During processing a file is turned into markdown by [file2txt](https://github.com/muchdogesec/file2txt/), which is then passed to [txt2stix](https://github.com/muchdogesec/txt2stix/) to .
+            Upload a file to be processed by SIEM Rules During processing a file is turned into markdown by [file2txt](https://github.com/muchdogesec/file2txt/), which is then passed to [txt2detection](https://github.com/muchdogesec/txt2detection/) to turn into rules.
 
             Files cannot be modified once uploaded. If you need to reprocess a file, you must upload it again.
 
@@ -37,12 +37,29 @@ from siemrules.siemrules import arangodb_helpers
         ),
     ),
     prompt=extend_schema(
-        summary="Create a new File from prompt",
+        summary="Create a new File from a text input",
         description=textwrap.dedent(
             """
-            Create a file from prompt, this prompt is to be processed by SIEM Rules During processing a file is turned into markdown by [file2txt](https://github.com/muchdogesec/file2txt/), which is then passed to [txt2stix](https://github.com/muchdogesec/txt2stix/) to .
+            Create a file from a text input. During processing the created file is passed to [txt2detection](https://github.com/muchdogesec/txt2detection/) to turn into rules.
 
-            Files cannot be modified once uploaded. If you need to reprocess a file, you must upload it again.
+            Files cannot be modified once created from an input. If you need to reprocess a file, you must enter it again.
+
+            The following key / values are accepted in the body of the request:
+
+            * `text_input` (required): this is a string of text that will be passed to the AI to create the rule.
+            * `name` (required): This will be assigned to the File and Report object created. Note, the names of each detection rule generated will be automatic. Max 256 characters. This is a txt2detection setting.
+            * `ai_provider` (required): An AI provider and model to be used for rule generation in format `provider:model` e.g. `openai:gpt-4o`. This is a txt2detection setting.
+            * `report_id` (optional): Only pass a UUIDv4. It will be use to generate the STIX Report ID, e.g. `report--<UUID>`. If not passed, this value will be randomly generated for this file. This is a txt2detection setting.
+
+            * `identity` (optional): This will be used as the `created_by_ref` for all created SDOs and SROs. This is a full STIX Identity JSON. e.g. `{"type":"identity","spec_version":"2.1","id":"identity--b1ae1a15-6f4b-431e-b990-1b9678f35e15","name":"Dummy Identity"}`. If no value is passed, the Stixify identity object will be used. This is a txt2detection setting.
+            * `tlp_level` (optional): This will be assigned to all SDOs and SROs created. Stixify uses TLPv2. This is a txt2detection setting.
+            * `confidence` (optional): Will be added to the confidence value of the Report SDO created. A value between 0-100. `0` means confidence unknown. `1` is the lowest confidence score, `100` is the highest confidence score.
+            * `labels` (optional): Will be added to the `labels` of the Report and Indicator SDOs created, and `tags` in the Sigma rule itself.
+            * `defang` (optional): Whether to defang the observables in the text. e.g. turns `1.1.1[.]1` to `1.1.1.1` for extraction. This is a file2txt setting.
+            * `extract_text_from_image` (optional, default `false`): Whether to convert the images found in a the file to text. Requires a Google Vision key to be set. This is a file2txt setting
+            * `ignore_embedded_relationships` (optional, default: `false`): boolean, if `true` passed, this will stop ANY embedded relationships from being generated. This applies for all object types (SDO, SCO, SRO, SMO). If you want to target certain object types see `ignore_embedded_relationships_sro` and `ignore_embedded_relationships_sro` flags. This is a stix2arango setting.
+            * `ignore_embedded_relationships_sro` (optional, default: false): boolean, if true passed, will stop any embedded relationships from being generated from SRO objects (type = `relationship`). This is a stix2arango setting.
+            * `ignore_embedded_relationships_smo` (optional, default: false): boolean, if true passed, will stop any embedded relationships from being generated from SMO objects (type = `marking-definition`, `extension-definition`, `language-content`). This is a stix2arango setting.
 
             The response will contain the Job information, including the Job `id`. This can be used with the GET Jobs by ID endpoint to monitor the status of the Job.
             """
