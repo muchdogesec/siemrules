@@ -43,7 +43,7 @@ def test_make_uploads():
     'modification',
     [test_data.MODIFY_1, test_data.MODIFY_2]
 )
-def test_modify_rule( modification):
+def test_modify_rule(client: django.test.Client, modification):
     indicator_id = modification['rule_id']
     indicator = [obj for obj in all_objects() if obj['id'] == indicator_id][0]
     indicator_refs = [x['external_id'] for x in indicator['external_references']]
