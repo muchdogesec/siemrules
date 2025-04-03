@@ -1148,6 +1148,7 @@ MODIFY_1 = {
     "rule_id": "indicator--815e3b87-d1e1-52fb-aa44-0dc7a9b55116",
     "sigma": """
 description: This description was modified
+confidence: 19
         """,
 }
 
@@ -1155,5 +1156,6 @@ MODIFY_2 = {
     "rule_id": "indicator--815e3b87-d1e1-52fb-aa44-0dc7a9b55116",
     "sigma": """
 description: This description has been modified twice
+confidence: 48
         """,
 }

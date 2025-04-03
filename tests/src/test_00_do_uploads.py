@@ -35,6 +35,7 @@ def all_objects():
     return [obj for obj in chain(*bundle_objects) if obj['type'] != 'relationship']
 
 @pytest.mark.django_db
+@pytest.mark.order('first')
 def test_make_uploads():
         upload_bundles()
 
@@ -42,6 +43,7 @@ def test_make_uploads():
     'modification',
     [test_data.MODIFY_1, test_data.MODIFY_2]
 )
+@pytest.mark.order(after='test_make_uploads')
 def test_modify_rule(client: django.test.Client, modification):
     indicator_id = modification['rule_id']
     indicator = [obj for obj in all_objects() if obj['id'] == indicator_id][0]
