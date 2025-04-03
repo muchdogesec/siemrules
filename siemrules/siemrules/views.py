@@ -138,7 +138,7 @@ class FileView(mixins.ListModelMixin, mixins.DestroyModelMixin, mixins.RetrieveM
             
     @extend_schema(responses={200: serializers.JobSerializer, 400: DEFAULT_400_ERROR}, request=serializers.FilePromptSerializer)
     @decorators.action(methods=['POST'], detail=False, parser_classes=[parsers.JSONParser])
-    def prompt(self, request, *args, **kwargs):
+    def text(self, request, *args, **kwargs):
         serializer = serializers.FilePromptSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         file_instance = serializer.save(mimetype="text/plain")

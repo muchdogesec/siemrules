@@ -75,10 +75,10 @@ class FilePromptSerializer(FileSerializer):
     type_label = 'siemrules.text'
     
     file = serializers.HiddenField(default='')
-    prompt = serializers.CharField(write_only=True)
+    text_input = serializers.CharField(write_only=True)
     mode = serializers.HiddenField(default="txt")
     def create(self, validated_data):
-        validated_data['file'] = SimpleUploadedFile("text-input--"+slugify(validated_data['name'])+'.txt', validated_data.pop('prompt', '').encode(), "text/plain")
+        validated_data['file'] = SimpleUploadedFile("text-input--"+slugify(validated_data['name'])+'.txt', validated_data.pop('text_input', '').encode(), "text/plain")
         return super().create(validated_data)
 
 class ImageSerializer(serializers.ModelSerializer):
