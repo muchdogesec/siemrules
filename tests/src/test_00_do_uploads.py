@@ -35,16 +35,15 @@ def all_objects():
     return [obj for obj in chain(*bundle_objects) if obj['type'] != 'relationship']
 
 @pytest.mark.django_db
-@pytest.mark.order('first')
 def test_make_uploads():
-        upload_bundles()
+    upload_bundles()
 
+@pytest.mark.django_db
 @pytest.mark.parametrize(
     'modification',
     [test_data.MODIFY_1, test_data.MODIFY_2]
 )
-@pytest.mark.order(after='test_make_uploads')
-def test_modify_rule(client: django.test.Client, modification):
+def test_modify_rule( modification):
     indicator_id = modification['rule_id']
     indicator = [obj for obj in all_objects() if obj['id'] == indicator_id][0]
     indicator_refs = [x['external_id'] for x in indicator['external_references']]
