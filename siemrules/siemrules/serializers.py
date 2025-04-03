@@ -1,10 +1,11 @@
 import io
 from django.core.files.uploadedfile import InMemoryUploadedFile, SimpleUploadedFile
 from rest_framework import serializers, validators
+import txt2detection
 from siemrules.siemrules.models import File, Job, FileImage, TLP_Levels
 from drf_spectacular.utils import extend_schema_field, extend_schema_serializer
 import file2txt.parsers.core as f2t_core
-from txt2detection.utils import parse_model as parse_ai_model
+from txt2detection.utils import parse_model as parse_ai_model, valid_licenses
 from django.template.defaultfilters import slugify
 
 
@@ -53,6 +54,9 @@ class FileSerializer(serializers.ModelSerializer):
     ai_provider = serializers.CharField(required=True, validators=[validate_model], help_text="An AI provider and model to be used for rule generation in format `provider:model` e.g. `openai:gpt-4o`. This is a txt2detection setting.")
     extract_text_from_image = serializers.BooleanField(required=False, default=True, help_text="whether to extract text from file's images. This is a file2txt setting.")
     ignore_embedded_relationships = serializers.BooleanField(default=False, help_text="Default is `false`. Setting this to `true` will stop stix2arango creating relationship objects for the embedded relationships found in objects created by txt2detection.")
+    references = serializers.ListField(child=serializers.URLField(), default=list, help_text="references to include in sigma rule's references")
+    license = serializers.ChoiceField(default=None, choices=list(valid_licenses().items()), allow_null=True, help_text='valid SPDX license')
+
     class Meta:
         model = File
         exclude = ['markdown_file']

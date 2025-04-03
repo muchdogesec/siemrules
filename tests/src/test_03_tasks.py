@@ -60,6 +60,8 @@ def test_run_txt2detection():
     mock_file.id = "12345"
     mock_file.markdown_file.read.return_value = b"Test input text"
     mock_file.ai_provider = 'openai'
+    mock_file.labels = []
+    mock_file.references = mock_file.license = 'random'
 
     # Mock dependencies
     with mock.patch("siemrules.worker.tasks.parse_ai_model") as mock_parse_ai_model, \
@@ -88,7 +90,10 @@ def test_run_txt2detection():
             confidence=mock_file.confidence,
             report_id=mock_file.id,
             ai_provider=mock_ai_provider,
-            input_text="Test input text"
+            input_text="Test input text",
+            labels=mock_file.labels,
+            reference_urls=mock_file.references,
+            license=mock_file.license,
         )
 
         assert result == {"mocked": "detection_output"}
