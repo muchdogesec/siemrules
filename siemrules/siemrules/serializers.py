@@ -38,6 +38,8 @@ class STIXIdentityField(serializers.JSONField):
     pass
 
 class FileSerializer(serializers.ModelSerializer):
+    type_label = 'siemrules.file'
+
     job_id = serializers.UUIDField(source='job.id', read_only=True)
     mimetype = serializers.CharField(read_only=True)
     download_url = serializers.FileField(source='file', read_only=True, allow_null=True)
@@ -62,8 +64,16 @@ class FileSerializer(serializers.ModelSerializer):
         exclude = ['markdown_file']
         read_only_fields = ['id']
 
+    
+    def create(self, validated_data):
+        labels = validated_data['labels'] = validated_data.get('labels') or []
+        labels.insert(0, self.type_label)
+        return super().create(validated_data)
+
 
 class FilePromptSerializer(FileSerializer):
+    type_label = 'siemrules.text'
+    
     file = serializers.HiddenField(default='')
     prompt = serializers.CharField(write_only=True)
     mode = serializers.HiddenField(default="txt")
