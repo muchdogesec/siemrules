@@ -106,7 +106,7 @@ BUNDLE_1 = {
                 "python"
             ],
             "pattern_type": "sigma",
-            "pattern": "id: 4d374788-a139-5e3e-bd85-5edb209d8c16\ntitle: Suspicious PyPI Package Version Upload\ndescription: Detects the upload of a specific version of the 'pypotr' package, which\n    was uploaded by a state agent, indicating potential supply chain compromise.\ndetection:\n    selection:\n        event_id: package_upload\n        package_name: pypotr\n        version: 5.1.1\n    condition: selection\nlogsource:\n    category: package-management\n    product: pypi\nfalsepositives:\n- Legitimate upload by a trusted developer\n- Testing or development purposes\ntags:\n- attack.supply-chain\n- attack.initial-access\n- fake\n- hand-written\n- pypotr\n- python\nstatus: experimental\nlicense: Apache-2.0\nreferences: https://github.com/muchdogesec/txt2detection/\n",
+            "pattern": "confidence: 21\nid: 4d374788-a139-5e3e-bd85-5edb209d8c16\ntitle: Suspicious PyPI Package Version Upload\ndescription: Detects the upload of a specific version of the 'pypotr' package, which\n    was uploaded by a state agent, indicating potential supply chain compromise.\ndetection:\n    selection:\n        event_id: package_upload\n        package_name: pypotr\n        version: 5.1.1\n    condition: selection\nlogsource:\n    category: package-management\n    product: pypi\nfalsepositives:\n- Legitimate upload by a trusted developer\n- Testing or development purposes\ntags:\n- attack.supply-chain\n- attack.initial-access\n- fake\n- hand-written\n- pypotr\n- python\nstatus: experimental\nlicense: Apache-2.0\nreferences: https://github.com/muchdogesec/txt2detection/\n",
             "valid_from": "2024-05-01T08:53:31.000Z",
             "object_marking_refs": [
                 "marking-definition--bab4a63c-aed9-4cf5-a766-dfca5abac2bb",
@@ -285,7 +285,7 @@ BUNDLE_2 = {
                 "linux"
             ],
             "pattern_type": "sigma",
-            "pattern": "id: 881e6846-697c-5ec9-a353-32c448827930\ntitle: Detection of Malicious Code in xz Tarballs\ndescription: Detects the presence of malicious code in the upstream tarballs of xz,\n    starting with version 5.6.0, which modifies the liblzma library to intercept and\n    modify data interactions.\ndetection:\n    selection:\n        file: xz-5.6.0.tar.gz\n        content: prebuilt object file\n    condition: selection\nlogsource:\n    category: file\n    product: linux\nfalsepositives:\n- Legitimate updates or patches to the xz library that include prebuilt object files\n    for performance reasons.\n- Custom builds of xz that include additional test files not related to malicious\n    activity.\ntags:\n- cve.2024-3094\n- attack.execution\n- attack.defense-evasion\n- downloaded\n- nvd\n- cve-2024-3094\n- xz\n- liblzma\n- linux\nstatus: experimental\nlicense: Apache-2.0\nreferences: https://github.com/muchdogesec/txt2detection/\n",
+            "pattern": "confidence: 12\nid: 881e6846-697c-5ec9-a353-32c448827930\ntitle: Detection of Malicious Code in xz Tarballs\ndescription: Detects the presence of malicious code in the upstream tarballs of xz,\n    starting with version 5.6.0, which modifies the liblzma library to intercept and\n    modify data interactions.\ndetection:\n    selection:\n        file: xz-5.6.0.tar.gz\n        content: prebuilt object file\n    condition: selection\nlogsource:\n    category: file\n    product: linux\nfalsepositives:\n- Legitimate updates or patches to the xz library that include prebuilt object files\n    for performance reasons.\n- Custom builds of xz that include additional test files not related to malicious\n    activity.\ntags:\n- cve.2024-3094\n- attack.execution\n- attack.defense-evasion\n- downloaded\n- nvd\n- cve-2024-3094\n- xz\n- liblzma\n- linux\nstatus: experimental\nlicense: Apache-2.0\nreferences: https://github.com/muchdogesec/txt2detection/\n",
             "valid_from": "2025-01-23T17:31:01.000Z",
             "object_marking_refs": [
                 "marking-definition--bab4a63c-aed9-4cf5-a766-dfca5abac2bb",
@@ -882,7 +882,7 @@ BUNDLE_3 = {
                 "something else"
             ],
             "pattern_type": "sigma",
-            "pattern": "id: 815e3b87-d1e1-52fb-aa44-0dc7a9b55116\ntitle: Detection of Stored Cross-Site Scripting in Exclusive Addons for Elementor\ndescription: Detects attempts to exploit CVE-2024-1234, a stored XSS vulnerability\n    in the Exclusive Addons for Elementor plugin for WordPress, allowing authenticated\n    users with contributor access or higher to inject arbitrary scripts.\ndetection:\n    selection:\n        EventID: '4104'\n        ScriptBlockText: '*Exclusive Addons for Elementor*'\n    condition: selection\nlogsource:\n    product: webserver\n    service: http\n    definition: logs from web server access or application logs\nfalsepositives:\n- Legitimate use of the Exclusive Addons for Elementor plugin by authorized users.\n- Non-malicious scripts added by developers for testing purposes.\ntags:\n- attack.execution\n- attack.t1059\n- cve.2024-1234\n- downloaded\n- nvd\n- cve-2024-1234\n- something else\nstatus: experimental\nlicense: Apache-2.0\nreferences: https://github.com/muchdogesec/txt2detection/\n",
+            "pattern": "confidence: 25\nid: 815e3b87-d1e1-52fb-aa44-0dc7a9b55116\ntitle: Detection of Stored Cross-Site Scripting in Exclusive Addons for Elementor\ndescription: Detects attempts to exploit CVE-2024-1234, a stored XSS vulnerability\n    in the Exclusive Addons for Elementor plugin for WordPress, allowing authenticated\n    users with contributor access or higher to inject arbitrary scripts.\ndetection:\n    selection:\n        EventID: '4104'\n        ScriptBlockText: '*Exclusive Addons for Elementor*'\n    condition: selection\nlogsource:\n    product: webserver\n    service: http\n    definition: logs from web server access or application logs\nfalsepositives:\n- Legitimate use of the Exclusive Addons for Elementor plugin by authorized users.\n- Non-malicious scripts added by developers for testing purposes.\ntags:\n- attack.execution\n- attack.t1059\n- cve.2024-1234\n- downloaded\n- nvd\n- cve-2024-1234\n- something else\nstatus: experimental\nlicense: Apache-2.0\nreferences: https://github.com/muchdogesec/txt2detection/\n",
             "valid_from": "2025-03-01T00:00:01.000Z",
             "object_marking_refs": [
                 "marking-definition--55d920b0-5e8b-4f79-9ee9-91f868d9b421",
@@ -1148,7 +1148,6 @@ MODIFY_1 = {
     "rule_id": "indicator--815e3b87-d1e1-52fb-aa44-0dc7a9b55116",
     "sigma": """
 description: This description was modified
-confidence: 19
         """,
 }
 
@@ -1156,6 +1155,5 @@ MODIFY_2 = {
     "rule_id": "indicator--815e3b87-d1e1-52fb-aa44-0dc7a9b55116",
     "sigma": """
 description: This description has been modified twice
-confidence: 48
         """,
 }
