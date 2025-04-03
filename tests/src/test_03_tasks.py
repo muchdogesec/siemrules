@@ -140,6 +140,8 @@ def test_upload_to_arango(job):
             username=settings.ARANGODB_USERNAME,
             password=settings.ARANGODB_PASSWORD,
             ignore_embedded_relationships=job.file.ignore_embedded_relationships,
+            ignore_embedded_relationships_sro=job.file.ignore_embedded_relationships_sro,
+            ignore_embedded_relationships_smo=job.file.ignore_embedded_relationships_smo,
         )
         mock_s2a_instance.run.assert_called_once()
         mock_db_view.assert_called()

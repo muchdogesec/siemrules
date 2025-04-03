@@ -56,7 +56,6 @@ class File(models.Model):
     mode = models.CharField(max_length=256)
     defang = models.BooleanField(default=True, help_text="Whether to defang the observables in the blog. e.g. turns 1.1.1[.]1 to 1.1.1.1 for extraction. This is a file2txt setting. This is a file2txt setting. Default is `true`.")
     extract_text_from_image = models.BooleanField(default=True)
-    ignore_embedded_relationships = models.BooleanField(default=False)
     ai_provider = models.CharField(max_length=256)
     markdown_file = models.FileField(max_length=512, upload_to=upload_to_func, null=True)
 
@@ -65,6 +64,11 @@ class File(models.Model):
 
     references = ArrayField(base_field=models.URLField(), default=list, null=True)
     license = models.CharField(max_length=256, null=True, default=None, blank=True)
+
+    ignore_embedded_relationships = models.BooleanField(default=False)
+    ignore_embedded_relationships_sro = models.BooleanField(default=False)
+    ignore_embedded_relationships_smo = models.BooleanField(default=False)
+
     
     @property
     def report_id(self):

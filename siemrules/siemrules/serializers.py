@@ -55,9 +55,13 @@ class FileSerializer(serializers.ModelSerializer):
     defang = serializers.BooleanField(default=True, help_text="whether to defang the observables in the blog. e.g. turns `1.1.1[.]1` to `1.1.1.1` for extraction. This is a file2txt setting.")
     ai_provider = serializers.CharField(required=True, validators=[validate_model], help_text="An AI provider and model to be used for rule generation in format `provider:model` e.g. `openai:gpt-4o`. This is a txt2detection setting.")
     extract_text_from_image = serializers.BooleanField(required=False, default=True, help_text="whether to extract text from file's images. This is a file2txt setting.")
-    ignore_embedded_relationships = serializers.BooleanField(default=False, help_text="Default is `false`. Setting this to `true` will stop stix2arango creating relationship objects for the embedded relationships found in objects created by txt2detection.")
     references = serializers.ListField(child=serializers.URLField(), default=list, help_text="references to include in sigma rule's references")
     license = serializers.ChoiceField(default=None, choices=list(valid_licenses().items()), allow_null=True, help_text='valid SPDX license')
+
+
+    ignore_embedded_relationships = serializers.BooleanField(default=False, help_text="Default is `false`. Setting this to `true` will stop stix2arango creating relationship objects for the embedded relationships found in objects created by txt2detection.")
+    ignore_embedded_relationships_sro = serializers.BooleanField(default=False, help_text="if true passed, will stop any embedded relationships from being generated from SRO objects (type = `relationship`).")
+    ignore_embedded_relationships_smo = serializers.BooleanField(default=False, help_text="Default is `false`. if true passed, will stop any embedded relationships from being generated from SMO objects (type = `marking-definition`, `extension-definition`, `language-content`).")
 
     class Meta:
         model = File

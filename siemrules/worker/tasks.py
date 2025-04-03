@@ -100,6 +100,8 @@ def upload_to_arango(job: models.Job, bundle: dict, link_collection=True):
             username=settings.ARANGODB_USERNAME,
             password=settings.ARANGODB_PASSWORD,
             ignore_embedded_relationships=job.file.ignore_embedded_relationships,
+            ignore_embedded_relationships_sro=job.file.ignore_embedded_relationships_sro,
+            ignore_embedded_relationships_smo=job.file.ignore_embedded_relationships_smo,
         )
         s2a.arangodb_extra_data = dict(_stixify_report_id=job.file.report_id)
         if link_collection:
