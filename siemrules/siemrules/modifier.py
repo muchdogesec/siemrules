@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import UTC, datetime
 import io
 import yaml
 from txt2detection.ai_extractor.utils import (
@@ -19,10 +19,20 @@ from drf_pydantic import BaseModel as DRFBaseModel
 
 def modify_indicator(report, indicator: dict, detection: Detection):
     bundler = Bundler(
-        "name", None, "red", "description", 10, ["some new label"], datetime(2020, 1, 1), report_id=report['id'].replace('report--', '')
+        "name",
+        None,
+        "red",
+        "description",
+        report.get('confidence'),
+        report['labels'],
+        datetime(2020, 1, 1),
+        report_id=report['id'].replace('report--', ''),
+        modified=datetime.now(UTC)
     )
     bundler.report.external_references.clear()
     bundler.report.external_references.extend(report['external_references'])
+    bundler.report.object_marking_refs.clear()
+    bundler.report.object_marking_refs.extend(report['object_marking_refs'])
     detection.id = indicator['id']
     bundler.bundle_detections(DetectionContainer(success=True, detections=[detection]))
     retval = []
