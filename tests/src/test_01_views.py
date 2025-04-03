@@ -150,9 +150,9 @@ class TestRuleView:
     @pytest.mark.parametrize(
         ["rule_id", "expected_version_count"],
         [
-            ["indicator--815e3b87-d1e1-52fb-aa44-0dc7a9b55116", 3],
-            ["indicator--4d374788-a139-5e3e-bd85-5edb209d8c16", 1],
-            ["indicator--881e6846-697c-5ec9-a353-32c448827930", 1],
+            ["indicator--2683daab-aa64-52ff-a001-3ea5aee9dd72", 3],
+            ["indicator--8af82832-2abd-5765-903c-01d414dae1e9", 1],
+            ["indicator--9e2536b0-988b-598d-8cc3-407f9f13fc61", 1],
         ],
     )
     def test_versions(
