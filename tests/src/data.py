@@ -847,6 +847,7 @@ BUNDLE_3 = {
                 "vulnerability--a99faefb-377e-585b-9890-70f73d75ffee",
                 "relationship--1b333c3f-1203-57b6-bad9-efabeaa333ff"
             ],
+            "confidence": 92,
             "labels": [
                 "siemrules.text"
             ],
@@ -896,6 +897,11 @@ BUNDLE_3 = {
                 {
                     "external_id": "TA0002",
                     "url": "https://attack.mitre.org/tactics/TA0002",
+                    "source_name": "mitre-attack"
+                },
+                {
+                    "external_id": "T1059",
+                    "url": "https://attack.mitre.org/techniques/TA0002",
                     "source_name": "mitre-attack"
                 },
                 {

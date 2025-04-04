@@ -36,7 +36,7 @@ from siemrules.siemrules import arangodb_helpers
             """
         ),
     ),
-    prompt=extend_schema(
+    text=extend_schema(
         summary="Create a new File from a text input",
         description=textwrap.dedent(
             """

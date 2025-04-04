@@ -62,6 +62,7 @@ def test_run_txt2detection():
     mock_file.ai_provider = 'openai'
     mock_file.labels = []
     mock_file.references = mock_file.license = 'random'
+    mock_file.status = 'unsupported'
 
     # Mock dependencies
     with mock.patch("siemrules.worker.tasks.parse_ai_model") as mock_parse_ai_model, \
@@ -94,6 +95,7 @@ def test_run_txt2detection():
             labels=mock_file.labels,
             reference_urls=mock_file.references,
             license=mock_file.license,
+            status=mock_file.status,
         )
 
         assert result == {"mocked": "detection_output"}

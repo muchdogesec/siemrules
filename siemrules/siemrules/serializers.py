@@ -2,6 +2,7 @@ import io
 from django.core.files.uploadedfile import InMemoryUploadedFile, SimpleUploadedFile
 from rest_framework import serializers, validators
 import txt2detection
+import txt2detection.utils
 from siemrules.siemrules.models import File, Job, FileImage, TLP_Levels
 from drf_spectacular.utils import extend_schema_field, extend_schema_serializer
 import file2txt.parsers.core as f2t_core
@@ -60,6 +61,7 @@ class FileSerializer(serializers.ModelSerializer):
     ignore_embedded_relationships = serializers.BooleanField(default=False, help_text="Default is `false`. Setting this to `true` will stop stix2arango creating relationship objects for the embedded relationships found in objects created by txt2detection.")
     ignore_embedded_relationships_sro = serializers.BooleanField(default=False, help_text="if true passed, will stop any embedded relationships from being generated from SRO objects (type = `relationship`).")
     ignore_embedded_relationships_smo = serializers.BooleanField(default=False, help_text="Default is `false`. if true passed, will stop any embedded relationships from being generated from SMO objects (type = `marking-definition`, `extension-definition`, `language-content`).")
+    status = serializers.ChoiceField(required=False, choices=[(x, x.title()) for x in txt2detection.utils.STATUSES], help_text="sigma rule's status. this is also added to the generated indicator's external_references")
 
     class Meta:
         model = File
