@@ -30,7 +30,7 @@ class TestFileView:
         assert isinstance(response.data["files"], list)
         assert len(response.data["files"]) == 1
 
-    def test_file_upload(self, client):
+    def test_file_create__upload(self, client):
         mock_file_content = b"dummy content"
         file_data = dict(
             file=SimpleUploadedFile(
@@ -51,15 +51,16 @@ class TestFileView:
             assert file.mode == file_data["mode"]
             assert file.name == file_data["name"]
             assert file.ai_provider == file_data["ai_provider"]
+            assert 'siemrules.file' in file.labels, "must contain labels to differentiate from text_input"
 
-    def test_file_prompt(self, client: django.test.Client):
+    def test_file_create__text(self, client: django.test.Client):
         mock_file_content = b"dummy content"
         file_data = dict(
-            prompt=mock_file_content.decode(), ai_provider="openai", name="dummy name"
+            text_input=mock_file_content.decode(), ai_provider="openai", name="dummy name"
         )
         with patch("siemrules.worker.tasks.new_task") as mock_task:
             response = client.post(
-                self.url + "prompt/", data=file_data, content_type="application/json"
+                self.url + "text/", data=file_data, content_type="application/json"
             )
             assert response.status_code == status.HTTP_200_OK, response.content
             mock_task.assert_called_once()
@@ -68,6 +69,7 @@ class TestFileView:
             assert file.mode == "txt"
             assert file.name == file_data["name"]
             assert file.ai_provider == file_data["ai_provider"]
+            assert 'siemrules.text' in file.labels, "must contain labels to differentiate from upload"
 
     def test_retrieve_file(self, client):
         response = client.get(f"{self.url}{self.file.id}/")
@@ -148,9 +150,9 @@ class TestRuleView:
     @pytest.mark.parametrize(
         ["rule_id", "expected_version_count"],
         [
-            ["indicator--815e3b87-d1e1-52fb-aa44-0dc7a9b55116", 3],
-            ["indicator--4d374788-a139-5e3e-bd85-5edb209d8c16", 1],
-            ["indicator--881e6846-697c-5ec9-a353-32c448827930", 1],
+            ["indicator--2683daab-aa64-52ff-a001-3ea5aee9dd72", 3],
+            ["indicator--8af82832-2abd-5765-903c-01d414dae1e9", 1],
+            ["indicator--9e2536b0-988b-598d-8cc3-407f9f13fc61", 1],
         ],
     )
     def test_versions(

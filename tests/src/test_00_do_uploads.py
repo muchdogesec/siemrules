@@ -35,9 +35,10 @@ def all_objects():
     return [obj for obj in chain(*bundle_objects) if obj['type'] != 'relationship']
 
 @pytest.mark.django_db
-def test_nothing():
-        upload_bundles()
+def test_make_uploads():
+    upload_bundles()
 
+@pytest.mark.django_db
 @pytest.mark.parametrize(
     'modification',
     [test_data.MODIFY_1, test_data.MODIFY_2]

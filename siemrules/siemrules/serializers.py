@@ -1,10 +1,11 @@
 import io
 from django.core.files.uploadedfile import InMemoryUploadedFile, SimpleUploadedFile
 from rest_framework import serializers, validators
+import txt2detection
 from siemrules.siemrules.models import File, Job, FileImage, TLP_Levels
 from drf_spectacular.utils import extend_schema_field, extend_schema_serializer
 import file2txt.parsers.core as f2t_core
-from txt2detection.utils import parse_model as parse_ai_model
+from txt2detection.utils import parse_model as parse_ai_model, valid_licenses
 from django.template.defaultfilters import slugify
 
 
@@ -37,6 +38,8 @@ class STIXIdentityField(serializers.JSONField):
     pass
 
 class FileSerializer(serializers.ModelSerializer):
+    type_label = 'siemrules.file'
+
     job_id = serializers.UUIDField(source='job.id', read_only=True)
     mimetype = serializers.CharField(read_only=True)
     download_url = serializers.FileField(source='file', read_only=True, allow_null=True)
@@ -51,20 +54,33 @@ class FileSerializer(serializers.ModelSerializer):
     labels = serializers.ListField(child=serializers.CharField(), required=False, help_text="Will be added to the `labels` of the Report and Indicator SDOs created, and `tags` in the Sigma rule itself.")
     defang = serializers.BooleanField(default=True, help_text="Whether to defang the observables in the text. e.g. turns `1.1.1[.]1` to `1.1.1.1` for extraction. This is a file2txt setting.")
     ai_provider = serializers.CharField(required=True, validators=[validate_model], help_text="An AI provider and model to be used for rule generation in format `provider:model` e.g. `openai:gpt-4o`. This is a txt2detection setting.")
+    references = serializers.ListField(child=serializers.URLField(), default=list, help_text="references to include in sigma rule's references")
+    license = serializers.ChoiceField(default=None, choices=list(valid_licenses().items()), allow_null=True, help_text='valid SPDX license')
     extract_text_from_image = serializers.BooleanField(required=False, default=True, help_text="Whether to convert the images found in a the file to text. Requires a Google Vision key to be set. This is a file2txt setting")
     ignore_embedded_relationships = serializers.BooleanField(default=False, help_text="Default is `false`. Setting this to `true` will stop stix2arango creating relationship objects for the embedded relationships found in objects created by txt2detection.")
+    ignore_embedded_relationships_sro = serializers.BooleanField(default=False, help_text="if true passed, will stop any embedded relationships from being generated from SRO objects (type = `relationship`).")
+    ignore_embedded_relationships_smo = serializers.BooleanField(default=False, help_text="Default is `false`. if true passed, will stop any embedded relationships from being generated from SMO objects (type = `marking-definition`, `extension-definition`, `language-content`).")
+
     class Meta:
         model = File
         exclude = ['markdown_file']
         read_only_fields = ['id']
 
+    
+    def create(self, validated_data):
+        labels = validated_data['labels'] = validated_data.get('labels') or []
+        labels.insert(0, self.type_label)
+        return super().create(validated_data)
+
 
 class FilePromptSerializer(FileSerializer):
+    type_label = 'siemrules.text'
+    
     file = serializers.HiddenField(default='')
-    prompt = serializers.CharField(write_only=True)
+    text_input = serializers.CharField(write_only=True)
     mode = serializers.HiddenField(default="txt")
     def create(self, validated_data):
-        validated_data['file'] = SimpleUploadedFile("text-input--"+slugify(validated_data['name'])+'.txt', validated_data.pop('prompt', '').encode(), "text/plain")
+        validated_data['file'] = SimpleUploadedFile("text-input--"+slugify(validated_data['name'])+'.txt', validated_data.pop('text_input', '').encode(), "text/plain")
         return super().create(validated_data)
 
 class ImageSerializer(serializers.ModelSerializer):

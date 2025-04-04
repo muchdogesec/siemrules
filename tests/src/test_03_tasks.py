@@ -60,6 +60,8 @@ def test_run_txt2detection():
     mock_file.id = "12345"
     mock_file.markdown_file.read.return_value = b"Test input text"
     mock_file.ai_provider = 'openai'
+    mock_file.labels = []
+    mock_file.references = mock_file.license = 'random'
 
     # Mock dependencies
     with mock.patch("siemrules.worker.tasks.parse_ai_model") as mock_parse_ai_model, \
@@ -88,7 +90,10 @@ def test_run_txt2detection():
             confidence=mock_file.confidence,
             report_id=mock_file.id,
             ai_provider=mock_ai_provider,
-            input_text="Test input text"
+            input_text="Test input text",
+            labels=mock_file.labels,
+            reference_urls=mock_file.references,
+            license=mock_file.license,
         )
 
         assert result == {"mocked": "detection_output"}
@@ -135,6 +140,8 @@ def test_upload_to_arango(job):
             username=settings.ARANGODB_USERNAME,
             password=settings.ARANGODB_PASSWORD,
             ignore_embedded_relationships=job.file.ignore_embedded_relationships,
+            ignore_embedded_relationships_sro=job.file.ignore_embedded_relationships_sro,
+            ignore_embedded_relationships_smo=job.file.ignore_embedded_relationships_smo,
         )
         mock_s2a_instance.run.assert_called_once()
         mock_db_view.assert_called()

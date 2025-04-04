@@ -47,7 +47,18 @@ def save_file(file: InMemoryUploadedFile):
 def run_txt2detection(file: models.File):
     provider = parse_ai_model(file.ai_provider)
     input_str = file.markdown_file.read().decode()
-    bundler: txt2detectionBundler = txt2detection.run_txt2detection(name=file.name, identity=parse_stix(file.identity), tlp_level=file.tlp_level, confidence=file.confidence, report_id=file.id, ai_provider=provider, input_text=input_str)    
+    bundler: txt2detectionBundler = txt2detection.run_txt2detection(
+        name=file.name,
+        identity=parse_stix(file.identity),
+        tlp_level=file.tlp_level,
+        confidence=file.confidence,
+        labels=file.labels,
+        report_id=file.id,
+        ai_provider=provider,
+        input_text=input_str,
+        reference_urls=file.references,
+        license=file.license,
+    )
     return bundler.bundle_dict
 
 def run_file2txt(file: models.File):
@@ -89,6 +100,8 @@ def upload_to_arango(job: models.Job, bundle: dict, link_collection=True):
             username=settings.ARANGODB_USERNAME,
             password=settings.ARANGODB_PASSWORD,
             ignore_embedded_relationships=job.file.ignore_embedded_relationships,
+            ignore_embedded_relationships_sro=job.file.ignore_embedded_relationships_sro,
+            ignore_embedded_relationships_smo=job.file.ignore_embedded_relationships_smo,
         )
         s2a.arangodb_extra_data = dict(_stixify_report_id=job.file.report_id)
         if link_collection:
