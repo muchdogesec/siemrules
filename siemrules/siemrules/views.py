@@ -296,6 +296,8 @@ class RuleView(viewsets.GenericViewSet):
     def list(self, request, *args, **kwargs):
         return arangodb_helpers.get_rules(request)
     
+
+    @extend_schema(parameters=[OpenApiParameter('format', description='format to render rule in one of json (STIX indicator) and sigms (sigma rule in yaml format)', enum=['sigma', 'json'])])
     def retrieve(self, request, *args, indicator_id=None, **kwargs):
         return arangodb_helpers.get_single_rule(indicator_id, version=request.query_params.get('version'))
     
