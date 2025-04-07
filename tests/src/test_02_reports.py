@@ -273,3 +273,22 @@ class TestReportsView:
             with subtests.test('unexpected id', stix_id=obj['id']):
                 assert obj['type'] == 'relationship', 'all unexpected ids must be of type relationship'
                 assert obj['source_ref'] in expected_ids_set or obj['target_ref'] in expected_ids_set, 'all unexpected ids must be related to one of expected ids'
+    @pytest.mark.parametrize(
+            'sort_filter',
+            reports.ReportView.SORT_PROPERTIES+[None]
+    )
+    def test_list_reports_sort(self, client, sort_filter: str):
+        DEFAULT = 'modified_descending'
+        expected_sort = sort_filter or DEFAULT
+        filters = dict(sort=sort_filter) if sort_filter else None
+        response = client.get(self.url, query_params=filters)
+        assert response.status_code == status.HTTP_200_OK
+        report_objects = response.data["objects"]
+        assert {obj["type"] for obj in report_objects} == set(["report"]), "expected all returned objects to have type = 'report'"
+        property, _, direction = expected_sort.rpartition('_')
+        def sort_fn(obj):
+            retval = obj[property]
+            if property == 'name':
+                retval = retval.lower()
+            return retval
+        assert is_sorted(report_objects, key=sort_fn, reverse=direction == 'descending'), f"expected reports to be sorted by {property} in {direction} order"
