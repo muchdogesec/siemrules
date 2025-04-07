@@ -15,6 +15,7 @@ import textwrap
 from llama_index.core.base.llms.types import ChatMessage, MessageRole
 from llama_index.core.program import LLMTextCompletionProgram
 from drf_pydantic import BaseModel as DRFBaseModel
+from rest_framework import serializers, validators
 
 
 def modify_indicator(report, indicator: dict, detection: Detection):
@@ -46,7 +47,12 @@ def modify_indicator(report, indicator: dict, detection: Detection):
 
 
 class DRFDetection(DRFBaseModel, Detection):
-    pass
+    @staticmethod
+    def is_valid(s):
+        if hasattr(s, 'initial_data'):
+            unknown_keys = set(s.initial_data.keys()) - set(s.fields.keys())
+            if unknown_keys:
+                raise validators.ValidationError("Got unknown fields: {}".format(unknown_keys))
 
 def yaml_to_detection(modification: str, indicator_types=[]):
     modification = yaml.safe_load(io.StringIO(modification))

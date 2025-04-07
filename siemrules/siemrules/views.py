@@ -338,6 +338,7 @@ class RuleView(viewsets.GenericViewSet):
         data = {**old_detection.model_dump(), **request.data}
         s = DRFDetection.drf_serializer(data=data)
         s.is_valid(raise_exception=True)
+        DRFDetection.is_valid(s)
         detection = DRFDetection.model_validate(s.data)
         detection.id = indicator_id.split('--')[-1]
 
