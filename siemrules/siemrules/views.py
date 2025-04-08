@@ -1,6 +1,6 @@
 
 import io
-from rest_framework import viewsets, parsers, decorators, mixins, renderers, exceptions, serializers as drf_serializers, status
+from rest_framework import viewsets, parsers, decorators, mixins, renderers, exceptions, serializers as drf_serializers, status, validators
 from txt2detection.utils import parse_model
 import yaml
 from siemrules.siemrules import models, reports
@@ -172,6 +172,8 @@ class FileView(mixins.ListModelMixin, mixins.DestroyModelMixin, mixins.RetrieveM
         serializer = serializers.FileSigmaSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         temp_file = request.FILES['file']
+        if temp_file.content_type != "application/x-yaml":
+            validators.ValidationError("file content-type must be application/x-yaml")
         file_instance = serializer.save(mimetype=temp_file.content_type)
         job_instance =  models.Job.objects.create(file=file_instance)
         job_serializer = JobSerializer(job_instance)
