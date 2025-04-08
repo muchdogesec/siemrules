@@ -36,7 +36,7 @@ def fix_report_id(report_id: str):
         return report_id
     return "report--"+report_id
 
-def get_rules(request, paginate=True, all_versions=False):
+def get_rules(request, paginate=True, all_versions=False, nokeep=True):
     helper = ArangoDBHelper(settings.VIEW_NAME, request, result_key="rules")
     binds = {}
     filters = []
@@ -98,12 +98,13 @@ FILTER doc.type == 'indicator' AND #version
 @filters
 @sort_stmt
 #LIMIT
-RETURN KEEP(doc, KEYS(doc, true))
+RETURN KEEP(doc, KEYS(doc, #NOKEEP))
 """ \
         .replace('#version', version_filter) \
         .replace(
             "@filters", "\n".join(filters)
         ) \
+        .replace('#NOKEEP', str(nokeep))\
         .replace(
             "@sort_stmt",
             helper.get_sort_stmt(
@@ -132,6 +133,24 @@ def get_single_rule_versions(indicator_id):
     if not rules:
         raise NotFound(f"no rule with id `{indicator_id}`")
     return Response(sorted([rule['modified'] for rule in rules], reverse=True))
+
+def get_objects_for_rule(indicator_id, version=None):
+    r = request.Request(HttpRequest())
+    r.query_params.update(indicator_id=indicator_id, version=version)
+    helper = ArangoDBHelper(settings.VIEW_NAME, r)
+    rules = get_rules(r, paginate=False, nokeep=False)
+    if not rules:
+        raise NotFound(f"no rule with id `{indicator_id}`")
+    rule = rules[0]
+    query = '''
+    LET rel_ids = (FOR rel IN siemrules_edge_collection FILTER rel._from == @rule_key OR rel._to == @rule_key RETURN [rel._from, rel._to, rel._id])
+    LET obj_ids = FLATTEN([@rule_key, rel_ids], 3)
+    FOR doc IN @@view
+    FILTER doc._id IN obj_ids
+    LIMIT @offset, @count
+    RETURN KEEP(doc, KEYS(doc, TRUE))
+    '''
+    return helper.execute_query(query, bind_vars={'rule_key': rule['_id'], '@view': settings.VIEW_NAME})
 
 
 def get_objects_by_id(indicator_id):

@@ -403,5 +403,19 @@ class RuleView(viewsets.GenericViewSet):
         arangodb_helpers.delete_rule(indicator_id, '')
         return Response(status=status.HTTP_204_NO_CONTENT)
 
+    @extend_schema(
+        summary="Get objects linked to Sigma Rule",
+        description=textwrap.dedent(
+            """
+            description here
+            """
+        ),
+        responses=arangodb_helpers.ArangoDBHelper.get_paginated_response_schema(),
+        parameters=arangodb_helpers.ArangoDBHelper.get_schema_operation_parameters(),
+    )
+    @decorators.action(methods=['GET'], detail=True)
+    def objects(self, request, *args, indicator_id=None, **kwargs):
+        return arangodb_helpers.get_objects_for_rule(indicator_id, version=request.query_params.get('version'))
+
         
 
