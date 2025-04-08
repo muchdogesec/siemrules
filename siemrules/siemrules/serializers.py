@@ -33,7 +33,7 @@ class ReportIDField(serializers.CharField):
     
     def to_representation(self, value):
         return "report--"+serializers.UUIDField().to_representation(value)
-    
+
 @extend_schema_field(dict)
 class STIXIdentityField(serializers.JSONField):
     pass
@@ -58,9 +58,6 @@ class FileSerializer(serializers.ModelSerializer):
     references = serializers.ListField(child=serializers.URLField(), default=list, help_text="A list of URLs to be added as `references` in the Sigma Rule property and in the `external_references` property of the Indicator and Report STIX object created (e.g. `https://www.dogesec.com`). This is a txt2detection setting.")
     license = serializers.ChoiceField(default=None, choices=list(valid_licenses().items()), allow_null=True, help_text='[License of the rule according the SPDX ID specification](https://spdx.org/licenses/) (e.g. `MIT`). Will be added to the Sigma rule. This is a txt2detection setting.')
     extract_text_from_image = serializers.BooleanField(required=False, default=True, help_text="Whether to convert the images found in a the file to text. Requires a Google Vision key to be set. This is a file2txt setting")
-    ignore_embedded_relationships = serializers.BooleanField(default=False, help_text="Default is `false`. Setting this to `true` will stop stix2arango creating relationship objects for the embedded relationships found in objects created by txt2detection.")
-    ignore_embedded_relationships_sro = serializers.BooleanField(default=False, help_text="Default is `false`. If `true` passed, will stop any embedded relationships from being generated from SRO objects (type = `relationship`).")
-    ignore_embedded_relationships_smo = serializers.BooleanField(default=False, help_text="Default is `false`. if true passed, will stop any embedded relationships from being generated from SMO objects (type = `marking-definition`, `extension-definition`, `language-content`).")
     status = serializers.ChoiceField(required=False, choices=[(x, x.title()) for x in txt2detection.utils.STATUSES], help_text="sigma rule's status. this is also added to the generated indicator's external_references")
 
     class Meta:
@@ -84,6 +81,39 @@ class FilePromptSerializer(FileSerializer):
     def create(self, validated_data):
         validated_data['file'] = SimpleUploadedFile("text-input--"+slugify(validated_data['name'])+'.txt', validated_data.pop('text_input', '').encode(), "text/plain")
         return super().create(validated_data)
+
+class FileSigmaSerializer(serializers.ModelSerializer):
+    type_label = 'siemrules.sigma'
+    mode = serializers.HiddenField(default="sigma")
+    ai_provider = serializers.HiddenField(default=None)
+
+    file = serializers.FileField(write_only=True, help_text="sigma yaml file")
+    report_id = ReportIDField(source='id', help_text="Only pass a UUIDv4. It will be use to generate the STIX Report ID, e.g. `report--<UUID>`. If not passed, this value will be randomly generated for this file. This is a txt2detection setting.", validators=[
+        validators.UniqueValidator(queryset=File.objects.all(), message="File with report id already exists"),
+    ], required=False)
+    labels = serializers.ListField(child=serializers.CharField(), required=False, help_text="Will be added to the `labels` of the Report and Indicator SDOs created, and `tags` in the Sigma rule itself.")
+    identity = STIXIdentityField(write_only=True, required=False, help_text='This will be used as the `created_by_ref` for all created SDOs and SROs. This is a full STIX Identity JSON. e.g. `{"type":"identity","spec_version":"2.1","id":"identity--b1ae1a15-6f4b-431e-b990-1b9678f35e15","name":"Dummy Identity"}`. If no value is passed, [the Stixify identity object will be used](https://raw.githubusercontent.com/muchdogesec/stix4doge/refs/heads/main/objects/identity/stixify.json). This is a txt2detection setting.')
+
+    ignore_embedded_relationships = serializers.BooleanField(default=False, help_text="Default is `false`. Setting this to `true` will stop stix2arango creating relationship objects for the embedded relationships found in objects created by txt2detection.")
+    ignore_embedded_relationships_sro = serializers.BooleanField(default=False, help_text="Default is `false`. If `true` passed, will stop any embedded relationships from being generated from SRO objects (type = `relationship`).")
+    ignore_embedded_relationships_smo = serializers.BooleanField(default=False, help_text="Default is `false`. if true passed, will stop any embedded relationships from being generated from SMO objects (type = `marking-definition`, `extension-definition`, `language-content`).")
+
+    class Meta:
+        model = File
+        fields = [
+            'mode',
+            'ai_provider',
+            "name",
+            'file',
+            'report_id',
+            'labels',
+            'identity',
+
+            'ignore_embedded_relationships',
+            'ignore_embedded_relationships_sro',
+            'ignore_embedded_relationships_smo',
+        ]
+        read_only_fields = ["id"]
 
 class ImageSerializer(serializers.ModelSerializer):
     url = serializers.SerializerMethodField()
@@ -119,4 +149,3 @@ class RuleSigmaSerializer(serializers.Serializer):
 class AIModifySerializer(serializers.Serializer):
     prompt = serializers.CharField(help_text='prompt to send to the AI processor')
     ai_provider = serializers.CharField(required=True, validators=[validate_model], help_text="An AI provider and model to be used for rule generation in format `provider:model` e.g. `openai:gpt-4o`. This is a txt2detection setting.")
-

@@ -2,13 +2,15 @@ from datetime import UTC, datetime
 import io
 import yaml
 from txt2detection.ai_extractor.utils import (
-    Detection,
-    DetectionContainer,
     ParserWithLogging,
 )
 from txt2detection.ai_extractor import prompts
 from txt2detection.bundler import Bundler
 from txt2detection.utils import parse_model
+from txt2detection.models import (
+    Detection,
+    DetectionContainer,
+)
 
 from llama_index.core import PromptTemplate, ChatPromptTemplate
 import textwrap

@@ -56,7 +56,7 @@ class File(models.Model):
     mode = models.CharField(max_length=256)
     defang = models.BooleanField(default=True, help_text="Whether to defang the observables in the blog. e.g. turns 1.1.1[.]1 to 1.1.1.1 for extraction. This is a file2txt setting. This is a file2txt setting. Default is `true`.")
     extract_text_from_image = models.BooleanField(default=True)
-    ai_provider = models.CharField(max_length=256)
+    ai_provider = models.CharField(max_length=256, null=True)
     markdown_file = models.FileField(max_length=512, upload_to=upload_to_func, null=True)
 
     confidence = models.IntegerField(default=0)

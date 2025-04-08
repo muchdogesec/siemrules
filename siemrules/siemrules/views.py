@@ -36,6 +36,18 @@ from siemrules.siemrules import arangodb_helpers
             """
         ),
     ),
+    sigma=extend_schema(
+        summary="Upload a new File",
+        description=textwrap.dedent(
+            """
+            Upload a SIGMA Rule file to be processed by SIEM Rules, this file is passed as is to [txt2detection](https://github.com/muchdogesec/txt2detection/) to turn into rules.
+
+            Files cannot be modified once uploaded. If you need to reprocess a file, you must upload it again.
+
+            The response will contain the Job information, including the Job `id`. This can be used with the GET Jobs by ID endpoint to monitor the status of the Job.
+            """
+        ),
+    ),
     text=extend_schema(
         summary="Create a new File from a text input",
         description=textwrap.dedent(
@@ -145,6 +157,19 @@ class FileView(mixins.ListModelMixin, mixins.DestroyModelMixin, mixins.RetrieveM
     @decorators.action(methods=['POST'], detail=False)
     def upload(self, request, *args, **kwargs):
         serializer = FileSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        temp_file = request.FILES['file']
+        file_instance = serializer.save(mimetype=temp_file.content_type)
+        job_instance =  models.Job.objects.create(file=file_instance)
+        job_serializer = JobSerializer(job_instance)
+        tasks.new_task(job_instance, file_instance)
+        return Response(job_serializer.data)
+
+                
+    @extend_schema(responses={200: serializers.JobSerializer, 400: DEFAULT_400_ERROR}, request=serializers.FileSigmaSerializer)
+    @decorators.action(methods=['POST'], detail=False)
+    def sigma(self, request, *args, **kwargs):
+        serializer = serializers.FileSigmaSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         temp_file = request.FILES['file']
         file_instance = serializer.save(mimetype=temp_file.content_type)

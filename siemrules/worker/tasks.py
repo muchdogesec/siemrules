@@ -45,8 +45,15 @@ def save_file(file: InMemoryUploadedFile):
     return filename
 
 def run_txt2detection(file: models.File):
-    provider = parse_ai_model(file.ai_provider)
-    input_str = file.markdown_file.read().decode()
+    input_str = None
+    provider = None
+    kwargs = {}
+    if file.mode == 'sigma':
+        kwargs['sigma_file'] = file.file.read().decode()
+    else:
+        input_str = file.markdown_file.read().decode()
+        provider = parse_ai_model(file.ai_provider)
+
     bundler: txt2detectionBundler = txt2detection.run_txt2detection(
         name=file.name,
         identity=parse_stix(file.identity),
@@ -59,6 +66,7 @@ def run_txt2detection(file: models.File):
         reference_urls=file.references,
         license=file.license,
         status=file.status,
+        **kwargs,
     )
     return bundler.bundle_dict
 
@@ -84,7 +92,7 @@ def run_file2txt(file: models.File):
             # images.append(img_file)
             models.FileImage.objects.create(report=file, image=DjangoFile(img_file, name), name=name)
         
-        return 
+        return
 
 def upload_to_arango(job: models.Job, bundle: dict, link_collection=True):
     with tempfile.NamedTemporaryFile('w+') as f:
@@ -115,7 +123,10 @@ def upload_to_arango(job: models.Job, bundle: dict, link_collection=True):
 def process_post(filename, job_id, *args):
     job = Job.objects.get(id=job_id)
     try:
-        run_file2txt(job.file)
+        if job.file.mode == 'sigma':
+            pass
+        else:
+            run_file2txt(job.file)
         bundle = run_txt2detection(job.file)
         upload_to_arango(job, bundle)
         job.file.save()
