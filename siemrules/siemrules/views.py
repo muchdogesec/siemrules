@@ -36,7 +36,7 @@ from siemrules.siemrules import arangodb_helpers
             """
         ),
     ),
-    prompt=extend_schema(
+    text=extend_schema(
         summary="Create a new File from a text input",
         description=textwrap.dedent(
             """
@@ -243,12 +243,20 @@ class JobView(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewsets.Generic
         ),
         responses={200: serializers.RuleSerializer, (200, "application/sigma+yaml"): serializers.RuleSigmaSerializer},
         parameters=[
-            OpenApiParameter('version', description='version of rule to pull')
+            OpenApiParameter('version', description='The version of the rule you want to retrieve (e.g. `2025-04-04T06:12:59.482478Z`). The `version` value is the same as the STIX objects `modified` time. You can see all of the versions of a rule using the version endpoint. ')
         ]
     ),
     destroy=extend_schema(
-        summary="delete a rule",
-        description="remove a rule from database",
+        summary="Delete a Rule by ID",
+        description=textwrap.dedent(
+            """
+            Use this endpoint to delete a Rule. All versions of the Rule that exist will be removed.
+
+            This endpoint will remove the Rule from the databases, and any references to it (e.g. in its corresponding `report` object). However, the original `report` object the rule was created from will still remain.
+
+            If you wish to delete the `report` object and all `indicators` (rules) connected to it, use the Delete Reports endpoint.
+            """
+        ),
     ),
 )
 class RuleView(viewsets.GenericViewSet):
@@ -288,17 +296,41 @@ class RuleView(viewsets.GenericViewSet):
     def list(self, request, *args, **kwargs):
         return arangodb_helpers.get_rules(request)
     
+
+    @extend_schema(parameters=[OpenApiParameter('format', description='format to render rule in one of json (STIX indicator) and sigms (sigma rule in yaml format)', enum=['sigma', 'json'])])
     def retrieve(self, request, *args, indicator_id=None, **kwargs):
         return arangodb_helpers.get_single_rule(indicator_id, version=request.query_params.get('version'))
     
-    @extend_schema(summary="get versions", description="retrieve rule's versions, ordered from latest to oldest", responses={200: {"type": "array","items": {"type": "string", "format": "date-time"}}})
+    @extend_schema(
+        summary="Get Versions of a Rule by ID",
+        description=textwrap.dedent(
+            """
+            Use this endpoint to retrieve all versions of a rule using its STIX Indicator ID.
+
+            If you do not know the ID of the Rule you can use the Search and retrieve created Rules endpoint.
+
+            You can use the list of versions on the Get Rule endpoint to see each version of the Rule.
+            """
+        ),
+        responses={200: {"type": "array","items": {"type": "string", "format": "date-time"}}})
     @decorators.action(methods=['GET'], detail=True, pagination_class = None)
     def versions(self, request, *args, indicator_id=None, **kwargs):
         return arangodb_helpers.get_single_rule_versions(indicator_id)
 
     
     
-    @extend_schema(request=DRFDetection.drf_serializer, summary="takes sigma rule as input", description="modify sigma rule by providing (partial modification, only sent item are modified)")
+    @extend_schema(request=DRFDetection.drf_serializer,
+        summary="Manually edit a Sigma Rule by ID",
+        description=textwrap.dedent(
+            """
+            Use this endpoint to modify a Sigma Rule.
+
+            You should only enter the parts of the Sigma Rule you wish to change. Any properties/values not passed will remain unchanged in the rule. To delete a value from a property, pass the property without the value.
+
+            The rule will be validated against the Sigma specification. You will recieve an error if validation fails and the rule will not be updated.
+            """
+        ),
+    )
     @decorators.action(methods=['POST'], detail=True, parser_classes = [SigmaRuleParser])
     def modify(self, request, *args, indicator_id=None, **kwargs):
         report, indicator, all_objs = arangodb_helpers.get_objects_by_id(indicator_id)
@@ -308,6 +340,7 @@ class RuleView(viewsets.GenericViewSet):
         data = {**old_detection.model_dump(), **request.data}
         s = DRFDetection.drf_serializer(data=data)
         s.is_valid(raise_exception=True)
+        DRFDetection.is_valid(s)
         detection = DRFDetection.model_validate(s.data)
         detection.id = indicator_id.split('--')[-1]
 
@@ -322,7 +355,19 @@ class RuleView(viewsets.GenericViewSet):
 
         return self.retrieve(request, indicator_id=indicator_id)
     
-    @extend_schema(request=serializers.AIModifySerializer, summary="takes prompt and delegates modification to AI provider", description="takes prompt and delegates modification to AI provider")
+    @extend_schema(request=serializers.AIModifySerializer,
+        summary="Use AI to modify a rule by ID",
+        description=textwrap.dedent(
+            """
+            Use this endpoint to get AI to modify a Sigma Rule via a prompt.
+
+            The following key / values are accepted in the body of the request:
+
+            * `prompt` (required): The prompt you wish to send to the AI with instructions on how to modify or improve the rule. For example; Add MITRE ATT&CK Technique T1134 to this rule.
+            * `ai_provider` (required): An AI provider and model to be used for rule generation in format `provider:model` e.g. `openai:gpt-4o`. This is a txt2detection setting.
+            """
+        ),
+    )
     @decorators.action(methods=['POST'], detail=True)
     def modify_ai(self, request, *args, indicator_id=None, **kwargs):
         report, indicator, all_objs = arangodb_helpers.get_objects_by_id(indicator_id)

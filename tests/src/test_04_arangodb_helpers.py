@@ -31,13 +31,12 @@ from tests.src.utils import is_sorted
         pytest.param(dict(attack_id="T105911"), [], id="attack_id bad"),
         pytest.param(
             dict(attack_id="T1059"),
-            ["indicator--2683daab-aa64-52ff-a001-3ea5aee9dd72"],
-            id="attack_id x1",
+            [],
+            id="attack_id bad 2",
         ),
         pytest.param(
             dict(attack_id="T1059,TA0001"),
             [
-                "indicator--2683daab-aa64-52ff-a001-3ea5aee9dd72",
                 "indicator--8af82832-2abd-5765-903c-01d414dae1e9",
             ],
             id="attack_id x2",
@@ -57,16 +56,16 @@ from tests.src.utils import is_sorted
             id="good identity",
         ),
         pytest.param(
-            dict(created_by_ref="identity--a4d70b75-6f4a-5d19-9137-da863edd33d7", attack_id="T1059"),
+            dict(created_by_ref="identity--a4d70b75-6f4a-5d19-9137-da863edd33d7", attack_id="TA0001"),
             [
-                "indicator--2683daab-aa64-52ff-a001-3ea5aee9dd72",
+                "indicator--8af82832-2abd-5765-903c-01d414dae1e9",
             ],
             id="good identity + attacK_id",
         ),
         pytest.param(dict(cve_id='CVE-2022-99999'), [], id='cve_id bad'),
         pytest.param(dict(cve_id='CVE-2024-1234,CVE-2024-123456'), ["indicator--2683daab-aa64-52ff-a001-3ea5aee9dd72"], id='cve_id good+bad'),
         pytest.param(dict(cve_id='CVE-2024-3094,CVE-2024-1234'), ["indicator--2683daab-aa64-52ff-a001-3ea5aee9dd72", "indicator--9e2536b0-988b-598d-8cc3-407f9f13fc61"], id='cve_id good+good'),
-        pytest.param(dict(cve_id='CVE-2024-3094,CVE-2024-1234', attack_id="T1059"), ["indicator--2683daab-aa64-52ff-a001-3ea5aee9dd72"], id='cve_id + attack_id'),
+        pytest.param(dict(cve_id='CVE-2024-3094,CVE-2024-1234', attack_id="TA0005"), ["indicator--9e2536b0-988b-598d-8cc3-407f9f13fc61"], id='cve_id + attack_id'),
         pytest.param(dict(file_id='some-id'), [], id='bad file id'),
         pytest.param(dict(file_id='60915f4c-fa2d-5bf1-b7d1-d7ecab167560'), ["indicator--9e2536b0-988b-598d-8cc3-407f9f13fc61"], id='good file id'),
         pytest.param(dict(report_id='some-id'), [], id='bad report id'),
