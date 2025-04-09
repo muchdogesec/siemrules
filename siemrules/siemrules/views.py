@@ -355,7 +355,19 @@ class RuleView(viewsets.GenericViewSet):
 
         return self.retrieve(request, indicator_id=indicator_id)
     
-    @extend_schema(request=serializers.AIModifySerializer, summary="takes prompt and delegates modification to AI provider", description="takes prompt and delegates modification to AI provider")
+    @extend_schema(request=serializers.AIModifySerializer,
+        summary="Use AI to modify a rule by ID",
+        description=textwrap.dedent(
+            """
+            Use this endpoint to get AI to modify a Sigma Rule via a prompt.
+
+            The following key / values are accepted in the body of the request:
+
+            * `prompt` (required): The prompt you wish to send to the AI with instructions on how to modify or improve the rule. For example; Add MITRE ATT&CK Technique T1134 to this rule.
+            * `ai_provider` (required): An AI provider and model to be used for rule generation in format `provider:model` e.g. `openai:gpt-4o`. This is a txt2detection setting.
+            """
+        ),
+    )
     @decorators.action(methods=['POST'], detail=True)
     def modify_ai(self, request, *args, indicator_id=None, **kwargs):
         report, indicator, all_objs = arangodb_helpers.get_objects_by_id(indicator_id)
