@@ -26,7 +26,6 @@ def modify_indicator(report, indicator: dict, detection: Detection):
         None,
         "red",
         "description",
-        report.get('confidence'),
         report['labels'],
         datetime(2020, 1, 1),
         report_id=report['id'].replace('report--', ''),

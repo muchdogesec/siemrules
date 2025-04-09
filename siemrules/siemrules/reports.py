@@ -127,8 +127,6 @@ class ReportView(viewsets.ViewSet):
         "created_ascending",
         "name_descending",
         "name_ascending",
-        "confidence_descending",
-        "confidence_ascending",
     ]
 
     @extend_schema()
@@ -152,7 +150,6 @@ class ReportView(viewsets.ViewSet):
             OpenApiParameter('tlp_level', description="", enum=[f[0] for f in TLP_Levels.choices]),
             OpenApiParameter('description', description="Filter by the content in a report `description` (which contains the markdown version of the report). Will search for descriptions that contain the value entered. Search is wildcard so `exploit` will match `exploited`, `exploits`, etc."),
             OpenApiParameter('labels', description="searches the `labels` property for the value entered. Search is wildcard so `exploit` will match `exploited`, `exploits`, etc."),
-            OpenApiParameter('confidence_min', description="The minimum confidence score of a report `0` is no confidence, `1` is lowest, `100` is highest.", type=OpenApiTypes.NUMBER),
             OpenApiParameter('created_max', description="Maximum value of `created` value to filter by in format `YYYY-MM-DD`."),
             OpenApiParameter('created_min', description="Minimum value of `created` value to filter by in format `YYYY-MM-DD`."),
             OpenApiParameter('sort', description="report property to sort by", enum=SORT_PROPERTIES),
@@ -222,11 +219,6 @@ class ReportView(viewsets.ViewSet):
         if term := helper.query.get('labels'):
             bind_vars['labels'] = term.lower()
             filters.append("FILTER doc.labels[? ANY FILTER CONTAINS(LOWER(CURRENT), @labels)]")
-
-        if term := helper.query.get('confidence_min'):
-            if term.replace('.', '').isdigit():
-                bind_vars['confidence_min'] = float(term)
-                filters.append("FILTER doc.confidence >= @confidence_min")
 
         if term := helper.query.get('created_max'):
             bind_vars['created_max'] = term

@@ -56,7 +56,6 @@ def test_run_txt2detection():
     mock_file.name = "test_file"
     mock_file.identity = {"type": "identity", "id": "identity--"+str(uuid.uuid4()), "name": "random identity", "identity_class": "organization"}
     mock_file.tlp_level = "TLP:WHITE"
-    mock_file.confidence = 85
     mock_file.id = "12345"
     mock_file.markdown_file.read.return_value = b"Test input text"
     mock_file.ai_provider = 'openai'
@@ -88,7 +87,6 @@ def test_run_txt2detection():
             name=mock_file.name,
             identity=mock_stix_identity,
             tlp_level=mock_file.tlp_level,
-            confidence=mock_file.confidence,
             report_id=mock_file.id,
             ai_provider=mock_ai_provider,
             input_text="Test input text",

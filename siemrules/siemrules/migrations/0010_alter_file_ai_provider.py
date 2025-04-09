@@ -15,4 +15,8 @@ class Migration(migrations.Migration):
             name='ai_provider',
             field=models.CharField(max_length=256, null=True),
         ),
+        migrations.RemoveField(
+            model_name='file',
+            name='confidence',
+        ),
     ]

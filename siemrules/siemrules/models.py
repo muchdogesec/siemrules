@@ -59,7 +59,6 @@ class File(models.Model):
     ai_provider = models.CharField(max_length=256, null=True)
     markdown_file = models.FileField(max_length=512, upload_to=upload_to_func, null=True)
 
-    confidence = models.IntegerField(default=0)
     created = models.DateTimeField(auto_now_add=True)
 
     references = ArrayField(base_field=models.URLField(), default=list, null=True)

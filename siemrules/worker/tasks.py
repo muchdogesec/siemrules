@@ -58,7 +58,6 @@ def run_txt2detection(file: models.File):
         name=file.name,
         identity=parse_stix(file.identity),
         tlp_level=file.tlp_level,
-        confidence=file.confidence,
         labels=file.labels,
         report_id=file.id,
         ai_provider=provider,
