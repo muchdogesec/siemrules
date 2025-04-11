@@ -3,7 +3,10 @@ import json
 import logging
 import os
 from pathlib import Path
-from siemrules.siemrules.models import Job, File
+import uuid
+from siemrules.siemrules.correlations import correlations
+from siemrules.siemrules.correlations.models import RuleModel
+from siemrules.siemrules.models import Job, File, JobType
 from siemrules.siemrules import models
 from celery import shared_task
 from txt2detection.utils import validate_token_count, parse_model as parse_ai_model
@@ -17,7 +20,8 @@ if typing.TYPE_CHECKING:
     from siemrules import settings
 
 
-from stix2 import parse as parse_stix
+from stix2 import parse as parse_stix, Bundle
+from stix2.serialization import serialize as stix2_serialize
 from dogesec_commons.objects import db_view_creator
 
 
@@ -31,11 +35,20 @@ from stix2arango.stix2arango import Stix2Arango
 POLL_INTERVAL = 1
 
 
-def new_task(job: Job, file: File):
-    ( process_post.s(file.file.name, job.id) | job_completed_with_error.si(job.id)).apply_async(
+def new_task(job: Job):
+    task = process_post.s(job.file.file.name, job.id)
+    ( task| job_completed_with_error.si(job.id)).apply_async(
         countdown=POLL_INTERVAL, root_id=str(job.id), task_id=str(job.id)
     )
 
+def new_correlation_task(job: Job, correlation: RuleModel, extra_documents):
+    assert job.type == JobType.CORRELATION
+    # process_correlation(job.id, correlation.model_dump(by_alias=True), extra_documents)
+    task = process_correlation.s(job.id, correlation.model_dump(by_alias=True), extra_documents)
+    ( 
+        task| job_completed_with_error.si(job.id)).apply_async(
+        countdown=POLL_INTERVAL, root_id=str(job.id), task_id=str(job.id)
+    )
 
 def save_file(file: InMemoryUploadedFile):
     filename = Path(file.name).name
@@ -111,11 +124,34 @@ def upload_to_arango(job: models.Job, bundle: dict, link_collection=True):
             ignore_embedded_relationships_sro=job.file.ignore_embedded_relationships_sro,
             ignore_embedded_relationships_smo=job.file.ignore_embedded_relationships_smo,
         )
-        s2a.arangodb_extra_data = dict(_stixify_report_id=job.file.report_id)
+        s2a.arangodb_extra_data = dict(_stixify_report_id=job.file.report_id, _siemrules_job_id=str(job.id))
         if link_collection:
             db_view_creator.link_one_collection(s2a.arango.db, settings.VIEW_NAME, f"{settings.ARANGODB_COLLECTION}_edge_collection")
             db_view_creator.link_one_collection(s2a.arango.db, settings.VIEW_NAME, f"{settings.ARANGODB_COLLECTION}_vertex_collection")
         s2a.run()
+
+def bundle_dict(self):
+        return json.loads(self.to_json())
+
+def upload_objects(job: models.Job, objects):
+    s2a = Stix2Arango(
+        file=None,
+        database=settings.ARANGODB_DATABASE,
+        collection=settings.ARANGODB_COLLECTION,
+        stix2arango_note=f"siemrules-correlation",
+        host_url=settings.ARANGODB_HOST_URL,
+        username=settings.ARANGODB_USERNAME,
+        password=settings.ARANGODB_PASSWORD,
+        # ignore_embedded_relationships=job.file.ignore_embedded_relationships,
+        # ignore_embedded_relationships_sro=job.file.ignore_embedded_relationships_sro,
+        # ignore_embedded_relationships_smo=job.file.ignore_embedded_relationships_smo,
+    )
+    s2a.arangodb_extra_data = dict(_siemrules_job_id=str(job.id))
+    s2a.run(data=make_bundle(objects=objects))
+
+
+def make_bundle(objects):
+    return json.loads(stix2_serialize(dict(type="bundle", id="bundle--"+str(uuid.uuid4()), objects=objects)))
 
 
 @shared_task
@@ -135,6 +171,14 @@ def process_post(filename, job_id, *args):
         logging.exception(e)
     job.save()
     return job_id
+
+@shared_task
+def process_correlation(job_id, correlation: RuleModel, extra_documents):
+    correlation = RuleModel.model_validate(correlation)
+    job = Job.objects.get(id=job_id)
+    objects = correlations.add_rule_indicator(correlation, extra_documents)
+    upload_objects(job, objects)
+
 
 
 @shared_task

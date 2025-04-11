@@ -48,6 +48,7 @@ def modify_indicator(report, indicator: dict, detection: Detection):
 
 
 class DRFDetection(DRFBaseModel, Detection):
+    drf_config = {"validate_pydantic": True}
     @staticmethod
     def is_valid(s):
         if hasattr(s, 'initial_data'):

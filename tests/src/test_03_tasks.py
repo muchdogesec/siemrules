@@ -25,7 +25,7 @@ def test_new_task(job):
     with patch("siemrules.worker.tasks.process_post.s") as mock_process_post, \
          patch("siemrules.worker.tasks.job_completed_with_error.si") as mock_error_task:
         
-        new_task(job, file)
+        new_task(job)
 
         mock_process_post.assert_called_once_with(file.file.name, job.id)
         mock_error_task.assert_called_once_with(job.id)

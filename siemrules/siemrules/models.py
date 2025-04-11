@@ -103,19 +103,22 @@ class JobState(models.TextChoices):
     PROCESSING = "processing"
     COMPLETED = "completed"
 
+class JobType(models.TextChoices):
+    FILE = "file"
+    CORRELATION = "correlation"
+
+
 class Job(models.Model):
-    file = models.OneToOneField(File, on_delete=models.CASCADE)
+    type = models.CharField(choices=JobType.choices, max_length=20, default=JobType.FILE)
+    file = models.OneToOneField(File, on_delete=models.CASCADE, default=None, null=True)
     id = models.UUIDField(default=uuid.uuid4, primary_key=True)
     state = models.CharField(choices=JobState.choices, max_length=20, default=JobState.PENDING)
     error = models.CharField(max_length=65536, null=True)
     run_datetime = models.DateTimeField(auto_now_add=True)
     completion_time = models.DateTimeField(null=True, default=None)
+    data = models.JSONField(default=None, null=True)
 
     def save(self, *args, **kwargs) -> None:
         if not self.completion_time and self.state == JobState.COMPLETED:
             self.completion_time = datetime.now(timezone.utc)
         return super().save(*args, **kwargs)
-    
-    @property
-    def profile(self):
-        return self.file.profile

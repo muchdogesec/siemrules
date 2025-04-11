@@ -136,8 +136,13 @@ class JobSerializer(serializers.ModelSerializer):
     report_id = ReportIDField(source='file.id')
     class Meta:
         model = Job
-        fields = '__all__'
+        exclude = ['data']
 
+
+class CorrelationJobSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Job
+        exclude = ['file']
 
 class RuleSerializer(serializers.Serializer):
     id = serializers.CharField(default="indicator--3fa85f64-5717-4562-b3fc-2c963f66afa6")

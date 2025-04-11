@@ -36,7 +36,7 @@ def fix_report_id(report_id: str):
         return report_id
     return "report--"+report_id
 
-def get_rules(request, paginate=True, all_versions=False, nokeep=True):
+def get_rules(request, paginate=True, all_versions=False, nokeep=True, correlation_rules=False):
     helper = ArangoDBHelper(settings.VIEW_NAME, request, result_key="rules")
     binds = {}
     filters = []
@@ -47,6 +47,7 @@ def get_rules(request, paginate=True, all_versions=False, nokeep=True):
         version_filter = 'doc.modified == @version'
     if all_versions:
         version_filter = 'TRUE'
+
 
 
     report_ids = helper.query_as_array('report_id')
@@ -64,6 +65,8 @@ def get_rules(request, paginate=True, all_versions=False, nokeep=True):
         filters.append(
             "FILTER doc.id in @indicator_ids"
         )
+
+
 
     if name := helper.query.get('name', '').lower():
         binds['name'] = name
@@ -88,6 +91,11 @@ def get_rules(request, paginate=True, all_versions=False, nokeep=True):
         filters.append('''
                 FILTER doc.external_references[? ANY FILTER CURRENT.source_name == 'cve' AND CURRENT.external_id IN @cve_ids]
             ''')
+        
+    
+
+    filters.append('FILTER STARTS_WITH(doc.labels[0], "siemrules.correlation-rule") == @show_correlation_rules')
+    binds.update(show_correlation_rules=correlation_rules)
 
 
     query = """
@@ -118,27 +126,27 @@ RETURN KEEP(doc, KEYS(doc, #NOKEEP))
     # return HttpResponse(f"{query}\n\n//"+json.dumps(binds))
     return helper.execute_query(query, bind_vars=binds, paginate=paginate)
 
-def get_single_rule(indicator_id, version=None):
+def get_single_rule(indicator_id, version=None, correlation_rules=False):
     r = request.Request(HttpRequest())
     r.query_params.update(indicator_id=indicator_id, version=version)
-    rules = get_rules(r, paginate=False)
+    rules = get_rules(r, paginate=False, correlation_rules=correlation_rules)
     if not rules:
         raise NotFound(f"no rule with id `{indicator_id}`")
     return Response(rules[0])
 
-def get_single_rule_versions(indicator_id):
+def get_single_rule_versions(indicator_id, correlation_rules=False):
     r = request.Request(HttpRequest())
     r.query_params.update(indicator_id=indicator_id)
-    rules = get_rules(r, paginate=False, all_versions=True)
+    rules = get_rules(r, paginate=False, all_versions=True, correlation_rules=correlation_rules)
     if not rules:
         raise NotFound(f"no rule with id `{indicator_id}`")
     return Response(sorted([rule['modified'] for rule in rules], reverse=True))
 
-def get_objects_for_rule(indicator_id, version=None):
+def get_objects_for_rule(indicator_id, version=None, correlation_rules=False):
     r = request.Request(HttpRequest())
     r.query_params.update(indicator_id=indicator_id, version=version)
     helper = ArangoDBHelper(settings.VIEW_NAME, r)
-    rules = get_rules(r, paginate=False, nokeep=False)
+    rules = get_rules(r, paginate=False, nokeep=False, correlation_rules=correlation_rules)
     if not rules:
         raise NotFound(f"no rule with id `{indicator_id}`")
     rule = rules[0]
@@ -237,7 +245,7 @@ def modify_rule(indicator_id, old_modified, new_modified, new_objects):
     
 
     
-def delete_rule(indicator_id, rule_date=''):
+def delete_rule(indicator_id, rule_date='', correlation_rules=False):
     helper = ArangoDBHelper(settings.VIEW_NAME, request.Request(HttpRequest()))
     new_modified = format_datetime(datetime.now(UTC))
     objects = helper.execute_query('''
@@ -254,7 +262,8 @@ def delete_rule(indicator_id, rule_date=''):
         rules = [obj for obj in objects if obj['id'] == indicator_id]
     if not rules:
         raise NotFound(f"no rule with id `{indicator_id}`")
-    if not report:
+    
+    if not correlation_rules and not report:
         raise ParseError(f"cannot find report associated with rule `{indicator_id}`")
 
     rels = helper.execute_query('''
@@ -262,13 +271,15 @@ def delete_rule(indicator_id, rule_date=''):
             FILTER doc._from IN @stix_id_keys
             RETURN doc
     ''', bind_vars=dict(stix_id_keys=[obj['_id'] for obj in rules]), paginate=False)
-    report['object_refs'].remove(indicator_id)
-    for obj in rules:
-        with contextlib.suppress(Exception):
-            report['object_refs'].remove(obj['id'])
 
-    helper.execute_query('UPDATE {_key: @report_key} WITH @report_update IN siemrules_vertex_collection', 
-                        bind_vars=dict(report_key=report['_key'], report_update=dict(object_refs=report['object_refs'], modified=new_modified)), paginate=False)
+    if report:
+        report['object_refs'].remove(indicator_id)
+        for obj in rules:
+            with contextlib.suppress(Exception):
+                report['object_refs'].remove(obj['id'])
+
+        helper.execute_query('UPDATE {_key: @report_key} WITH @report_update IN siemrules_vertex_collection', 
+                            bind_vars=dict(report_key=report['_key'], report_update=dict(object_refs=report['object_refs'], modified=new_modified)), paginate=False)
     
     helper.execute_query('''
             LET vertex_deletions = (

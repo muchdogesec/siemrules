@@ -14,6 +14,7 @@ from txt2detection.utils import parse_model
 import yaml
 from siemrules.siemrules import models, reports
 from siemrules.siemrules import serializers
+from siemrules.siemrules.correlations.serializers import DRFCorrelationRule
 from siemrules.siemrules.modifier import (
     DRFDetection,
     get_modification,
@@ -21,10 +22,14 @@ from siemrules.siemrules.modifier import (
     yaml_to_detection,
 )
 from siemrules.siemrules.serializers import (
+    CorrelationJobSerializer,
     FileSerializer,
     ImageSerializer,
     JobSerializer,
 )
+
+from rest_framework import request
+from django.http import HttpRequest, HttpResponse
 from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter
 import textwrap
 import typing
@@ -206,9 +211,9 @@ class FileView(
         serializer.is_valid(raise_exception=True)
         temp_file = request.FILES["file"]
         file_instance = serializer.save(mimetype=temp_file.content_type)
-        job_instance = models.Job.objects.create(file=file_instance)
+        job_instance = models.Job.objects.create(file=file_instance, type=models.JobType.FILE)
         job_serializer = JobSerializer(job_instance)
-        tasks.new_task(job_instance, file_instance)
+        tasks.new_task(job_instance)
         return Response(job_serializer.data)
 
     @extend_schema(
@@ -225,7 +230,7 @@ class FileView(
         file_instance = serializer.save(mimetype=temp_file.content_type)
         job_instance = models.Job.objects.create(file=file_instance)
         job_serializer = JobSerializer(job_instance)
-        tasks.new_task(job_instance, file_instance)
+        tasks.new_task(job_instance)
         return Response(job_serializer.data)
 
     @extend_schema(
@@ -241,7 +246,7 @@ class FileView(
         file_instance = serializer.save(mimetype="text/plain")
         job_instance = models.Job.objects.create(file=file_instance)
         job_serializer = JobSerializer(job_instance)
-        tasks.new_task(job_instance, file_instance)
+        tasks.new_task(job_instance)
         return Response(job_serializer.data)
 
     @decorators.action(detail=True, methods=["GET"])
@@ -368,16 +373,17 @@ class RuleView(viewsets.GenericViewSet):
     lookup_url_kwarg = "indicator_id"
 
     lookup_value_regex = r'indicator--[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'
+    correlation_rules_only = False
 
     openapi_path_params = [
         OpenApiParameter(
             lookup_url_kwarg,
             location=OpenApiParameter.PATH,
-            type=dict(
-                pattern=lookup_value_regex,
-                type='str',
-                format='path',
-            ),
+            # type=dict(
+            #     # pattern=lookup_value_regex,
+            #     type='str',
+            #     format='path',
+            # ),
             description="The `id` of the Indicator. e.g. `indicator--3fa85f64-5717-4562-b3fc-2c963f66afa6`.",
         )
     ]
@@ -421,7 +427,7 @@ class RuleView(viewsets.GenericViewSet):
         return super().get_parsers()
 
     def list(self, request, *args, **kwargs):
-        return arangodb_helpers.get_rules(request)
+        return arangodb_helpers.get_rules(request, correlation_rules=self.correlation_rules_only)
 
     @extend_schema(
         parameters=[
@@ -434,7 +440,8 @@ class RuleView(viewsets.GenericViewSet):
     )
     def retrieve(self, request, *args, indicator_id=None, **kwargs):
         return arangodb_helpers.get_single_rule(
-            indicator_id, version=request.query_params.get("version")
+            indicator_id, version=request.query_params.get("version"),
+            correlation_rules=self.correlation_rules_only,
         )
 
     @extend_schema(
@@ -454,7 +461,10 @@ class RuleView(viewsets.GenericViewSet):
     )
     @decorators.action(methods=["GET"], detail=True, pagination_class=None)
     def versions(self, request, *args, indicator_id=None, **kwargs):
-        return arangodb_helpers.get_single_rule_versions(indicator_id)
+        return arangodb_helpers.get_single_rule_versions(
+            indicator_id,
+            correlation_rules=self.correlation_rules_only,
+                                                         )
 
     @extend_schema(
         request=DRFDetection.drf_serializer,
@@ -534,7 +544,9 @@ class RuleView(viewsets.GenericViewSet):
         )
 
     def destroy(self, request, *args, indicator_id=None, **kwargs):
-        arangodb_helpers.delete_rule(indicator_id, "")
+        arangodb_helpers.delete_rule(indicator_id, "", 
+            correlation_rules=self.correlation_rules_only,
+                                    )
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     @extend_schema(
@@ -550,5 +562,67 @@ class RuleView(viewsets.GenericViewSet):
     @decorators.action(methods=["GET"], detail=True)
     def objects(self, request, *args, indicator_id=None, **kwargs):
         return arangodb_helpers.get_objects_for_rule(
-            indicator_id, version=request.query_params.get("version")
+            indicator_id, version=request.query_params.get("version"),
+            correlation_rules=self.correlation_rules_only,
         )
+
+
+@extend_schema_view(
+    upload=extend_schema(summary="create correlation from yml file"),
+    prompt=extend_schema(summary="create correlation from prompts"),
+)
+class CorrelationView(RuleView):
+    openapi_tags = ["Correlation"]
+    correlation_rules_only = True
+
+    def get_renderers(self):
+        if self.action == "retrieve":
+            return [renderers.JSONRenderer(), SigmaRuleRenderer()]
+        return super().get_renderers()
+
+    def get_parsers(self):
+        if self.request and "/upload/" in self.request.path:
+            return [SigmaRuleParser()]
+        return super().get_parsers()
+
+    def get_rules(self, rule_ids):
+        r = request.Request(HttpRequest())
+        rule_ids = [str(r) for r in rule_ids]
+        indicator_ids = ["indicator--" + rule_id for rule_id in rule_ids]
+        r.query_params.update(indicator_id=",".join(indicator_ids))
+        indicators = arangodb_helpers.get_rules(r, paginate=False)
+        rules = {
+            indicator["id"].replace("indicator--", ""): yaml.safe_load(
+                io.StringIO(indicator["pattern"])
+            )
+            for indicator in indicators
+        }
+        if non_existent_rules := set(rule_ids).difference(rules):
+            raise validators.ValidationError(
+                f"non existent rules in correlation {non_existent_rules}"
+            )
+        return rules
+
+    @extend_schema(request=DRFCorrelationRule.drf_serializer)
+    @decorators.action(methods=['POST'], detail=False, serializer_class=JobSerializer)
+    def upload(self, request, *args, **kwargs):
+        rule_s = DRFCorrelationRule.drf_serializer(data=request.data)
+        rule_s.is_valid(raise_exception=True)
+        rule = DRFCorrelationRule.model_validate(rule_s.data)
+        extra_documents = []
+        if rule.correlation.rules:
+            rules_mapping = self.get_rules(rule.correlation.rules)
+            extra_documents = list(rules_mapping.values())
+
+        job_instance = models.Job.objects.create(type=models.JobType.CORRELATION)
+        job_s = CorrelationJobSerializer(job_instance)
+
+        tasks.new_correlation_task(job_instance, rule, extra_documents)
+        return Response(job_s.data)
+
+
+    def list(self, request, *args, **kwargs):
+        return arangodb_helpers.get_rules(request, correlation_rules=True)
+    
+    modify = None
+    modify_ai = None
