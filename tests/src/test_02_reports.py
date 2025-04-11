@@ -125,23 +125,6 @@ class TestReportsView:
                 ],
                 id='no filter'
             ),
-            pytest.param(
-                dict(confidence_min=0),
-                [
-                    "report--60915f4c-fa2d-5bf1-b7d1-d7ecab167560",
-                    "report--bc14a07a-5189-5f64-85c3-33161b923627",
-                    "report--cc297329-2c8d-55f3-bef9-3137bb9d87a7",
-                ],
-                id='confidence min 0'
-            ),
-            pytest.param(
-                dict(confidence_min=20),
-                [
-                    "report--60915f4c-fa2d-5bf1-b7d1-d7ecab167560",
-                    "report--cc297329-2c8d-55f3-bef9-3137bb9d87a7",
-                ],
-                id='confidence min 1'
-            ),
             pytest.param(dict(created_min="2027-01-01"), []),
             pytest.param(
                 dict(created_min="2001-01-01"),

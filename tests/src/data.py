@@ -71,7 +71,6 @@ BUNDLE_1 = {
                 "pypotr",
                 "python"
             ],
-            "confidence": 0,
             "external_references": [
                 {
                     "source_name": "description_md5_hash",
@@ -119,7 +118,6 @@ BUNDLE_1 = {
                     "source_name": "mitre-attack"
                 }
             ],
-            "confidence": 85
         },
         {
             "created": "2018-10-17T00:14:20.652Z",
@@ -253,7 +251,6 @@ BUNDLE_2 = {
                 "liblzma",
                 "linux"
             ],
-            "confidence": 54,
             "external_references": [
                 {
                     "source_name": "description_md5_hash",
@@ -309,7 +306,6 @@ BUNDLE_2 = {
                     "external_id": "CVE-2024-3094"
                 }
             ],
-            "confidence": 85
         },
         {
             "created": "2018-10-17T00:14:20.652Z",
@@ -910,7 +906,6 @@ BUNDLE_3 = {
                     "external_id": "CVE-2024-1234"
                 }
             ],
-            "confidence": 85
         },
         {
             "created": "2018-10-17T00:14:20.652Z",

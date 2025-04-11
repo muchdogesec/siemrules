@@ -25,7 +25,7 @@ def test_new_task(job):
     with patch("siemrules.worker.tasks.process_post.s") as mock_process_post, \
          patch("siemrules.worker.tasks.job_completed_with_error.si") as mock_error_task:
         
-        new_task(job, file)
+        new_task(job)
 
         mock_process_post.assert_called_once_with(file.file.name, job.id)
         mock_error_task.assert_called_once_with(job.id)
@@ -56,7 +56,6 @@ def test_run_txt2detection():
     mock_file.name = "test_file"
     mock_file.identity = {"type": "identity", "id": "identity--"+str(uuid.uuid4()), "name": "random identity", "identity_class": "organization"}
     mock_file.tlp_level = "TLP:WHITE"
-    mock_file.confidence = 85
     mock_file.id = "12345"
     mock_file.markdown_file.read.return_value = b"Test input text"
     mock_file.ai_provider = 'openai'
@@ -88,7 +87,6 @@ def test_run_txt2detection():
             name=mock_file.name,
             identity=mock_stix_identity,
             tlp_level=mock_file.tlp_level,
-            confidence=mock_file.confidence,
             report_id=mock_file.id,
             ai_provider=mock_ai_provider,
             input_text="Test input text",
