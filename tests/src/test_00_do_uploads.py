@@ -52,7 +52,7 @@ def upload_bundles():
         )
         job = models.Job.objects.create(file=file, id=file.id)
         tasks.upload_to_arango(job, bundle)
-    time.sleep(10)
+    time.sleep(5)
 
 def all_objects():
     bundle_objects = [bundle['objects'] for bundle in [test_data.BUNDLE_1, test_data.BUNDLE_2, test_data.BUNDLE_3]]
@@ -71,7 +71,9 @@ def test_modify_rule(client: django.test.Client, modification):
     indicator_id = modification['rule_id']
     indicator = [obj for obj in all_objects() if obj['id'] == indicator_id][0]
     indicator_refs = [x['external_id'] for x in indicator['external_references']]
+    time.sleep(2)
     with patch('txt2detection.bundler.Bundler.get_attack_objects') as get_attack_objects, patch('txt2detection.bundler.Bundler.get_cve_objects') as get_cve_objects:
         get_attack_objects.return_value = [obj for obj in all_objects() if obj['type'] != 'indicator' and obj.get('external_references') and obj['external_references'][0]['external_id'] in indicator_refs and obj['external_references'][0]['source_name'] == 'mitre-attack']
         get_cve_objects.return_value = [obj for obj in all_objects() if obj['type'] != 'indicator' and obj.get('external_references') and obj['external_references'][0]['external_id'] in indicator_refs and obj['external_references'][0]['source_name'] == 'cve']
         resp = client.post(f'/api/v1/rules/{indicator_id}/modify/', data=modification['sigma'], content_type='application/sigma+yaml')
+        time.sleep(1)

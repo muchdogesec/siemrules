@@ -23,6 +23,12 @@ from rest_framework.request import Request
 from tests.src.utils import is_sorted
 
 
+RULE_TYPES = [
+    "base",
+    "correlation",
+]
+
+
 
 
 @pytest.mark.parametrize(
@@ -103,14 +109,17 @@ def test_get_rules_sort(sort_param):
     assert is_sorted(result.data['rules'], key=lambda obj: obj[param], reverse=direction=='descending')
 
 
-
-def test_get_single_rule():
+@pytest.mark.parametrize(
+        "rule_type",
+        RULE_TYPES
+)
+def test_get_single_rule(rule_type):
     indicator_id = "indicator--a4d70b75-6f4a-5d19-9137-da863edd33d7"
     with patch("siemrules.siemrules.arangodb_helpers.get_rules") as mock_get_rules:
-        get_single_rule(indicator_id)
+        get_single_rule(indicator_id, rule_type=rule_type)
         mock_get_rules.assert_called_once()
         request = mock_get_rules.mock_calls[0].args[0]
-        mock_get_rules.assert_called_once_with(request, paginate=False)
+        mock_get_rules.assert_called_once_with(request, paginate=False, rule_type=rule_type)
         assert isinstance(request, Request)
         assert request.query_params.get("indicator_id") == indicator_id
 

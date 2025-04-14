@@ -107,47 +107,34 @@ def run_file2txt(file: models.File):
         return
 
 def upload_to_arango(job: models.Job, bundle: dict, link_collection=True):
-    with tempfile.NamedTemporaryFile('w+') as f:
-        f.write(json.dumps(bundle))
-        f.flush()
-        f.seek(0)
-    
-        s2a = Stix2Arango(
-            file=str(f.name),
-            database=settings.ARANGODB_DATABASE,
-            collection=settings.ARANGODB_COLLECTION,
-            stix2arango_note=f"siemrules-file--{job.file.id}",
-            host_url=settings.ARANGODB_HOST_URL,
-            username=settings.ARANGODB_USERNAME,
-            password=settings.ARANGODB_PASSWORD,
+    upload_objects(
+            job, bundle, 
+            extra_data=dict(_stixify_report_id=job.file.report_id, _siemrules_job_id=str(job.id)),
             ignore_embedded_relationships=job.file.ignore_embedded_relationships,
             ignore_embedded_relationships_sro=job.file.ignore_embedded_relationships_sro,
             ignore_embedded_relationships_smo=job.file.ignore_embedded_relationships_smo,
-        )
-        s2a.arangodb_extra_data = dict(_stixify_report_id=job.file.report_id, _siemrules_job_id=str(job.id))
-        if link_collection:
-            db_view_creator.link_one_collection(s2a.arango.db, settings.VIEW_NAME, f"{settings.ARANGODB_COLLECTION}_edge_collection")
-            db_view_creator.link_one_collection(s2a.arango.db, settings.VIEW_NAME, f"{settings.ARANGODB_COLLECTION}_vertex_collection")
-        s2a.run()
+            stix2arango_note=f"siemrules-file--{job.file.id}",
+            link_collection=link_collection,
+    )
+    
 
-def bundle_dict(self):
-        return json.loads(self.to_json())
-
-def upload_objects(job: models.Job, objects):
+def upload_objects(job: models.Job, bundle, extra_data: dict, link_collection=False, **kwargs):
     s2a = Stix2Arango(
         file=None,
         database=settings.ARANGODB_DATABASE,
         collection=settings.ARANGODB_COLLECTION,
-        stix2arango_note=f"siemrules-correlation",
         host_url=settings.ARANGODB_HOST_URL,
         username=settings.ARANGODB_USERNAME,
         password=settings.ARANGODB_PASSWORD,
-        # ignore_embedded_relationships=job.file.ignore_embedded_relationships,
-        # ignore_embedded_relationships_sro=job.file.ignore_embedded_relationships_sro,
-        # ignore_embedded_relationships_smo=job.file.ignore_embedded_relationships_smo,
+        **kwargs
     )
-    s2a.arangodb_extra_data = dict(_siemrules_job_id=str(job.id))
-    s2a.run(data=make_bundle(objects=objects))
+    s2a.arangodb_extra_data = {**(extra_data or  {}), '_siemrules_job_id':str(job.id)}
+    if link_collection:
+        db_view_creator.link_one_collection(s2a.arango.db, settings.VIEW_NAME, f"{settings.ARANGODB_COLLECTION}_edge_collection")
+        db_view_creator.link_one_collection(s2a.arango.db, settings.VIEW_NAME, f"{settings.ARANGODB_COLLECTION}_vertex_collection")
+
+    s2a.run(data=bundle)
+    return s2a
 
 
 def make_bundle(objects):
@@ -177,7 +164,7 @@ def process_correlation(job_id, correlation: RuleModel, extra_documents):
     correlation = RuleModel.model_validate(correlation)
     job = Job.objects.get(id=job_id)
     objects = correlations.add_rule_indicator(correlation, extra_documents)
-    upload_objects(job, objects)
+    upload_objects(job, make_bundle(objects), stix2arango_note=f"siemrules-correlation")
 
 
 

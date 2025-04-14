@@ -1,7 +1,7 @@
 from datetime import date as dt_date
 from enum import Enum
 import itertools
-from pydantic import BaseModel, Field, ValidationInfo, field_validator, model_validator, root_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator, model_validator, root_validator
 from typing import ClassVar, List, Dict, Optional
 from uuid import UUID
 
@@ -28,7 +28,7 @@ class Condition(BaseModel):
 class Correlation(BaseModel):
     type: CorrelationType = Field(..., description="Correlation type (e.g. event_count, value_count, temporal, etc.)")
     rules: Optional[List[UUID]] = Field(default=None, description="List of UUIDs referencing Sigma rules", min_length=1)
-    group_by: List[str] = Field(..., alias="group-by", description="Fields to group by (e.g. User, ComputerName)")
+    group_by: Optional[List[str]] = Field(..., alias="group-by", description="Fields to group by (e.g. User, ComputerName)", examples=["User", "ComputerName"])
     timespan: str = Field(..., description="Timespan like '10s', '5m', '2h', '1d'")
     condition: Optional[Condition] = Field(default=None, description="Condition to match correlated events")
     field: Optional[str] = Field(
@@ -48,8 +48,8 @@ class Correlation(BaseModel):
     }
     FIELD_REQUIREMENT_FIELDS: ClassVar = set(itertools.chain(*FIELD_REQUIREMENT_MAPPING.values()))
 
-    class Config:
-        populate_by_name = True
+    model_config = ConfigDict(
+        populate_by_name = True,
         json_schema_extra = {
             "examples": [
                 {
@@ -64,6 +64,7 @@ class Correlation(BaseModel):
                 }
             ]
         }
+    )
 
     @field_validator("timespan", mode='after')
     @classmethod
@@ -83,10 +84,11 @@ class Correlation(BaseModel):
         if info.field_name in required_fields and not v:
                 raise ValueError(f"'{info.field_name}' is required for correlation type '{correlation_type}'.")
             
-        elif info.field_name not in required_fields and v:
-                raise ValueError(f"'{info.field_name}' is not supported for correlation type '{correlation_type}'.")
-        
+        # elif info.field_name not in required_fields and v:
+        #         raise ValueError(f"'{info.field_name}' is not supported for correlation type '{correlation_type}'.")
+    
         return v
+    
 
 class RuleModel(BaseModel):
     title: str = Field(min_length=3, description="Title of the Sigma rule")

@@ -373,7 +373,7 @@ class RuleView(viewsets.GenericViewSet):
     lookup_url_kwarg = "indicator_id"
 
     lookup_value_regex = r'indicator--[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'
-    correlation_rules_only = False
+    rule_type = "base"
 
     openapi_path_params = [
         OpenApiParameter(
@@ -427,7 +427,7 @@ class RuleView(viewsets.GenericViewSet):
         return super().get_parsers()
 
     def list(self, request, *args, **kwargs):
-        return arangodb_helpers.get_rules(request, correlation_rules=self.correlation_rules_only)
+        return arangodb_helpers.get_rules(request, rule_type=self.rule_type)
 
     @extend_schema(
         parameters=[
@@ -441,7 +441,7 @@ class RuleView(viewsets.GenericViewSet):
     def retrieve(self, request, *args, indicator_id=None, **kwargs):
         return arangodb_helpers.get_single_rule(
             indicator_id, version=request.query_params.get("version"),
-            correlation_rules=self.correlation_rules_only,
+            rule_type=self.rule_type,
         )
 
     @extend_schema(
@@ -463,7 +463,7 @@ class RuleView(viewsets.GenericViewSet):
     def versions(self, request, *args, indicator_id=None, **kwargs):
         return arangodb_helpers.get_single_rule_versions(
             indicator_id,
-            correlation_rules=self.correlation_rules_only,
+            rule_type=self.rule_type,
                                                          )
 
     @extend_schema(
@@ -485,12 +485,11 @@ class RuleView(viewsets.GenericViewSet):
         old_detection = yaml_to_detection(
             indicator["pattern"], indicator["indicator_types"]
         )
-        data = {**old_detection.model_dump(), **request.data}
+        data = {**old_detection.model_dump(exclude=['created', 'modified', 'date']), **request.data}
         s = DRFDetection.drf_serializer(data=data)
         s.is_valid(raise_exception=True)
         DRFDetection.is_valid(s)
         detection = DRFDetection.model_validate(s.data)
-        detection.id = indicator_id.split("--")[-1]
 
         return self.modify_resp(request, indicator_id, report, indicator, detection)
 
@@ -542,11 +541,26 @@ class RuleView(viewsets.GenericViewSet):
         return self.modify_resp(
             request, indicator_id, report, indicator, detection_container.detections[0]
         )
+    
+    @extend_schema(request=serializers.RuleRevertSerializer,
+        summary="Revert rule to older version",
+        description=textwrap.dedent(
+            """
+            Use this endpoint to revert rule to older version
+            """
+        ),
+    )
+    @decorators.action(methods=['PATCH'], detail=True)
+    def revert(self, request, *args, indicator_id=None, **kwargs):
+        s = serializers.RuleRevertSerializer(data=request.data)
+        s.is_valid(raise_exception=True)
+        rev = arangodb_helpers.delete_rule(indicator_id, rule_type=self.rule_type, rule_date=s.initial_data['version'], delete=False)
+        return self.retrieve(request, indicator_id=indicator_id)
 
     def destroy(self, request, *args, indicator_id=None, **kwargs):
-        arangodb_helpers.delete_rule(indicator_id, "", 
-            correlation_rules=self.correlation_rules_only,
-                                    )
+        arangodb_helpers.delete_rule(indicator_id, "",
+            rule_type=self.rule_type,
+        )
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     @extend_schema(
@@ -563,8 +577,9 @@ class RuleView(viewsets.GenericViewSet):
     def objects(self, request, *args, indicator_id=None, **kwargs):
         return arangodb_helpers.get_objects_for_rule(
             indicator_id, version=request.query_params.get("version"),
-            correlation_rules=self.correlation_rules_only,
+            rule_type=self.rule_type,
         )
+    
 
 
 @extend_schema_view(
@@ -573,7 +588,7 @@ class RuleView(viewsets.GenericViewSet):
 )
 class CorrelationView(RuleView):
     openapi_tags = ["Correlation"]
-    correlation_rules_only = True
+    rule_type = "correlation"
 
     def get_renderers(self):
         if self.action == "retrieve":
@@ -622,7 +637,7 @@ class CorrelationView(RuleView):
 
 
     def list(self, request, *args, **kwargs):
-        return arangodb_helpers.get_rules(request, correlation_rules=True)
+        return arangodb_helpers.get_rules(request, rule_type=True)
     
     modify = None
     modify_ai = None

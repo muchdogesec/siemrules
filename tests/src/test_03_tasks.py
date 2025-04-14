@@ -8,7 +8,7 @@ from django.core.files.uploadedfile import InMemoryUploadedFile, SimpleUploadedF
 from siemrules.siemrules import models
 from siemrules.siemrules.models import Job, File
 from siemrules.worker.tasks import (
-    new_task, process_post, save_file, run_txt2detection, run_file2txt, upload_to_arango, job_completed_with_error
+    new_task, process_post, save_file, run_txt2detection, run_file2txt, upload_to_arango, job_completed_with_error, upload_objects
 )
 import stix2
 
@@ -119,12 +119,8 @@ def test_upload_to_arango(job):
     bundle = {"objects": []}
     from django.conf import settings
 
-    with patch("tempfile.NamedTemporaryFile") as mock_tempfile, \
-         patch("siemrules.worker.tasks.Stix2Arango") as mock_s2a, \
+    with patch("siemrules.worker.tasks.Stix2Arango") as mock_s2a, \
          patch("siemrules.worker.tasks.db_view_creator.link_one_collection") as mock_db_view:
-        mock_tempfile_instance = io.StringIO()
-        mock_tempfile_instance.name = 'bundle.json'
-        mock_tempfile.return_value = mock_tempfile_instance
 
         mock_s2a_instance = MagicMock()
         mock_s2a.return_value = mock_s2a_instance
@@ -132,7 +128,7 @@ def test_upload_to_arango(job):
         upload_to_arango(job, bundle)
 
         mock_s2a.assert_called_once_with(
-            file=mock_tempfile_instance.name,
+            file=None,
             database=settings.ARANGODB_DATABASE,
             collection=settings.ARANGODB_COLLECTION,
             stix2arango_note=f"siemrules-file--{job.file.id}",
@@ -146,7 +142,30 @@ def test_upload_to_arango(job):
         mock_s2a_instance.run.assert_called_once()
         mock_db_view.assert_called()
 
+@pytest.mark.django_db
+def test_upload_objects(job):
+    bundle = {"objects": []}
+    from django.conf import settings
+    mock_extra_data = {'die': 'flugel'}
 
+    with patch("siemrules.worker.tasks.Stix2Arango") as mock_s2a:
+
+        mock_s2a_instance = MagicMock()
+        mock_s2a.return_value = mock_s2a_instance
+
+        upload_objects(job, bundle, extra_data=mock_extra_data, bad_kwargs=None)
+
+        mock_s2a.assert_called_once_with(
+            file=None,
+            database=settings.ARANGODB_DATABASE,
+            collection=settings.ARANGODB_COLLECTION,
+            host_url=settings.ARANGODB_HOST_URL,
+            username=settings.ARANGODB_USERNAME,
+            password=settings.ARANGODB_PASSWORD,
+            bad_kwargs=None
+        )
+        assert 'die' in mock_s2a_instance.arangodb_extra_data
+        mock_s2a_instance.run.assert_called_once()
 
 @pytest.mark.django_db
 def test_job_completed_with_error(job):

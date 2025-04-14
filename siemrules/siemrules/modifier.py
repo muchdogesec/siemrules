@@ -21,6 +21,7 @@ from rest_framework import serializers, validators
 
 
 def modify_indicator(report, indicator: dict, detection: Detection):
+    detection.detection_id = indicator['id'].replace('indicator--', '')
     bundler = Bundler(
         "name",
         None,
@@ -35,7 +36,6 @@ def modify_indicator(report, indicator: dict, detection: Detection):
     bundler.report.external_references.extend(report['external_references'])
     bundler.report.object_marking_refs.clear()
     bundler.report.object_marking_refs.extend(report['object_marking_refs'])
-    detection.id = indicator['id']
     bundler.bundle_detections(DetectionContainer(success=True, detections=[detection]))
     retval = []
     for obj in bundler.bundle_dict['objects']:
