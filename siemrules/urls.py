@@ -34,6 +34,7 @@ router = routers.SimpleRouter()
 router.register('files', views.FileView, 'files')
 router.register('jobs', views.JobView, 'jobs')
 router.register('rules', views.RuleView, 'rules')
+router.register('correlation-rules', views.CorrelationView, 'correlation-rules')
 router.register('reports', reports.ReportView, 'reports')
 
 
@@ -51,7 +52,7 @@ urlpatterns = [
 
 
 urlpatterns += [
-    path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
+    path('api/schema/', views.SchemaViewCached.as_view(), name='schema'),
     # Optional UI:
     path('api/schema/swagger-ui/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
 ]

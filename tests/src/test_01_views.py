@@ -1,4 +1,5 @@
 from itertools import chain
+import random
 import django
 import pytest
 
@@ -8,6 +9,7 @@ from rest_framework import status
 from unittest.mock import patch
 from django.core.files.uploadedfile import SimpleUploadedFile
 from siemrules.siemrules import models
+from siemrules.siemrules.views import RuleView
 from siemrules.worker import tasks
 from tests.src.data import BUNDLE_1
 from rest_framework.response import Response
@@ -46,12 +48,13 @@ class TestFileView:
             )
             assert response.status_code == status.HTTP_200_OK, response.content
             mock_task.assert_called_once()
-            file: models.File = mock_task.mock_calls[0].args[1]
-            assert file.file.read() == mock_file_content
-            assert file.mode == file_data["mode"]
-            assert file.name == file_data["name"]
-            assert file.ai_provider == file_data["ai_provider"]
-            assert 'siemrules.file' in file.labels, "must contain labels to differentiate from text_input"
+            job: models.Job = mock_task.mock_calls[0].args[0]
+            assert job.type == models.JobType.FILE
+            assert job.file.file.read() == mock_file_content
+            assert job.file.mode == file_data["mode"]
+            assert job.file.name == file_data["name"]
+            assert job.file.ai_provider == file_data["ai_provider"]
+            assert 'siemrules.file' in job.file.labels, "must contain labels to differentiate from text_input"
 
     def test_file_create__text(self, client: django.test.Client):
         mock_file_content = b"dummy content"
@@ -64,7 +67,9 @@ class TestFileView:
             )
             assert response.status_code == status.HTTP_200_OK, response.content
             mock_task.assert_called_once()
-            file: models.File = mock_task.mock_calls[0].args[1]
+            job: models.Job = mock_task.mock_calls[0].args[0]
+            file: models.File = job.file
+            assert job.type == models.JobType.FILE
             assert file.file.read() == mock_file_content
             assert file.mode == "txt"
             assert file.name == file_data["name"]
@@ -114,16 +119,19 @@ class TestRuleView:
         # yield tasks.upload_to_arango(job, BUNDLE_1)
 
     def test_list_rules(self, client: django.test.Client):
-        with patch("siemrules.siemrules.arangodb_helpers.get_rules") as mock_queryset:
-            mock_queryset.return_value = Response()
+        with patch("siemrules.siemrules.arangodb_helpers.get_rules") as mock_get_rules:
+            mock_get_rules.return_value = Response()
             response = client.get(self.url)
-            mock_queryset.assert_called_once()
+            mock_get_rules.assert_called_once()
+            # mock_get_rules.assert_called_once_with(response.request, rule_type=RuleView.rule_type)
+            assert mock_get_rules.mock_calls[0].kwargs['rule_type'] == RuleView.rule_type
 
     def test_retrieve_rule(self, client):
         with patch("siemrules.siemrules.arangodb_helpers.get_single_rule") as mock_get:
             mock_get.return_value = Response()
             response = client.get(f"{self.url}{self.rule_id}/")
             mock_get.assert_called_once()
+            assert mock_get.mock_calls[0].kwargs['rule_type'] == RuleView.rule_type
 
     @pytest.mark.parametrize(
         ["format", "expected_content_type"],
@@ -172,3 +180,16 @@ class TestRuleView:
                 rule_resp = client.get(rule_url, query_params=params)
                 assert rule_resp.data['id'] == rule_id
                 assert rule_resp.data["modified"] == version or response.data[0]
+
+    
+    def test_revert_rule(self, client: django.test.Client):
+        rule_id = "indicator--2683daab-aa64-52ff-a001-3ea5aee9dd72"
+        rule_url = f"{self.url}{rule_id}/"
+
+        versions = client.get(rule_url + "versions/").data
+        expected_version = random.choice(versions)
+        response = client.patch(rule_url + "revert/", data=dict(version=expected_version), content_type="application/json")
+        assert response.data['modified'] == expected_version
+        response = client.patch(rule_url)
+        assert response.data['modified'] == expected_version
+
