@@ -1,4 +1,4 @@
-from datetime import date as dt_date
+from datetime import date as dt_date, datetime
 from enum import Enum
 import itertools
 from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator, model_validator, root_validator
@@ -21,7 +21,7 @@ class Condition(BaseModel):
 
     @model_validator(mode="after")
     def validate_condition_operators(self) -> "Condition":
-        if not any(map(lambda x: x!=None, [self.eq, self.gt, self.gte, self.lt, self.lte])):
+        if all(map(lambda x: x==None, [self.eq, self.gt, self.gte, self.lt, self.lte])):
             raise ValueError("At least one of eq, gt, gte, lt, or lte must be defined in condition.")
         return self
 
@@ -90,11 +90,22 @@ class Correlation(BaseModel):
         return v
     
 
-class RuleModel(BaseModel):
+class BaseRuleModel(BaseModel):
     title: str = Field(min_length=3, description="Title of the Sigma rule")
     description: str = Field(min_length=10, description="Description of the Sigma rule")
     correlation: 'Correlation' = Field(..., description="Correlation configuration for the rule")
 
+class RuleModel(BaseRuleModel):
     author: Optional[str] = None
     date: Optional["dt_date"] = Field(default=None)
     modified: Optional["dt_date"] = None
+
+    @field_validator('date', 'modified', mode='before')
+    @classmethod
+    def clean_dates(cls, value):
+        if isinstance(value, datetime):
+            return value.date()
+        return value
+
+class AIRuleModel(BaseRuleModel):
+    pass

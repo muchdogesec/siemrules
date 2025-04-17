@@ -18,7 +18,7 @@ from django.conf import settings
 import typing
 if typing.TYPE_CHECKING:
     from siemrules import settings
-
+from rest_framework import validators
 
 from stix2 import parse as parse_stix, Bundle
 from stix2.serialization import serialize as stix2_serialize
@@ -41,10 +41,16 @@ def new_task(job: Job):
         countdown=POLL_INTERVAL, root_id=str(job.id), task_id=str(job.id)
     )
 
-def new_correlation_task(job: Job, correlation: RuleModel, extra_documents):
+def new_correlation_task(job: Job, correlation: RuleModel, extra_documents, data):
     assert job.type == JobType.CORRELATION
+    match job.data['input_form']:
+        case 'sigma':
+            task = process_correlation.s(job.id, correlation.model_dump(by_alias=True), extra_documents)
+        case 'ai_prompt':
+            task = process_correlation_ai.s(job.id, data, extra_documents)
+        case _:
+            raise validators.ValidationError('Unknown job type')
     # process_correlation(job.id, correlation.model_dump(by_alias=True), extra_documents)
-    task = process_correlation.s(job.id, correlation.model_dump(by_alias=True), extra_documents)
     ( 
         task| job_completed_with_error.si(job.id)).apply_async(
         countdown=POLL_INTERVAL, root_id=str(job.id), task_id=str(job.id)
@@ -163,8 +169,27 @@ def process_post(filename, job_id, *args):
 def process_correlation(job_id, correlation: RuleModel, extra_documents):
     correlation = RuleModel.model_validate(correlation)
     job = Job.objects.get(id=job_id)
-    objects = correlations.add_rule_indicator(correlation, extra_documents)
-    upload_objects(job, make_bundle(objects), stix2arango_note=f"siemrules-correlation")
+    
+    upload_correlation(correlation, extra_documents, job)
+
+def upload_correlation(correlation, extra_documents, job: Job):
+    objects = correlations.add_rule_indicator(correlation, extra_documents, job.data['input_form'], job.data)
+    upload_objects(job, make_bundle(objects), None, stix2arango_note=f"siemrules-correlation")
+
+@shared_task
+def process_correlation_ai(job_id, data, extra_documents):
+    job = Job.objects.get(id=job_id)
+    model = parse_ai_model(data["ai_provider"])
+    correlation = correlations.generate_correlation_with_ai(model, data['prompt'], extra_documents)
+    correlation_with_date = RuleModel.model_validate(
+        dict(
+            **correlation.model_dump(),
+            author=data.get('author'),
+            date=data.get('created'),
+            modified=data.get('modified')
+        )
+    )
+    upload_correlation(correlation_with_date, extra_documents, job)
 
 
 

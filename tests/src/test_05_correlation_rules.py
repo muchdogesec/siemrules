@@ -50,6 +50,31 @@ correlation:
         mock_task.assert_called_once()
         job: models.Job = mock_task.mock_calls[0].args[0]
         assert job.type == models.JobType.CORRELATION
+        assert job.data['input_form'] == 'sigma'
+
+
+@pytest.mark.django_db
+def test_correlation_create__prompt(client: django.test.Client):
+    rule = {
+        "rules": [
+            "8af82832-2abd-5765-903c-01d414dae1e9"
+        ],
+        "prompt": "create a tempral correlation",
+        "ai_provider": "openai",
+        "date": "2025-03-02T14:36:52.663Z",
+        "author": "myauthor",
+        "modified": "2025-04-17T14:36:52.663Z"
+    }
+    with patch("siemrules.worker.tasks.new_correlation_task") as mock_task:
+        response = client.post(
+            correlation_url + "from_prompt/", format="sigma", data=rule
+        )
+        assert response.status_code == status.HTTP_200_OK, response.content
+        mock_task.assert_called_once()
+        job: models.Job = mock_task.mock_calls[0].args[0]
+        assert job.type == models.JobType.CORRELATION
+        assert job.data['input_form'] == 'ai_prompt'
+
 
 @pytest.mark.parametrize(
         ["rule_ids", "should_fail"],

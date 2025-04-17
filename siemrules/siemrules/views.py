@@ -14,7 +14,7 @@ from txt2detection.utils import parse_model
 import yaml
 from siemrules.siemrules import models, reports
 from siemrules.siemrules import serializers
-from siemrules.siemrules.correlations.serializers import DRFCorrelationRule
+from siemrules.siemrules.correlations.serializers import CorrelationRuleSerializer, DRFCorrelationRule
 from siemrules.siemrules.modifier import (
     DRFDetection,
     get_modification,
@@ -598,8 +598,8 @@ class RuleView(viewsets.GenericViewSet):
 
 
 @extend_schema_view(
-    upload=extend_schema(summary="create correlation from yml file"),
-    prompt=extend_schema(summary="create correlation from prompts"),
+    upload=extend_schema(summary="create correlation from yml file", description="create new correlation from sigma"),
+    from_prompt=extend_schema(summary="create correlation from prompts", description="create new correlation from prompt"),
 )
 class CorrelationView(RuleView):
     openapi_tags = ["Correlation"]
@@ -644,15 +644,27 @@ class CorrelationView(RuleView):
             rules_mapping = self.get_rules(rule.correlation.rules)
             extra_documents = list(rules_mapping.values())
 
-        job_instance = models.Job.objects.create(type=models.JobType.CORRELATION)
+        job_instance = models.Job.objects.create(type=models.JobType.CORRELATION, data=dict(input_form='sigma'))
         job_s = CorrelationJobSerializer(job_instance)
 
-        tasks.new_correlation_task(job_instance, rule, extra_documents)
+        tasks.new_correlation_task(job_instance, rule, extra_documents, {})
         return Response(job_s.data)
+    
 
+    @extend_schema(request=CorrelationRuleSerializer)
+    @decorators.action(methods=['POST'], detail=False, serializer_class=JobSerializer)
+    def from_prompt(self, request, *args, **kwargs):
+        s = CorrelationRuleSerializer(data=request.data)
+        s.is_valid(raise_exception=True)
+        extra_documents = []
+        if s.validated_data['rules']:
+            rules_mapping = self.get_rules(s.validated_data['rules'])
+            extra_documents = list(rules_mapping.values())
 
-    def list(self, request, *args, **kwargs):
-        return arangodb_helpers.get_rules(request, rule_type=True)
+        job_instance = models.Job.objects.create(type=models.JobType.CORRELATION, data=dict(input_form='ai_prompt', **s.data))
+        job_s = CorrelationJobSerializer(job_instance)
+        tasks.new_correlation_task(job_instance, s.validated_data, extra_documents, s.validated_data)
+        return Response(job_s.data)
     
     modify = None
     modify_ai = None
