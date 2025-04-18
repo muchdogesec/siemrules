@@ -180,7 +180,7 @@ if os.getenv("USE_S3_STORAGE") == "1":
         "access_key": os.environ["R2_ACCESS_KEY"],
         "secret_key": os.environ["R2_SECRET_KEY"],
         'custom_domain': os.environ["R2_CUSTOM_DOMAIN"],
-        'location': 'feed',
+        'location': 'files',
     }
     STORAGES["default"] = {
         "BACKEND": "storages.backends.s3.S3Storage",
