@@ -149,13 +149,13 @@ class ReportView(viewsets.ViewSet):
         parameters=ArangoDBHelper.get_schema_operation_parameters() + [
             OpenApiParameter('identity', description="Filter the result by only the reports created by this identity. Pass in the format `identity--b1ae1a15-6f4b-431e-b990-1b9678f35e15`"),
             OpenApiParameter('name', description="Filter by the `name` of a report. Search is wildcard so `exploit` will match `exploited`, `exploits`, etc."),
-            OpenApiParameter('tlp_level', description="", enum=[f[0] for f in TLP_Levels.choices]),
+            OpenApiParameter('tlp_level', description="Filter by the TLP level of the report", enum=[f[0] for f in TLP_Levels.choices]),
             OpenApiParameter('description', description="Filter by the content in a report `description` (which contains the markdown version of the report). Will search for descriptions that contain the value entered. Search is wildcard so `exploit` will match `exploited`, `exploits`, etc."),
             OpenApiParameter('labels', description="searches the `labels` property for the value entered. Search is wildcard so `exploit` will match `exploited`, `exploits`, etc."),
             OpenApiParameter('confidence_min', description="The minimum confidence score of a report `0` is no confidence, `1` is lowest, `100` is highest.", type=OpenApiTypes.NUMBER),
             OpenApiParameter('created_max', description="Maximum value of `created` value to filter by in format `YYYY-MM-DD`."),
             OpenApiParameter('created_min', description="Minimum value of `created` value to filter by in format `YYYY-MM-DD`."),
-            OpenApiParameter('sort', description="report property to sort by", enum=SORT_PROPERTIES),
+            OpenApiParameter('sort', description="Sort by", enum=SORT_PROPERTIES),
         ],
     )
     def list(self, request, *args, **kwargs):
