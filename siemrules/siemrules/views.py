@@ -382,7 +382,7 @@ class JobView(
     ),
 )
 class RuleView(viewsets.GenericViewSet):
-    openapi_tags = ["Rules"]
+    openapi_tags = ["Base Rules"]
     pagination_class = Pagination("rules")
     serializer_class = serializers.RuleSerializer
     lookup_url_kwarg = "indicator_id"
@@ -602,7 +602,7 @@ class RuleView(viewsets.GenericViewSet):
     from_prompt=extend_schema(summary="create correlation from prompts", description="create new correlation from prompt"),
 )
 class CorrelationView(RuleView):
-    openapi_tags = ["Correlation"]
+    openapi_tags = ["Correlation Rules"]
     rule_type = "correlation"
 
     def get_renderers(self):
