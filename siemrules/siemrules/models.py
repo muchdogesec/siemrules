@@ -63,7 +63,6 @@ class File(models.Model):
 
     references = ArrayField(base_field=models.URLField(), default=list, null=True)
     license = models.CharField(max_length=256, null=True, default=None, blank=True)
-    status = models.CharField(max_length=20, default="experimental")
 
     ignore_embedded_relationships = models.BooleanField(default=False)
     ignore_embedded_relationships_sro = models.BooleanField(default=False)
