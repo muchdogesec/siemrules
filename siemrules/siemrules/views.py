@@ -608,6 +608,10 @@ class RuleView(viewsets.GenericViewSet):
 @extend_schema_view(
     upload=extend_schema(summary="create correlation from yml file", description="create new correlation from sigma"),
     from_prompt=extend_schema(summary="create correlation from prompts", description="create new correlation from prompt"),
+    list=extend_schema(summary="search correlation rules", description="search correlation rules"),
+    retrieve=extend_schema(summary="get a correlation rule by id", description="sget a correlation rule by id"),
+    objects=extend_schema(summary="get a correlation rule objects", description="sget a correlation rule by id"),
+    versions=extend_schema(summary="get a correlation rule versions", description="sget a correlation rule by id"),
 )
 class CorrelationView(RuleView):
     openapi_tags = ["Correlation Rules"]

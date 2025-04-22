@@ -83,10 +83,6 @@ class Correlation(BaseModel):
         # Check that all required fields are present
         if info.field_name in required_fields and not v:
                 raise ValueError(f"'{info.field_name}' is required for correlation type '{correlation_type}'.")
-            
-        # elif info.field_name not in required_fields and v:
-        #         raise ValueError(f"'{info.field_name}' is not supported for correlation type '{correlation_type}'.")
-    
         return v
     
 
