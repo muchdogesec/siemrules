@@ -90,7 +90,7 @@ class FileSigmaSerializer(serializers.ModelSerializer):
     mode = serializers.HiddenField(default="sigma")
     ai_provider = serializers.HiddenField(default=None)
 
-    file = serializers.FileField(write_only=True, help_text="sigma yaml file")
+    file = serializers.FileField(write_only=True, help_text="The Sigma Rule. Must be in `.yaml` of `yml` format and conform to the Sigma specification.")
     report_id = ReportIDField(source='id', help_text="Only pass a UUIDv4. It will be use to generate the STIX Report ID, e.g. `report--<UUID>`. If not passed, this value will be randomly generated for this file. This is a txt2detection setting.", validators=[
         validators.UniqueValidator(queryset=File.objects.all(), message="File with report id already exists"),
     ], required=False)
