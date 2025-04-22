@@ -1,3 +1,4 @@
+import copy
 from functools import lru_cache
 from itertools import chain
 import os
@@ -51,11 +52,12 @@ def upload_bundles():
             id=bundle["id"].replace("bundle--", ""),
         )
         job = models.Job.objects.create(file=file, id=file.id)
-        tasks.upload_to_arango(job, bundle)
+        tasks.upload_to_arango(job, copy.deepcopy(bundle))
     time.sleep(5)
 
 def all_objects():
     bundle_objects = [bundle['objects'] for bundle in [test_data.BUNDLE_1, test_data.BUNDLE_2, test_data.BUNDLE_3]]
+    bundle_objects = copy.deepcopy(bundle_objects)
     return [obj for obj in chain(*bundle_objects) if obj['type'] != 'relationship']
 
 @pytest.mark.django_db

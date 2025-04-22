@@ -66,10 +66,10 @@ BUNDLE_1 = {
                 "relationship--b7c68949-80d9-5bdf-bd89-f41e928849eb"
             ],
             "labels": [
-                "fake",
-                "hand-written",
-                "pypotr",
-                "python"
+                "siemrules.fake",
+                "siemrules.hand-written",
+                "siemrules.pypotr",
+                "siemrules.python"
             ],
             "external_references": [
                 {
