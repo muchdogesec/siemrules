@@ -446,7 +446,7 @@ class RuleView(viewsets.GenericViewSet):
         parameters=[
             OpenApiParameter(
                 "format",
-                description="format to render rule in one of json (STIX indicator) and sigms (sigma rule in yaml format)",
+                description="The format of the report, either `sigma` (returns only the Sigma YAML) or `json` (returns the STIX 2.1 Indicator object containing the Sigma rule). Make sure to set the `Accept` header correctly.",
                 enum=["sigma", "json"],
             )
         ]
@@ -488,7 +488,17 @@ class RuleView(viewsets.GenericViewSet):
 
             You should only enter the parts of the Sigma Rule you wish to change. Any properties/values not passed will remain unchanged in the rule. To delete a value from a property, pass the property without the value.
 
-            The rule will be validated against the Sigma specification. You will recieve an error if validation fails and the rule will not be updated.
+            You cannot change the following properties:
+
+            * `id`
+            * `date`
+            * `modified`
+            * `author`
+
+
+            The rule will be validated against the Sigma specification. [You can read the specification here to see available properties and values allowed](https://github.com/SigmaHQ/sigma-specification/blob/main/specification/sigma-rules-specification.md).
+
+            You will recieve an error if validation fails. If any part of the validation fails the rule will not be updated.
             """
         ),
     )
