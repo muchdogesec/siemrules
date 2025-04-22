@@ -8,7 +8,7 @@ from django.core.files.uploadedfile import InMemoryUploadedFile, SimpleUploadedF
 from siemrules.siemrules import models
 from siemrules.siemrules.models import Job, File
 from siemrules.worker.tasks import (
-    new_task, process_post, save_file, run_txt2detection, run_file2txt, upload_to_arango, job_completed_with_error
+    new_task, process_post, save_file, run_txt2detection, run_file2txt, upload_to_arango, job_completed_with_error, upload_objects
 )
 import stix2
 
@@ -25,7 +25,7 @@ def test_new_task(job):
     with patch("siemrules.worker.tasks.process_post.s") as mock_process_post, \
          patch("siemrules.worker.tasks.job_completed_with_error.si") as mock_error_task:
         
-        new_task(job, file)
+        new_task(job)
 
         mock_process_post.assert_called_once_with(file.file.name, job.id)
         mock_error_task.assert_called_once_with(job.id)
@@ -56,7 +56,6 @@ def test_run_txt2detection():
     mock_file.name = "test_file"
     mock_file.identity = {"type": "identity", "id": "identity--"+str(uuid.uuid4()), "name": "random identity", "identity_class": "organization"}
     mock_file.tlp_level = "TLP:WHITE"
-    mock_file.confidence = 85
     mock_file.id = "12345"
     mock_file.markdown_file.read.return_value = b"Test input text"
     mock_file.ai_provider = 'openai'
@@ -88,7 +87,6 @@ def test_run_txt2detection():
             name=mock_file.name,
             identity=mock_stix_identity,
             tlp_level=mock_file.tlp_level,
-            confidence=mock_file.confidence,
             report_id=mock_file.id,
             ai_provider=mock_ai_provider,
             input_text="Test input text",
@@ -121,12 +119,8 @@ def test_upload_to_arango(job):
     bundle = {"objects": []}
     from django.conf import settings
 
-    with patch("tempfile.NamedTemporaryFile") as mock_tempfile, \
-         patch("siemrules.worker.tasks.Stix2Arango") as mock_s2a, \
+    with patch("siemrules.worker.tasks.Stix2Arango") as mock_s2a, \
          patch("siemrules.worker.tasks.db_view_creator.link_one_collection") as mock_db_view:
-        mock_tempfile_instance = io.StringIO()
-        mock_tempfile_instance.name = 'bundle.json'
-        mock_tempfile.return_value = mock_tempfile_instance
 
         mock_s2a_instance = MagicMock()
         mock_s2a.return_value = mock_s2a_instance
@@ -134,7 +128,7 @@ def test_upload_to_arango(job):
         upload_to_arango(job, bundle)
 
         mock_s2a.assert_called_once_with(
-            file=mock_tempfile_instance.name,
+            file=None,
             database=settings.ARANGODB_DATABASE,
             collection=settings.ARANGODB_COLLECTION,
             stix2arango_note=f"siemrules-file--{job.file.id}",
@@ -148,7 +142,30 @@ def test_upload_to_arango(job):
         mock_s2a_instance.run.assert_called_once()
         mock_db_view.assert_called()
 
+@pytest.mark.django_db
+def test_upload_objects(job):
+    bundle = {"objects": []}
+    from django.conf import settings
+    mock_extra_data = {'die': 'flugel'}
 
+    with patch("siemrules.worker.tasks.Stix2Arango") as mock_s2a:
+
+        mock_s2a_instance = MagicMock()
+        mock_s2a.return_value = mock_s2a_instance
+
+        upload_objects(job, bundle, extra_data=mock_extra_data, bad_kwargs=None)
+
+        mock_s2a.assert_called_once_with(
+            file=None,
+            database=settings.ARANGODB_DATABASE,
+            collection=settings.ARANGODB_COLLECTION,
+            host_url=settings.ARANGODB_HOST_URL,
+            username=settings.ARANGODB_USERNAME,
+            password=settings.ARANGODB_PASSWORD,
+            bad_kwargs=None
+        )
+        assert 'die' in mock_s2a_instance.arangodb_extra_data
+        mock_s2a_instance.run.assert_called_once()
 
 @pytest.mark.django_db
 def test_job_completed_with_error(job):

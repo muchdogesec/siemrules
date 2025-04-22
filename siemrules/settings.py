@@ -221,9 +221,10 @@ SPECTACULAR_SETTINGS = {
     "TAGS": [
         {"name": "Files", "description": "Upload files and retrieve uploaded files"},
         {"name": "Reports", "description": "Search and retrieve Reports created from uploaded files"},
-        {"name": "Rules", "description": "Search and retrieve Rules created from uploaded files"},
-        {"name": "Jobs", "description": "Check the status of data retrieval from files"},
+        {"name": "Base Rules", "description": "Search and retrieve Base Rules created from uploaded files"},
+        {"name": "Correlation Rules", "description": "Create and search for Correlation Rules created from Base Rules"},
         {"name": "Objects", "description": "Search through all STIX objects"},
+        {"name": "Jobs", "description": "Check the status of data retrieval from files"},
     ],
     'COMPONENT_SPLIT_REQUEST': True,
     'ENUM_GENERATE_CHOICE_DESCRIPTION': False,

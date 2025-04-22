@@ -3,6 +3,7 @@ from django.core.files.uploadedfile import InMemoryUploadedFile, SimpleUploadedF
 from rest_framework import serializers, validators
 import txt2detection
 import txt2detection.utils
+import txt2detection.utils
 from siemrules.siemrules.models import File, Job, FileImage, TLP_Levels
 from drf_spectacular.utils import extend_schema_field, extend_schema_serializer
 import file2txt.parsers.core as f2t_core
@@ -33,7 +34,7 @@ class ReportIDField(serializers.CharField):
     
     def to_representation(self, value):
         return "report--"+serializers.UUIDField().to_representation(value)
-    
+
 @extend_schema_field(dict)
 class STIXIdentityField(serializers.JSONField):
     pass
@@ -51,7 +52,6 @@ class FileSerializer(serializers.ModelSerializer):
     mode = serializers.ChoiceField(choices=list(f2t_core.BaseParser.PARSERS.keys()), help_text="How the File should be processed. This is a file2txt setting.")
     identity = STIXIdentityField(write_only=True, required=False, help_text='This will be used as the `created_by_ref` for all created SDOs and SROs. This is a full STIX Identity JSON. e.g. `{"type":"identity","spec_version":"2.1","id":"identity--b1ae1a15-6f4b-431e-b990-1b9678f35e15","name":"Dummy Identity"}`. If no value is passed, [the Stixify identity object will be used](https://raw.githubusercontent.com/muchdogesec/stix4doge/refs/heads/main/objects/identity/stixify.json). This is a txt2detection setting.')
     tlp_level = serializers.ChoiceField(choices=TLP_Levels.choices, default=TLP_Levels.RED, help_text='This will be assigned to all SDOs and SROs created. Stixify uses TLPv2. This is a txt2detection setting.')
-    confidence = serializers.IntegerField(max_value=100, min_value=0, required=False, help_text="Will be added to the `confidence` value of the Report SDO created. A value between 0-100. `0` means confidence unknown. `1` is the lowest confidence score, `100` is the highest confidence score.")
     labels = serializers.ListField(child=serializers.CharField(), required=False, help_text="Will be added to the `labels` of the Report and Indicator SDOs created, and `tags` in the Sigma rule itself.")
     defang = serializers.BooleanField(default=True, help_text="Whether to defang the observables in the text. e.g. turns `1.1.1[.]1` to `1.1.1.1` for extraction. This is a file2txt setting.")
     ai_provider = serializers.CharField(required=True, validators=[validate_model], help_text="An AI provider and model to be used for rule generation in format `provider:model` e.g. `openai:gpt-4o`. This is a txt2detection setting.")
@@ -61,7 +61,6 @@ class FileSerializer(serializers.ModelSerializer):
     ignore_embedded_relationships = serializers.BooleanField(default=False, help_text="Default is `false`. Setting this to `true` will stop stix2arango creating relationship objects for the embedded relationships found in objects created by txt2detection.")
     ignore_embedded_relationships_sro = serializers.BooleanField(default=False, help_text="Default is `false`. If `true` passed, will stop any embedded relationships from being generated from SRO objects (type = `relationship`).")
     ignore_embedded_relationships_smo = serializers.BooleanField(default=False, help_text="Default is `false`. if true passed, will stop any embedded relationships from being generated from SMO objects (type = `marking-definition`, `extension-definition`, `language-content`).")
-    status = serializers.ChoiceField(required=False, choices=[(x, x.title()) for x in txt2detection.utils.STATUSES], help_text="sigma rule's status. this is also added to the generated indicator's external_references")
 
     class Meta:
         model = File
@@ -85,6 +84,39 @@ class FilePromptSerializer(FileSerializer):
         validated_data['file'] = SimpleUploadedFile("text-input--"+slugify(validated_data['name'])+'.txt', validated_data.pop('text_input', '').encode(), "text/plain")
         return super().create(validated_data)
 
+class FileSigmaSerializer(serializers.ModelSerializer):
+    type_label = 'siemrules.sigma'
+    mode = serializers.HiddenField(default="sigma")
+    ai_provider = serializers.HiddenField(default=None)
+
+    file = serializers.FileField(write_only=True, help_text="The Sigma Rule. Must be in `.yaml` of `yml` format and conform to the Sigma specification.")
+    report_id = ReportIDField(source='id', help_text="Only pass a UUIDv4. It will be use to generate the STIX Report ID, e.g. `report--<UUID>`. If not passed, this value will be randomly generated for this file. This is a txt2detection setting.", validators=[
+        validators.UniqueValidator(queryset=File.objects.all(), message="File with report id already exists"),
+    ], required=False)
+    labels = serializers.ListField(child=serializers.CharField(), required=False, help_text="Will be added to the `labels` of the Report and Indicator SDOs created, and `tags` in the Sigma rule itself.")
+    identity = STIXIdentityField(write_only=True, required=False, help_text='This will be used as the `created_by_ref` for all created SDOs and SROs. This is a full STIX Identity JSON. e.g. `{"type":"identity","spec_version":"2.1","id":"identity--b1ae1a15-6f4b-431e-b990-1b9678f35e15","name":"Dummy Identity"}`. If no value is passed, [the Stixify identity object will be used](https://raw.githubusercontent.com/muchdogesec/stix4doge/refs/heads/main/objects/identity/stixify.json). This is a txt2detection setting.')
+
+    ignore_embedded_relationships = serializers.BooleanField(default=False, help_text="Default is `false`. Setting this to `true` will stop stix2arango creating relationship objects for the embedded relationships found in objects created by txt2detection.")
+    ignore_embedded_relationships_sro = serializers.BooleanField(default=False, help_text="Default is `false`. If `true` passed, will stop any embedded relationships from being generated from SRO objects (type = `relationship`).")
+    ignore_embedded_relationships_smo = serializers.BooleanField(default=False, help_text="Default is `false`. if true passed, will stop any embedded relationships from being generated from SMO objects (type = `marking-definition`, `extension-definition`, `language-content`).")
+
+    class Meta:
+        model = File
+        fields = [
+            'mode',
+            'ai_provider',
+            "name",
+            'file',
+            'report_id',
+            'labels',
+            'identity',
+
+            'ignore_embedded_relationships',
+            'ignore_embedded_relationships_sro',
+            'ignore_embedded_relationships_smo',
+        ]
+        read_only_fields = ["id"]
+
 class ImageSerializer(serializers.ModelSerializer):
     url = serializers.SerializerMethodField()
     class Meta:
@@ -103,8 +135,13 @@ class JobSerializer(serializers.ModelSerializer):
     report_id = ReportIDField(source='file.id')
     class Meta:
         model = Job
-        fields = '__all__'
+        exclude = ['data']
 
+
+class CorrelationJobSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Job
+        exclude = ['file']
 
 class RuleSerializer(serializers.Serializer):
     id = serializers.CharField(default="indicator--3fa85f64-5717-4562-b3fc-2c963f66afa6")
@@ -120,3 +157,5 @@ class AIModifySerializer(serializers.Serializer):
     prompt = serializers.CharField(help_text='prompt to send to the AI processor')
     ai_provider = serializers.CharField(required=True, validators=[validate_model], help_text="An AI provider and model to be used for rule generation in format `provider:model` e.g. `openai:gpt-4o`. This is a txt2detection setting.")
 
+class RuleRevertSerializer(serializers.Serializer):
+    version = serializers.DateTimeField()

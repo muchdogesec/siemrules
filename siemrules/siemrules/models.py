@@ -56,15 +56,13 @@ class File(models.Model):
     mode = models.CharField(max_length=256)
     defang = models.BooleanField(default=True, help_text="Whether to defang the observables in the blog. e.g. turns 1.1.1[.]1 to 1.1.1.1 for extraction. This is a file2txt setting. This is a file2txt setting. Default is `true`.")
     extract_text_from_image = models.BooleanField(default=True)
-    ai_provider = models.CharField(max_length=256)
+    ai_provider = models.CharField(max_length=256, null=True)
     markdown_file = models.FileField(max_length=512, upload_to=upload_to_func, null=True)
 
-    confidence = models.IntegerField(default=0)
     created = models.DateTimeField(auto_now_add=True)
 
     references = ArrayField(base_field=models.URLField(), default=list, null=True)
     license = models.CharField(max_length=256, null=True, default=None, blank=True)
-    status = models.CharField(max_length=20, default="experimental")
 
     ignore_embedded_relationships = models.BooleanField(default=False)
     ignore_embedded_relationships_sro = models.BooleanField(default=False)
@@ -104,19 +102,22 @@ class JobState(models.TextChoices):
     PROCESSING = "processing"
     COMPLETED = "completed"
 
+class JobType(models.TextChoices):
+    FILE = "file"
+    CORRELATION = "correlation"
+
+
 class Job(models.Model):
-    file = models.OneToOneField(File, on_delete=models.CASCADE)
+    type = models.CharField(choices=JobType.choices, max_length=20, default=JobType.FILE)
+    file = models.OneToOneField(File, on_delete=models.CASCADE, default=None, null=True)
     id = models.UUIDField(default=uuid.uuid4, primary_key=True)
     state = models.CharField(choices=JobState.choices, max_length=20, default=JobState.PENDING)
     error = models.CharField(max_length=65536, null=True)
     run_datetime = models.DateTimeField(auto_now_add=True)
     completion_time = models.DateTimeField(null=True, default=None)
+    data = models.JSONField(default=None, null=True)
 
     def save(self, *args, **kwargs) -> None:
         if not self.completion_time and self.state == JobState.COMPLETED:
             self.completion_time = datetime.now(timezone.utc)
         return super().save(*args, **kwargs)
-    
-    @property
-    def profile(self):
-        return self.file.profile
