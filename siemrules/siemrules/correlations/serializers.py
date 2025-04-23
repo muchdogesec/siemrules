@@ -1,5 +1,6 @@
 from datetime import datetime, UTC
 from siemrules.siemrules.serializers import validate_model
+from siemrules.siemrules.utils import TLP_Levels
 from .models import RuleModel as CorrelationRule, Correlation
 from drf_pydantic import BaseModel as DRFBaseModel, DrfPydanticSerializer
 from drf_pydantic.parse import create_serializer_from_model, SERIALIZER_REGISTRY
@@ -31,3 +32,4 @@ class CorrelationRuleSerializer(serializers.Serializer):
     created = serializers.DateTimeField(default=lambda: datetime.now(UTC))
     author = serializers.CharField()
     modified = serializers.DateTimeField(default=None)
+    tlp_level = serializers.ChoiceField(choices=TLP_Levels.choices, default=TLP_Levels.CLEAR, help_text='If TLP exist in rule, setting a value for this property will overwrite the existing value. When unset, the `tlp.` tag in the report will be turned into a TLP level. Defaults to `clear` if there is no `tlp.` tag in rule.')

@@ -185,7 +185,8 @@ def process_correlation_ai(job_id, data, extra_documents):
             **correlation.model_dump(),
             author=data.get('author'),
             date=data.get('created'),
-            modified=data.get('modified')
+            modified=data.get('modified'),
+            tags=["tlp."+data['tlp_level'].replace('_', '-')],
         )
     )
     upload_correlation(correlation_with_date, extra_documents, job)

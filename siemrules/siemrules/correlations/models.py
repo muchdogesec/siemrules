@@ -1,9 +1,10 @@
 from datetime import UTC, date as dt_date, datetime
 from enum import Enum
 import itertools
-from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator, model_validator, root_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator, model_validator, NameEmail
 from typing import ClassVar, List, Dict, Optional
 from uuid import UUID
+from txt2detection.models import SigmaTag
 
 
 class CorrelationType(str, Enum):
@@ -95,6 +96,7 @@ class RuleModel(BaseRuleModel):
     author: Optional[str] = None
     date: Optional["dt_date"] = Field(default_factory=lambda: datetime.now(UTC).date())
     modified: Optional["dt_date"] = None
+    tags: Optional[list[SigmaTag]] = Field(default_factory=list)
 
     @field_validator('date', 'modified', mode='before')
     @classmethod
@@ -102,6 +104,17 @@ class RuleModel(BaseRuleModel):
         if isinstance(value, datetime):
             return value.date()
         return value
+    
+    @field_validator('tags', mode='after')
+    @classmethod
+    def validate_tlp(cls, tags: list[str]):
+        tlps = []
+        for tag in tags:
+            if tag.startswith('tlp.'):
+                tlps.append(tag)
+        if len(tlps) != 1:
+            raise ValueError(f'tag must contain exactly one tag in tlp namespace. Got {tlps}')
+        return tags
 
 class AIRuleModel(BaseRuleModel):
     pass
