@@ -1,4 +1,4 @@
-from datetime import date as dt_date, datetime
+from datetime import UTC, date as dt_date, datetime
 from enum import Enum
 import itertools
 from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator, model_validator, root_validator
@@ -93,7 +93,7 @@ class BaseRuleModel(BaseModel):
 
 class RuleModel(BaseRuleModel):
     author: Optional[str] = None
-    date: Optional["dt_date"] = Field(default=None)
+    date: Optional["dt_date"] = Field(default_factory=lambda: datetime.now(UTC).date())
     modified: Optional["dt_date"] = None
 
     @field_validator('date', 'modified', mode='before')
