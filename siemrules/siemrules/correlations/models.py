@@ -98,6 +98,8 @@ class RuleModel(BaseRuleModel):
     modified: Optional["dt_date"] = None
     tags: Optional[list[SigmaTag]] = Field(default_factory=list)
 
+    _rule_id = None
+
     @field_validator('date', 'modified', mode='before')
     @classmethod
     def clean_dates(cls, value):
@@ -115,6 +117,14 @@ class RuleModel(BaseRuleModel):
         if len(tlps) != 1:
             raise ValueError(f'tag must contain exactly one tag in tlp namespace. Got {tlps}')
         return tags
+    
+    @property
+    def rule_id(self):
+        return self._rule_id
+    
+    @rule_id.setter
+    def rule_id(self, rule_id):
+        self._rule_id = rule_id
 
 class AIRuleModel(BaseRuleModel):
     pass
