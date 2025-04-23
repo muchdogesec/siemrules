@@ -81,6 +81,7 @@ class FilePromptSerializer(FileSerializer):
     file = serializers.HiddenField(default='')
     text_input = serializers.CharField(write_only=True)
     mode = serializers.HiddenField(default="txt")
+    extract_text_from_image = serializers.HiddenField(default=False)
     def create(self, validated_data):
         validated_data['file'] = SimpleUploadedFile("text-input--"+slugify(validated_data['name'])+'.txt', validated_data.pop('text_input', '').encode(), "text/plain")
         return super().create(validated_data)
