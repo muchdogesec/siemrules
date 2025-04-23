@@ -96,7 +96,7 @@ def get_rules(request, paginate=True, all_versions=False, nokeep=True, rule_type
         
     
 
-    filters.append('FILTER STARTS_WITH(doc.labels[0], "siemrules.correlation-rule") == @show_correlation_rules')
+    filters.append('FILTER (doc.labels[0] LIKE "siemrules.correlation-rule%") == @show_correlation_rules')
     binds.update(show_correlation_rules=rule_type == 'correlation')
 
 

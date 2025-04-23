@@ -237,7 +237,7 @@ class FileView(
     def sigma(self, request, *args, **kwargs):
         serializer = serializers.FileSigmaSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        temp_file = request.FILES["file"]
+        temp_file = request.FILES["sigma_file"]
         if temp_file.content_type != "application/x-yaml":
             validators.ValidationError("file content-type must be application/x-yaml")
         file_instance = serializer.save(mimetype=temp_file.content_type)
