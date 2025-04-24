@@ -575,7 +575,11 @@ class RuleView(viewsets.GenericViewSet):
         summary="Revert rule to older version",
         description=textwrap.dedent(
             """
-            Use this endpoint to revert rule to older version
+            This endpoint allows you to roll back (revert) the content of a Base Rule to an old version more easily.
+
+            The `version` value in the body is the STIX Indicators `modified` time for the version of the Base Rule you want to revert to.
+
+            Note, this will not delete this version of the rule. It will create a new version with the content of the rule at the point you want to revert to, except for `modified` times, which will match the time of revert.
             """
         ),
     )
