@@ -591,7 +591,7 @@ class RuleView(viewsets.GenericViewSet):
         return self.retrieve(request, indicator_id=indicator_id)
 
     def destroy(self, request, *args, indicator_id=None, **kwargs):
-        arangodb_helpers.delete_rule(indicator_id, "",
+        arangodb_helpers.delete_rule(indicator_id, 
             rule_type=self.rule_type,
         )
         return Response(status=status.HTTP_204_NO_CONTENT)

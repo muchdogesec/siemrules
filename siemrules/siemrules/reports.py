@@ -15,6 +15,7 @@ from dogesec_commons.objects.helpers import ArangoDBHelper
 if typing.TYPE_CHECKING:
     from siemrules import settings
 
+from siemrules.siemrules import arangodb_helpers
 from siemrules.siemrules.models import TLP_LEVEL_STIX_ID_MAPPING, File, TLP_Levels
 from drf_spectacular.utils import extend_schema, extend_schema_view
 import textwrap
@@ -188,6 +189,12 @@ class ReportView(viewsets.ViewSet):
     def destroy(self, request, *args, **kwargs):
         report_id = kwargs.get(self.lookup_url_kwarg)
         report_uuid = self.path_param_as_uuid(report_id)
+
+        rules = arangodb_helpers.get_rules(arangodb_helpers.request_from_queries(report_id=report_id), paginate=False)
+        related_correlations = arangodb_helpers.related_correlation_rules([rule['id'] for rule in rules])
+        if related_correlations:
+            raise validators.ValidationError(f'sorry, you cannot delete this report because it is linked to {len(related_correlations)} correlation(s)')
+        raise Exception()
 
         File.objects.filter(id=report_uuid).delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
