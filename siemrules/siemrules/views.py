@@ -1,3 +1,4 @@
+from datetime import UTC, datetime
 import io
 from rest_framework import (
     viewsets,
@@ -12,7 +13,7 @@ from rest_framework import (
 )
 from txt2detection.utils import parse_model
 import yaml
-from siemrules.siemrules import models, reports
+from siemrules.siemrules import correlations, models, reports
 from siemrules.siemrules import serializers
 from siemrules.siemrules.correlations.serializers import CorrelationRuleSerializer, DRFCorrelationRule
 from siemrules.siemrules.modifier import (
@@ -27,6 +28,7 @@ from siemrules.siemrules.serializers import (
     ImageSerializer,
     JobSerializer,
 )
+from rest_framework.exceptions import NotFound, ParseError
 
 from rest_framework import request
 from django.http import HttpRequest, HttpResponse
@@ -237,7 +239,7 @@ class FileView(
     def sigma(self, request, *args, **kwargs):
         serializer = serializers.FileSigmaSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        temp_file = request.FILES["file"]
+        temp_file = request.FILES["sigma_file"]
         if temp_file.content_type != "application/x-yaml":
             validators.ValidationError("file content-type must be application/x-yaml")
         file_instance = serializer.save(mimetype=temp_file.content_type)
@@ -505,6 +507,10 @@ class RuleView(viewsets.GenericViewSet):
     @decorators.action(methods=["POST"], detail=True, parser_classes=[SigmaRuleParser])
     def modify(self, request, *args, indicator_id=None, **kwargs):
         report, indicator, all_objs = arangodb_helpers.get_objects_by_id(indicator_id)
+
+        if not report:
+            raise ParseError(f"cannot find report associated with rule `{indicator_id}`")
+        
         old_detection = yaml_to_detection(
             indicator["pattern"], indicator["indicator_types"]
         )
@@ -569,7 +575,11 @@ class RuleView(viewsets.GenericViewSet):
         summary="Revert rule to older version",
         description=textwrap.dedent(
             """
-            Use this endpoint to revert rule to older version
+            This endpoint allows you to roll back (revert) the content of a Base Rule to an old version more easily.
+
+            The `version` value in the body is the STIX Indicators `modified` time for the version of the Base Rule you want to revert to.
+
+            Note, this will not delete this version of the rule. It will create a new version with the content of the rule at the point you want to revert to, except for `modified` times, which will match the time of revert.
             """
         ),
     )
@@ -680,3 +690,82 @@ class CorrelationView(RuleView):
     
     modify = None
     modify_ai = None
+
+
+    @extend_schema(
+        request=correlations.serializers.DRFCorrelationRuleModify.drf_serializer,
+        summary="Manually edit a Correlation Rule by ID",
+        description=textwrap.dedent(
+            """
+            Use this endpoint to modify a Correlation Rule.
+
+            You should only enter the parts of the Correlation Rule you wish to change. Any properties/values not passed will remain unchanged in the rule. To delete a value from a property, pass the property without the value.
+
+            You cannot change the following properties:
+
+            * `id`
+            * `date`
+            * `modified`
+            * `author`
+            
+            """
+        ),
+    )
+    @decorators.action(methods=["POST"], detail=True, parser_classes=[SigmaRuleParser])
+    def modify(self, request, *args, indicator_id=None, **kwargs):
+        report, indicator, all_objs = arangodb_helpers.get_objects_by_id(indicator_id)
+        old_rule = correlations.correlations.yaml_to_rule(
+            indicator["pattern"]
+        )
+        print(f"{old_rule=}")
+        new_rule = correlations.serializers.DRFCorrelationRuleModify.serialize_rule_from(old_rule, request.data)
+        print(new_rule)
+
+        return self.modify_resp(request, indicator_id, report, indicator, new_rule)
+
+    def modify_resp(self, request, indicator_id, report, indicator, rule):
+        new_objects = correlations.correlations.add_rule_indicator(rule, [], indicator['labels'][0].split('.')[-1], dict(modified=datetime.now(UTC)))
+        arangodb_helpers.modify_rule(
+            indicator["id"],
+            indicator["modified"],
+            new_objects[0]["modified"],
+            new_objects,
+        )
+
+        return self.retrieve(request, indicator_id=indicator_id)
+    
+    @extend_schema(request=serializers.AIModifySerializer,
+        summary="Use AI to modify a rule by ID",
+        description=textwrap.dedent(
+            """
+            Use this endpoint to get AI to modify a Sigma Rule via a prompt.
+
+            The following key / values are accepted in the body of the request:
+
+            * `prompt` (required): The prompt you wish to send to the AI with instructions on how to modify or improve the rule. For example; Add MITRE ATT&CK Technique T1134 to this rule.
+            * `ai_provider` (required): An AI provider and model to be used for rule generation in format `provider:model` e.g. `openai:gpt-4o`. This is a txt2detection setting.
+            """
+        ),
+    )
+    @decorators.action(methods=['POST'], detail=True)
+    def modify_ai(self, request, *args, indicator_id=None, **kwargs):
+        report, indicator, all_objs = arangodb_helpers.get_objects_by_id(indicator_id)
+        s = serializers.AIModifySerializer(data=request.data)
+        s.is_valid(raise_exception=True)
+        old_detection = yaml_to_detection(
+            indicator["pattern"], indicator["indicator_types"]
+        )
+        input_text = report["description"]
+        input_text = "<SKIPPED INPUT>"
+        detection_container = get_modification(
+            parse_model(s.data["ai_provider"]),
+            input_text,
+            old_detection,
+            s.data["prompt"],
+        )
+        if not detection_container.success:
+            raise exceptions.ParseError("txt2detection: failed to execute")
+
+        return self.modify_resp(
+            request, indicator_id, report, indicator, detection_container.detections[0]
+        )

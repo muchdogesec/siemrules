@@ -61,7 +61,6 @@ def test_run_txt2detection():
     mock_file.ai_provider = 'openai'
     mock_file.labels = []
     mock_file.references = mock_file.license = 'random'
-    mock_file.status = 'unsupported'
 
     # Mock dependencies
     with mock.patch("siemrules.worker.tasks.parse_ai_model") as mock_parse_ai_model, \
@@ -93,7 +92,6 @@ def test_run_txt2detection():
             labels=mock_file.labels,
             reference_urls=mock_file.references,
             license=mock_file.license,
-            status=mock_file.status,
         )
 
         assert result == {"mocked": "detection_output"}
@@ -146,7 +144,7 @@ def test_upload_to_arango(job):
 def test_upload_objects(job):
     bundle = {"objects": []}
     from django.conf import settings
-    mock_extra_data = {'die': 'flugel'}
+    mock_extra_data = {'key_x': 'value_y'}
 
     with patch("siemrules.worker.tasks.Stix2Arango") as mock_s2a:
 
@@ -164,7 +162,7 @@ def test_upload_objects(job):
             password=settings.ARANGODB_PASSWORD,
             bad_kwargs=None
         )
-        assert 'die' in mock_s2a_instance.arangodb_extra_data
+        assert 'key_x' in mock_s2a_instance.arangodb_extra_data
         mock_s2a_instance.run.assert_called_once()
 
 @pytest.mark.django_db

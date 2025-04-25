@@ -2,6 +2,7 @@ import contextlib
 from datetime import UTC, datetime
 import json
 from pathlib import Path
+import uuid
 import arango.exceptions
 from pytz import utc
 from rest_framework import request
@@ -96,7 +97,7 @@ def get_rules(request, paginate=True, all_versions=False, nokeep=True, rule_type
         
     
 
-    filters.append('FILTER STARTS_WITH(doc.labels[0], "siemrules.correlation-rule") == @show_correlation_rules')
+    filters.append('FILTER (doc.labels[0] LIKE "siemrules.correlation-rule%") == @show_correlation_rules')
     binds.update(show_correlation_rules=rule_type == 'correlation')
 
 
@@ -174,12 +175,10 @@ def get_objects_by_id(indicator_id):
     ''', bind_vars=dict(stix_id=indicator_id), paginate=False)
     report = obj = None
     with contextlib.suppress(IndexError):
-        report = [obj for obj in objects if obj['type'] == 'report'][0]
         obj = [obj for obj in objects if obj['id'] == indicator_id][0]
+        report = [obj for obj in objects if obj['type'] == 'report'][0]
     if not obj:
         raise NotFound(f"no rule with id `{indicator_id}`")
-    if not report:
-        raise ParseError(f"cannot find report associated with rule `{indicator_id}`")
 
 
     rels = helper.execute_query('''
@@ -211,40 +210,41 @@ def make_upload(report_id, bundle):
 
 def modify_rule(indicator_id, old_modified, new_modified, new_objects):
     report, obj, all_objs = get_objects_by_id(indicator_id)
-    object_refs: list = report['object_refs'] + [obj['id'] for obj in new_objects]
-    for ref in all_objs:
-        try:
-            object_refs.remove(ref['id'])
-        except Exception as e:
-            print(e)
-            pass
 
     if obj['modified'] != old_modified:
         raise Exception('object modified on db after modification job started')
     helper = ArangoDBHelper(settings.VIEW_NAME, request.Request(HttpRequest()))
-    # helper.execute_query('''
-    #         LET vertex_deletions = (
-    #                     FOR doc IN siemrules_vertex_collection
-    #                     FILTER doc._key IN @keys
-    #                     UPDATE doc WITH {_is_latest: FALSE} IN siemrules_vertex_collection
-    #                     RETURN doc.id
-    #         )
+    helper.execute_query('''
+            LET vertex_deletions = (
+                        FOR doc IN siemrules_vertex_collection
+                        FILTER doc._key IN @keys
+                        UPDATE doc WITH {_is_latest: FALSE} IN siemrules_vertex_collection
+                        RETURN doc.id
+            )
 
-    #         LET edge_deletions = (
-    #                     FOR doc IN siemrules_edge_collection
-    #                     FILTER doc._key IN @keys
-    #                     UPDATE doc WITH {_is_latest: FALSE} IN siemrules_edge_collection
-    #                     RETURN doc.id
-    #         )
-    #         RETURN {vertex_deletions, edge_deletions}
+            LET edge_deletions = (
+                        FOR doc IN siemrules_edge_collection
+                        FILTER doc._key IN @keys
+                        UPDATE doc WITH {_is_latest: FALSE} IN siemrules_edge_collection
+                        RETURN doc.id
+            )
+            RETURN {vertex_deletions, edge_deletions}
             
-    # ''', bind_vars=dict(keys=[obj['_key'] for obj in all_objs]), paginate=False)
+    ''', bind_vars=dict(keys=[obj['_key'] for obj in all_objs]), paginate=False)
 
-    make_upload(report['id'], {'objects': new_objects, 'type': 'bundle', 'id': f'bundle--{report["id"][8:]}'})
+    make_upload(obj.get('_stixify_report_id', ''), {'objects': new_objects, 'type': 'bundle', 'id': f'bundle--{uuid.uuid4()}'})
 
-    helper.execute_query('UPDATE {_key: @report_key} WITH @report_update IN siemrules_vertex_collection', 
-                        bind_vars=dict(report_key=report['_key'], report_update=dict(object_refs=object_refs, modified=new_modified)), paginate=False)
-    
+    if report:
+        object_refs: list = report['object_refs'] + [obj['id'] for obj in new_objects]
+        for ref in all_objs:
+            try:
+                object_refs.remove(ref['id'])
+            except Exception as e:
+                print(e)
+                pass
+        helper.execute_query('UPDATE {_key: @report_key} WITH @report_update IN siemrules_vertex_collection', 
+                            bind_vars=dict(report_key=report['_key'], report_update=dict(object_refs=object_refs, modified=new_modified)), paginate=False)
+        
 
     
 def delete_rule(indicator_id, rule_type="base", rule_date='', delete=True):

@@ -34,4 +34,4 @@ class SigmaRuleParser(parsers.BaseParser):
         try:
             return yaml.safe_load(stream)
         except:
-            raise #parsers.ParseError('failed to parse sigma input')
+            raise

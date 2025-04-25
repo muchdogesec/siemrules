@@ -4,13 +4,14 @@ from django.db.models.signals import post_delete
 from django.dispatch import receiver
 from django.db import models
 from django.contrib.postgres.fields import ArrayField
+from django.utils import timezone
 import uuid, typing
 # import txt2stix, txt2stix.extractions
 from django.core.exceptions import ValidationError
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from django.core.files.uploadedfile import InMemoryUploadedFile
 import stix2
-from .utils import TLP_Levels, TLP_LEVEL_STIX_ID_MAPPING
+from siemrules.siemrules.utils import TLP_Levels, TLP_LEVEL_STIX_ID_MAPPING
 from file2txt.parsers.core import BaseParser
 
 # Create your models here.
@@ -59,7 +60,7 @@ class File(models.Model):
     ai_provider = models.CharField(max_length=256, null=True)
     markdown_file = models.FileField(max_length=512, upload_to=upload_to_func, null=True)
 
-    created = models.DateTimeField(auto_now_add=True)
+    created = models.DateTimeField(default=timezone.now, null=True)
 
     references = ArrayField(base_field=models.URLField(), default=list, null=True)
     license = models.CharField(max_length=256, null=True, default=None, blank=True)
@@ -119,5 +120,5 @@ class Job(models.Model):
 
     def save(self, *args, **kwargs) -> None:
         if not self.completion_time and self.state == JobState.COMPLETED:
-            self.completion_time = datetime.now(timezone.utc)
+            self.completion_time = datetime.now(UTC)
         return super().save(*args, **kwargs)

@@ -1,4 +1,5 @@
 from datetime import datetime
+import io
 import logging
 import typing
 import uuid
@@ -35,9 +36,9 @@ def add_rule_indicator(rule: RuleModel, extra_documents = None, correlation_rule
     identity = default_identity()
     if rule.author:
         identity = make_identity(rule.author)
-    indicator_id = str(uuid.uuid4())
+    indicator_id = rule.rule_id or str(uuid.uuid4())
     rule_str = yaml.safe_dump_all(
-        [rule.model_dump(mode='json', exclude_none=True), *extra_documents],
+        [rule.model_dump(mode='json', exclude_none=True, by_alias=True), *extra_documents],
         indent=4,
         sort_keys=False,
     )
@@ -65,7 +66,7 @@ def add_rule_indicator(rule: RuleModel, extra_documents = None, correlation_rule
     logging.debug(f" =================== end of rule =================== ")
         
     indicator = parse_stix(indicator, allow_custom=True)
-    return [identity, indicator]
+    return [indicator, identity]
 
 
 def generate_correlation_with_ai(model: BaseAIExtractor, user_prompt, rules) -> AIRuleModel:
@@ -79,3 +80,8 @@ def generate_correlation_with_ai(model: BaseAIExtractor, user_prompt, rules) -> 
         rules=rules,
         user_prompt=user_prompt,
     )
+
+
+def yaml_to_rule(modification: str):
+    modification = list(yaml.safe_load_all(io.StringIO(modification)))[0]
+    return RuleModel.model_validate(modification)
