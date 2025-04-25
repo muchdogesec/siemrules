@@ -41,13 +41,13 @@ def new_task(job: Job):
         countdown=POLL_INTERVAL, root_id=str(job.id), task_id=str(job.id)
     )
 
-def new_correlation_task(job: Job, correlation: RuleModel, extra_documents, data):
+def new_correlation_task(job: Job, correlation: RuleModel, related_indicators, data):
     assert job.type == JobType.CORRELATION
     match job.data['input_form']:
         case 'sigma':
-            task = process_correlation.s(job.id, correlation.model_dump(by_alias=True), extra_documents)
+            task = process_correlation.s(job.id, correlation.model_dump(by_alias=True), related_indicators)
         case 'ai_prompt':
-            task = process_correlation_ai.s(job.id, data, extra_documents)
+            task = process_correlation_ai.s(job.id, data, related_indicators)
         case _:
             raise validators.ValidationError('Unknown job type')
     # process_correlation(job.id, correlation.model_dump(by_alias=True), extra_documents)
