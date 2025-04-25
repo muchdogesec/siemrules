@@ -604,7 +604,9 @@ class RuleView(viewsets.GenericViewSet):
             """
         ),
         responses=arangodb_helpers.ArangoDBHelper.get_paginated_response_schema(),
-        parameters=arangodb_helpers.ArangoDBHelper.get_schema_operation_parameters(),
+        parameters=arangodb_helpers.ArangoDBHelper.get_schema_operation_parameters() + [
+            OpenApiParameter('version', description="The version of the rule to use in retrieval.",)
+        ],
     )
     @decorators.action(methods=["GET"], detail=True)
     def objects(self, request, *args, indicator_id=None, **kwargs):
