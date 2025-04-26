@@ -63,8 +63,17 @@ def get_rules(request, paginate=True, all_versions=False, nokeep=True, rule_type
             "FILTER doc._stixify_report_id IN @report_ids"
         )
 
-    if value := helper.query_as_array('indicator_id'):
-        binds['indicator_ids'] = value
+    indicator_ids = helper.query_as_array('indicator_id')
+    if base_rules := helper.query_as_array('base_rule'):
+        matched_ids = helper.execute_query(
+            "FOR doc IN siemrules_edge_collection FILTER doc.target_ref IN @base_rules AND doc.relationship_type == 'contains-rule' RETURN doc.source_ref",
+            paginate=False,
+            bind_vars=dict(base_rules=base_rules)
+        )
+        indicator_ids = list(set(matched_ids).intersection(indicator_ids or matched_ids))
+
+    if indicator_ids or base_rules:
+        binds['indicator_ids'] = indicator_ids
         filters.append(
             "FILTER doc.id in @indicator_ids"
         )
@@ -94,7 +103,6 @@ def get_rules(request, paginate=True, all_versions=False, nokeep=True, rule_type
         filters.append('''
                 FILTER doc.external_references[? ANY FILTER CURRENT.source_name == 'cve' AND CURRENT.external_id IN @cve_ids]
             ''')
-        
     
 
     filters.append('FILTER (doc.labels[0] LIKE "siemrules.correlation-rule%") == @show_correlation_rules')

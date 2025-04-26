@@ -604,7 +604,9 @@ class RuleView(viewsets.GenericViewSet):
             """
         ),
         responses=arangodb_helpers.ArangoDBHelper.get_paginated_response_schema(),
-        parameters=arangodb_helpers.ArangoDBHelper.get_schema_operation_parameters(),
+        parameters=arangodb_helpers.ArangoDBHelper.get_schema_operation_parameters() + [
+            OpenApiParameter('version', description="The version of the rule to use in retrieval.",)
+        ],
     )
     @decorators.action(methods=["GET"], detail=True)
     def objects(self, request, *args, indicator_id=None, **kwargs):
@@ -626,6 +628,14 @@ class RuleView(viewsets.GenericViewSet):
 class CorrelationView(RuleView):
     openapi_tags = ["Correlation Rules"]
     rule_type = "correlation"
+
+    class filterset_class(RuleView.filterset_class):
+        cve_id = None
+        attack_id = None
+        file_id = None
+        base_rule = BaseInFilter(
+            help_text="Filter the result by the ID of contained base rules. Pass the full STIX ID of the Indicator object, e.g. `indicator--3fa85f64-5717-4562-b3fc-2c963f66afa6`."
+        )
 
     def get_renderers(self):
         if self.action == "retrieve":
