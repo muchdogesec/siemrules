@@ -21,7 +21,7 @@ from dogesec_commons.objects.helpers import ArangoDBHelper
 
 if typing.TYPE_CHECKING:
     from siemrules import settings
-from rest_framework.exceptions import NotFound, ParseError
+from rest_framework.exceptions import NotFound, ParseError, ValidationError
 from rest_framework.response import Response
 from stix2.utils import format_datetime
 
@@ -39,7 +39,7 @@ def fix_report_id(report_id: str):
         return report_id
     return "report--"+report_id
 
-def get_rules(request, paginate=True, all_versions=False, nokeep=True, rule_type="base"):
+def get_rules(request: request.Request, paginate=True, all_versions=False, nokeep=True, rule_type="base"):
     helper = ArangoDBHelper(settings.VIEW_NAME, request, result_key="rules")
     binds = {}
     filters = []
@@ -137,25 +137,27 @@ RETURN KEEP(doc, KEYS(doc, #NOKEEP))
     # return HttpResponse(f"{query}\n\n//"+json.dumps(binds))
     return helper.execute_query(query, bind_vars=binds, paginate=paginate)
 
-def get_single_rule(indicator_id, rule_type="base", version=None):
+def request_from_queries(**queries):
     r = request.Request(HttpRequest())
-    r.query_params.update(indicator_id=indicator_id, version=version)
+    r.query_params.update(queries)
+    return r
+
+def get_single_rule(indicator_id, rule_type="base", version=None):
+    r = request_from_queries(indicator_id=indicator_id, version=version)
     rules = get_rules(r, paginate=False, rule_type=rule_type)
     if not rules:
         raise NotFound(f"no rule with id `{indicator_id}`")
     return Response(rules[0])
 
 def get_single_rule_versions(indicator_id, rule_type="base"):
-    r = request.Request(HttpRequest())
-    r.query_params.update(indicator_id=indicator_id)
+    r = request_from_queries(indicator_id=indicator_id)
     rules = get_rules(r, paginate=False, all_versions=True, rule_type=rule_type)
     if not rules:
         raise NotFound(f"no rule with id `{indicator_id}`")
     return Response(sorted([rule['modified'] for rule in rules], reverse=True))
 
 def get_objects_for_rule(indicator_id, version=None, rule_type="base"):
-    r = request.Request(HttpRequest())
-    r.query_params.update(indicator_id=indicator_id, version=version)
+    r = request_from_queries(indicator_id=indicator_id, version=version)
     helper = ArangoDBHelper(settings.VIEW_NAME, r)
     rules = get_rules(r, paginate=False, nokeep=False, rule_type=rule_type)
     if not rules:
@@ -173,7 +175,7 @@ def get_objects_for_rule(indicator_id, version=None, rule_type="base"):
 
 
 def get_objects_by_id(indicator_id):
-    helper = ArangoDBHelper(settings.VIEW_NAME, request.Request(HttpRequest()))
+    helper = ArangoDBHelper(settings.VIEW_NAME, request_from_queries())
     objects = helper.execute_query('''
             FOR doc IN siemrules_vertex_collection
             FILTER doc.type IN ['report', 'indicator']
@@ -221,7 +223,7 @@ def modify_rule(indicator_id, old_modified, new_modified, new_objects):
 
     if obj['modified'] != old_modified:
         raise Exception('object modified on db after modification job started')
-    helper = ArangoDBHelper(settings.VIEW_NAME, request.Request(HttpRequest()))
+    helper = ArangoDBHelper(settings.VIEW_NAME, request_from_queries())
     helper.execute_query('''
             LET vertex_deletions = (
                         FOR doc IN siemrules_vertex_collection
@@ -256,7 +258,7 @@ def modify_rule(indicator_id, old_modified, new_modified, new_objects):
 
     
 def delete_rule(indicator_id, rule_type="base", rule_date='', delete=True):
-    helper = ArangoDBHelper(settings.VIEW_NAME, request.Request(HttpRequest()))
+    helper = ArangoDBHelper(settings.VIEW_NAME, request_from_queries())
     new_modified = format_datetime(datetime.now(UTC))
     objects = helper.execute_query('''
             FOR doc IN siemrules_vertex_collection
@@ -287,19 +289,18 @@ def delete_rule(indicator_id, rule_type="base", rule_date='', delete=True):
     rels = helper.execute_query('''
             FOR doc IN siemrules_edge_collection
             FILTER doc._from IN @stix_id_keys
-            RETURN KEEP(doc, "id", "_id", "_from", "_to", "_key")
+            RETURN KEEP(doc, "id", "_id", "_from", "_to", "_key", "modified", "relationship_type")
     ''', bind_vars=dict(stix_id_keys=[obj['_id'] for obj in rules]), paginate=False)
 
-    if  rule_type == 'base' and delete:
-        report['object_refs'].remove(indicator_id)
-        for obj in rules:
-            with contextlib.suppress(Exception):
-                report['object_refs'].remove(obj['id'])
 
-        helper.execute_query('UPDATE {_key: @report_key} WITH @report_update IN siemrules_vertex_collection', 
-                            bind_vars=dict(report_key=report['_key'], report_update=dict(object_refs=report['object_refs'], modified=new_modified)), paginate=False)
 
     if delete:
+        # check that there is no correlation using the rule
+        correlation_rels = related_correlation_rules([indicator_id])
+        if correlation_rels:
+            raise ValidationError(f'sorry, you cannot delete this rule because it is linked to {len({correlation_rels})} correlation(s)')
+
+        # perform deletion
         helper.execute_query('''
                 LET vertex_deletions = (
                             FOR doc IN siemrules_vertex_collection
@@ -317,6 +318,16 @@ def delete_rule(indicator_id, rule_type="base", rule_date='', delete=True):
                 RETURN {vertex_deletions, edge_deletions}
                 
         ''', bind_vars=dict(keys=[obj['_key'] for obj in rules+rels]), paginate=False)
+
+        # remove rule from report
+        if  rule_type == 'base':
+            report['object_refs'].remove(indicator_id)
+            for obj in rules:
+                with contextlib.suppress(Exception):
+                    report['object_refs'].remove(obj['id'])
+
+            helper.execute_query('UPDATE {_key: @report_key} WITH @report_update IN siemrules_vertex_collection', 
+                                bind_vars=dict(report_key=report['_key'], report_update=dict(object_refs=report['object_refs'], modified=new_modified)), paginate=False)
     else: #revert
         if not revert_key_id:
             raise ParseError(f"cannot find rule `{indicator_id}` @ {rule_date}")
@@ -340,3 +351,11 @@ def delete_rule(indicator_id, rule_type="base", rule_date='', delete=True):
     return True
 
 
+def related_correlation_rules(indicator_ids):
+    helper = ArangoDBHelper(settings.VIEW_NAME, request_from_queries())
+    correlation_rels = helper.execute_query('''
+            FOR doc IN siemrules_edge_collection
+            FILTER doc.target_ref IN @indicator_ids AND doc.relationship_type == "contains-rule"
+            RETURN KEEP(doc, "source_ref", "modified", "relationship_type")
+    ''', bind_vars=dict(indicator_ids=indicator_ids), paginate=False)
+    return ["{source_ref}@{modified}".format(**r) for r in correlation_rels]

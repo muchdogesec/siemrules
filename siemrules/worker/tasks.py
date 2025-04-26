@@ -41,16 +41,16 @@ def new_task(job: Job):
         countdown=POLL_INTERVAL, root_id=str(job.id), task_id=str(job.id)
     )
 
-def new_correlation_task(job: Job, correlation: RuleModel, extra_documents, data):
+def new_correlation_task(job: Job, correlation: RuleModel, related_indicators, data):
     assert job.type == JobType.CORRELATION
     match job.data['input_form']:
         case 'sigma':
-            task = process_correlation.s(job.id, correlation.model_dump(by_alias=True), extra_documents)
+            task = process_correlation.s(job.id, correlation.model_dump(by_alias=True), related_indicators)
         case 'ai_prompt':
-            task = process_correlation_ai.s(job.id, data, extra_documents)
+            task = process_correlation_ai.s(job.id, data, related_indicators)
         case _:
             raise validators.ValidationError('Unknown job type')
-    # process_correlation(job.id, correlation.model_dump(by_alias=True), extra_documents)
+    # process_correlation(job.id, correlation.model_dump(by_alias=True), related_indicators)
     ( 
         task| job_completed_with_error.si(job.id)).apply_async(
         countdown=POLL_INTERVAL, root_id=str(job.id), task_id=str(job.id)
@@ -165,21 +165,21 @@ def process_post(filename, job_id, *args):
     return job_id
 
 @shared_task
-def process_correlation(job_id, correlation: RuleModel, extra_documents):
+def process_correlation(job_id, correlation: RuleModel, related_indicators):
     correlation = RuleModel.model_validate(correlation)
     job = Job.objects.get(id=job_id)
     
-    upload_correlation(correlation, extra_documents, job)
+    upload_correlation(correlation, related_indicators, job)
 
-def upload_correlation(correlation, extra_documents, job: Job):
-    objects = correlations.add_rule_indicator(correlation, extra_documents, job.data['input_form'], job.data)
+def upload_correlation(correlation, related_indicators, job: Job):
+    objects = correlations.add_rule_indicator(correlation, related_indicators, job.data['input_form'], job.data)
     upload_objects(job, make_bundle(objects), None, stix2arango_note=f"siemrules-correlation")
 
 @shared_task
-def process_correlation_ai(job_id, data, extra_documents):
+def process_correlation_ai(job_id, data, related_indicators):
     job = Job.objects.get(id=job_id)
     model = parse_ai_model(data["ai_provider"])
-    correlation = correlations.generate_correlation_with_ai(model, data['prompt'], extra_documents)
+    correlation = correlations.generate_correlation_with_ai(model, data['prompt'], related_indicators)
     correlation_with_date = RuleModel.model_validate(
         dict(
             **correlation.model_dump(),
@@ -189,7 +189,7 @@ def process_correlation_ai(job_id, data, extra_documents):
             tags=["tlp."+data['tlp_level'].replace('_', '-')],
         )
     )
-    upload_correlation(correlation_with_date, extra_documents, job)
+    upload_correlation(correlation_with_date, related_indicators, job)
 
 
 

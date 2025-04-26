@@ -591,7 +591,7 @@ class RuleView(viewsets.GenericViewSet):
         return self.retrieve(request, indicator_id=indicator_id)
 
     def destroy(self, request, *args, indicator_id=None, **kwargs):
-        arangodb_helpers.delete_rule(indicator_id, "",
+        arangodb_helpers.delete_rule(indicator_id, 
             rule_type=self.rule_type,
         )
         return Response(status=status.HTTP_204_NO_CONTENT)
@@ -652,18 +652,16 @@ class CorrelationView(RuleView):
         rule_ids = [str(r) for r in rule_ids]
         indicator_ids = ["indicator--" + rule_id for rule_id in rule_ids]
         r.query_params.update(indicator_id=",".join(indicator_ids))
-        indicators = arangodb_helpers.get_rules(r, paginate=False)
+        indicators = arangodb_helpers.get_rules(r, paginate=False, nokeep=False)
         rules = {
-            indicator["id"].replace("indicator--", ""): yaml.safe_load(
-                io.StringIO(indicator["pattern"])
-            )
+            indicator["id"].replace("indicator--", "")
             for indicator in indicators
         }
         if non_existent_rules := set(rule_ids).difference(rules):
             raise validators.ValidationError(
                 f"non existent rules in correlation {non_existent_rules}"
             )
-        return rules
+        return indicators
 
     @extend_schema(request=DRFCorrelationRule.drf_serializer)
     @decorators.action(methods=['POST'], detail=False, serializer_class=JobSerializer)
@@ -671,15 +669,14 @@ class CorrelationView(RuleView):
         rule_s = DRFCorrelationRule.drf_serializer(data=request.data)
         rule_s.is_valid(raise_exception=True)
         rule = DRFCorrelationRule.model_validate(rule_s.data)
-        extra_documents = []
+        related_indicators = []
         if rule.correlation.rules:
-            rules_mapping = self.get_rules(rule.correlation.rules)
-            extra_documents = list(rules_mapping.values())
+            related_indicators = self.get_rules(rule.correlation.rules)
 
         job_instance = models.Job.objects.create(type=models.JobType.CORRELATION, data=dict(input_form='sigma'))
         job_s = CorrelationJobSerializer(job_instance)
 
-        tasks.new_correlation_task(job_instance, rule, extra_documents, {})
+        tasks.new_correlation_task(job_instance, rule, related_indicators, {})
         return Response(job_s.data)
     
 
@@ -688,14 +685,13 @@ class CorrelationView(RuleView):
     def from_prompt(self, request, *args, **kwargs):
         s = CorrelationRuleSerializer(data=request.data)
         s.is_valid(raise_exception=True)
-        extra_documents = []
+        related_indicators = []
         if s.validated_data['rules']:
-            rules_mapping = self.get_rules(s.validated_data['rules'])
-            extra_documents = list(rules_mapping.values())
+            related_indicators = self.get_rules(s.validated_data['rules'])
 
         job_instance = models.Job.objects.create(type=models.JobType.CORRELATION, data=dict(input_form='ai_prompt', **s.data))
         job_s = CorrelationJobSerializer(job_instance)
-        tasks.new_correlation_task(job_instance, s.validated_data, extra_documents, s.validated_data)
+        tasks.new_correlation_task(job_instance, s.validated_data, related_indicators, s.validated_data)
         return Response(job_s.data)
     
     modify = None

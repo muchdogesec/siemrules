@@ -11,7 +11,7 @@ from rest_framework import status
 from unittest.mock import patch
 from django.core.files.uploadedfile import SimpleUploadedFile
 from siemrules.siemrules import models, reports
-from siemrules.siemrules.views import CorrelationView
+from siemrules.siemrules.views import CorrelationView, RuleView
 from siemrules.worker import tasks
 from tests.src import data as test_data
 from rest_framework.response import Response
@@ -94,3 +94,4 @@ def test_get_rules(rule_ids, should_fail):
 
 def test_important_class_properties():
     assert CorrelationView().rule_type == "correlation"
+    assert RuleView().rule_type == 'base'

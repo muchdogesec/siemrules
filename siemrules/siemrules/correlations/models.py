@@ -4,7 +4,7 @@ import itertools
 from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator, model_validator, NameEmail
 from typing import ClassVar, List, Dict, Optional
 from uuid import UUID
-from txt2detection.models import SigmaTag
+from txt2detection.models import SigmaTag, BaseDetection, TLP_LEVEL
 
 
 class CorrelationType(str, Enum):
@@ -117,6 +117,16 @@ class RuleModel(BaseRuleModel):
         if len(tlps) != 1:
             raise ValueError(f'tag must contain exactly one tag in tlp namespace. Got {tlps}')
         return tags
+    
+    @property
+    def tlp_level(self):
+        for tag in self.tags:
+            ns, _, level = tag.partition(".")
+            if ns != "tlp":
+                continue
+            if tlp_level := TLP_LEVEL.get(level.replace("-", "_")):
+                return tlp_level
+        return None
     
     @property
     def rule_id(self):

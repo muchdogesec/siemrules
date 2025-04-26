@@ -11,7 +11,7 @@ if typing.TYPE_CHECKING:
     from siemrules import settings
 from siemrules.siemrules.correlations.models import AIRuleModel, RuleModel
 from siemrules.siemrules.models import default_identity
-from stix2 import Identity, parse as parse_stix
+from stix2 import Identity, parse as parse_stix, Relationship
 import yaml
 
 from llama_index.core import ChatPromptTemplate
@@ -30,19 +30,19 @@ def create_indicator(correlation: RuleModel):
 def make_identity(name):
     return Identity(id='identity--'+str(uuid.uuid5(settings.STIX_NAMESPACE, f"txt2detection+{name}")), name=name, created_by_ref=default_identity()['id'], created=datetime(2020, 1, 1), modified=datetime(2020, 1, 1))
 
-def add_rule_indicator(rule: RuleModel, extra_documents = None, correlation_rule_type='manual', job_data=None):
+def add_rule_indicator(rule: RuleModel, related_indicators = None, correlation_rule_type='manual', job_data=None):
     job_data = job_data or dict()
-    extra_documents = extra_documents or []
+    related_indicators = related_indicators or []
     identity = default_identity()
     if rule.author:
         identity = make_identity(rule.author)
     indicator_id = rule.rule_id or str(uuid.uuid4())
     rule_str = yaml.safe_dump_all(
-        [rule.model_dump(mode='json', exclude_none=True, by_alias=True), *extra_documents],
+        [rule.model_dump(mode='json', exclude_none=True), *rules_from_indicators(related_indicators)],
         indent=4,
         sort_keys=False,
     )
-    indicator = {
+    correlation_indicator = {
         "type": "indicator",
         "id": "indicator--"+indicator_id,
         "spec_version": "2.1",
@@ -56,20 +56,47 @@ def add_rule_indicator(rule: RuleModel, extra_documents = None, correlation_rule
         "pattern": rule_str,
         "valid_from": rule.date,
         "object_marking_refs": [
-
+            rule.tlp_level.value['id'],
+            "marking-definition--97ba4e8b-04f6-57e8-8f6e-3a0f0a7dc0fb"
         ],
-        # "external_references": self.url_refs + [dict(source_name="txt2detection-status", external_id=self.indicator_status)],
     }
     
     logging.debug(f"===== rule {indicator_id} =====")
-    logging.debug("```yaml\n"+str(indicator['pattern'])+"\n```")
+    logging.debug("```yaml\n"+str(correlation_indicator['pattern'])+"\n```")
     logging.debug(f" =================== end of rule =================== ")
         
-    indicator = parse_stix(indicator, allow_custom=True)
-    return [indicator, identity]
+    correlation_indicator = parse_stix(correlation_indicator, allow_custom=True)
+    objects = [correlation_indicator, identity]
+    for related_indicator in related_indicators:
+        objects.append(
+            dict(
+                type="relationship",
+                spec_version="2.1",
+                id="relationship--"+ str(uuid.uuid5(uuid.UUID('97ba4e8b-04f6-57e8-8f6e-3a0f0a7dc0fb'), f"{correlation_indicator.id}+{related_indicator['id']}")),
+                created_by_ref=correlation_indicator.created_by_ref,
+                created=correlation_indicator.created,
+                modified=correlation_indicator.modified,
+                relationship_type="contains-rule",
+                description=f"{correlation_indicator.name} contains the rule {related_indicator['name']}",
+                source_ref=correlation_indicator.id,
+                target_ref=related_indicator['id'],
+                object_marking_refs=correlation_indicator.object_marking_refs,
+                allow_custom=True,
+                _to=related_indicator['_id'],
+            )
+        )
+    return objects
 
 
-def generate_correlation_with_ai(model: BaseAIExtractor, user_prompt, rules) -> AIRuleModel:
+def rules_from_indicators(indicators: list[dict]):
+    return [
+        yaml.safe_load(
+                io.StringIO(indicator["pattern"])
+            )
+        for indicator in indicators
+    ]
+
+def generate_correlation_with_ai(model: BaseAIExtractor, user_prompt, related_indicators) -> AIRuleModel:
     print(model, type(model))
     return LLMTextCompletionProgram.from_defaults(
         output_parser=ParserWithLogging(AIRuleModel),
@@ -77,7 +104,7 @@ def generate_correlation_with_ai(model: BaseAIExtractor, user_prompt, rules) -> 
         verbose=True,
         llm=model.llm,
     )(
-        rules=rules,
+        rules=rules_from_indicators(related_indicators),
         user_prompt=user_prompt,
     )
 
