@@ -153,7 +153,7 @@ class ReportView(viewsets.ViewSet):
             OpenApiParameter('labels', description="searches the `labels` property for the value entered. Search is wildcard so `exploit` will match `exploited`, `exploits`, etc."),
             OpenApiParameter('created_max', description="Maximum value of `created` value to filter by in format `YYYY-MM-DD`."),
             OpenApiParameter('created_min', description="Minimum value of `created` value to filter by in format `YYYY-MM-DD`."),
-            OpenApiParameter('sort', description="Sort by", enum=SORT_PROPERTIES),
+            OpenApiParameter('sort', description="Sort results by property", enum=SORT_PROPERTIES),
         ],
     )
     def list(self, request, *args, **kwargs):
