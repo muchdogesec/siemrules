@@ -342,10 +342,10 @@ class JobView(
 
 @extend_schema_view(
     list=extend_schema(
-        summary="Search and retrieve created Rules",
+        summary="Search and retrieve created Base Sigma Rules",
         description=textwrap.dedent(
             """
-            During processing, txt2detection identifies detection rules from the intelligence described in the content. Each rule identified is converted into a STIX 2.1 Indicator object containing the rule.
+            During processing, txt2detection turns a File into one or more Base Sigma Rules.
 
             You can use this endpoint to retrieve them.
             """
@@ -353,12 +353,12 @@ class JobView(
         responses={200: serializers.RuleSerializer, 400: DEFAULT_400_ERROR},
     ),
     retrieve=extend_schema(
-        summary="Get a Rule by ID",
+        summary="Get a Base Sigma Rule by ID",
         description=textwrap.dedent(
             """
-            Use this endpoint to retrieve a rule using its STIX Indicator ID.
+            Use this endpoint to retrieve a Base Rule using its STIX Indicator ID.
 
-            If you do not know the ID of the Rule you can use the Search and retrieve created Rules endpoint.
+            If you do not know the ID of the Base Rule you can use the Search and retrieve created Base Rules endpoint.
             """
         ),
         responses={
@@ -373,7 +373,7 @@ class JobView(
         ],
     ),
     destroy=extend_schema(
-        summary="Delete a Rule by ID",
+        summary="Delete a Base Sigma Rule by ID",
         description=textwrap.dedent(
             """
             Use this endpoint to delete a Rule. All versions of the Rule that exist will be removed.
@@ -403,7 +403,7 @@ class RuleView(viewsets.GenericViewSet):
             #     type='str',
             #     format='path',
             # ),
-            description="The `id` of the Indicator. e.g. `indicator--3fa85f64-5717-4562-b3fc-2c963f66afa6`.",
+            description="The `id` of the Indicator. e.g. `indicator--3fa85f64-5717-4562-b3fc-2c963f66afa6`. Note the UUID part of the STIX `id` used here will match the `id` in the Sigma rule.",
         )
     ]
 
@@ -431,7 +431,7 @@ class RuleView(viewsets.GenericViewSet):
             help_text="Filter the result by only the reports created by this identity. Pass the full STIX ID of the Identity object, e.g. `identity--b1ae1a15-6f4b-431e-b990-1b9678f35e15`."
         )
         sort = ChoiceFilter(
-            help_text="Sort by value",
+            help_text="Sort results by property",
             choices=[(f, f) for f in arangodb_helpers.RULES_SORT_FIELDS],
         )
 
@@ -464,14 +464,16 @@ class RuleView(viewsets.GenericViewSet):
         )
 
     @extend_schema(
-        summary="Get Versions of a Rule by ID",
+        summary="Get all Versions of a Base Sigma Rule by ID",
         description=textwrap.dedent(
             """
-            Use this endpoint to retrieve all versions of a rule using its STIX Indicator ID.
+            Base Rules can be modified over time. Each modification versions the Base Rule.
 
-            If you do not know the ID of the Rule you can use the Search and retrieve created Rules endpoint.
+            Use this endpoint to retrieve all versions of a Base Rule using its STIX Indicator ID.
 
-            You can use the list of versions on the Get Rule endpoint to see each version of the Rule.
+            If you do not know the ID of the Base Rule you can use the Search and retrieve created Base Rules endpoint.
+
+            You can use the list of versions on the Get Base Rule endpoint to see each version of the Base Rule.
             """
         ),
         responses={
@@ -487,7 +489,7 @@ class RuleView(viewsets.GenericViewSet):
 
     @extend_schema(
         request=DRFDetection.drf_serializer,
-        summary="Manually edit a Sigma Rule by ID",
+        summary="Manually edit a Base Sigma Rule by ID",
         description=textwrap.dedent(
             """
             Use this endpoint to modify a Sigma Rule.
@@ -540,7 +542,7 @@ class RuleView(viewsets.GenericViewSet):
         return self.retrieve(request, indicator_id=indicator_id)
     
     @extend_schema(request=serializers.AIModifySerializer,
-        summary="Use AI to modify a rule by ID",
+        summary="Use AI to modify a Base Rule by ID",
         description=textwrap.dedent(
             """
             Use this endpoint to get AI to modify a Sigma Rule via a prompt.
@@ -576,14 +578,16 @@ class RuleView(viewsets.GenericViewSet):
         )
     
     @extend_schema(request=serializers.RuleRevertSerializer,
-        summary="Revert rule to older version",
+        summary="Revert a Base Rule to older version",
         description=textwrap.dedent(
             """
             This endpoint allows you to roll back (revert) the content of a Base Rule to an old version more easily.
 
-            The `version` value in the body is the STIX Indicators `modified` time for the version of the Base Rule you want to revert to.
+            This body requires the following values:
 
-            Note, this will not delete this version of the rule. It will create a new version with the content of the rule at the point you want to revert to, except for `modified` times, which will match the time of revert.
+            * `version` The version of the rule you want to roll back (e.g. `2025-04-04T06:12:59.482478Z`). The `version` value is the same as the STIX objects `modified` time. You can see all of the versions of a rule using the version endpoint.
+
+            Note, this will not delete the current version of the rule. It will create a new version with the content of the rule at the point you want to revert to, except for `modified` times, which will match the time of revert.
             """
         ),
     )
@@ -601,15 +605,17 @@ class RuleView(viewsets.GenericViewSet):
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     @extend_schema(
-        summary="Get objects linked to Sigma Rule",
+        summary="Get objects linked to Base Sigma Rule",
         description=textwrap.dedent(
             """
-            description here
+            A Base Sigma Rule can be directly linked to a range of other STIX objects representing MITRE ATT&CK references, CVE references, or detected observables inside the detection part of the rule.
+
+            Use the endpoint to return all objects linked a Base Sigma Rule, including the Base Sigma Rule.
             """
         ),
         responses=arangodb_helpers.ArangoDBHelper.get_paginated_response_schema(),
         parameters=arangodb_helpers.ArangoDBHelper.get_schema_operation_parameters() + [
-            OpenApiParameter('version', description="The version of the rule to use in retrieval.",)
+            OpenApiParameter('version', description="The version of the rule you want to retrieve (e.g. `2025-04-04T06:12:59.482478Z`). The `version` value is the same as the STIX objects `modified` time. You can see all of the versions of a rule using the version endpoint.",)
         ],
     )
     @decorators.action(methods=["GET"], detail=True)
@@ -622,13 +628,99 @@ class RuleView(viewsets.GenericViewSet):
 
 
 @extend_schema_view(
-    upload=extend_schema(summary="create correlation from yml file", description="create new correlation from sigma"),
-    from_prompt=extend_schema(summary="create correlation from prompts", description="create new correlation from prompt"),
-    list=extend_schema(summary="search correlation rules", description="search correlation rules"),
-    retrieve=extend_schema(summary="get a correlation rule by id", description="sget a correlation rule by id"),
-    objects=extend_schema(summary="get a correlation rule objects", description="sget a correlation rule by id"),
-    versions=extend_schema(summary="get a correlation rule versions", description="sget a correlation rule by id"),
+    upload=extend_schema(
+        summary="Create a Correlation Sigma Rule using YML",
+        description=textwrap.dedent(
+            """
+            This endpoint is useful if you're comfortable writing a Sigma Correlation Rule.
+
+            The URL parameters accepted are:
+
+            * `title` (required): used as the rule `title`
+            * `description` (optional) used as the rule `description`
+            * `author` (optional): A full STIX 2.1 identity object (make sure to properly escape). Will be validated by the STIX2 library. The ID is used to create the Indicator STIX object, and is used as the `author` property in the Sigma Correlation Rule. If not passed, the SIEM Rules Identity object will be used.
+            * `date` (optional): will be used at the `created` time in the Indicator object generated and `date` value in the Sigma Correlation Rule. Default is now. Must be lower than `date`. In format `YYYY-MM-DD` (e.g. `2000-01-31`).
+            * `modified`: will be used at the `modified` time in the Indicator object generated and `modified` value in the Sigma Correlation Rule. Default is now. Must be higher than `date`. In format `YYYY-MM-DD` (e.g. `2000-01-31`).
+            * `tlp_level` (optional): TLP level assigned to the Indicator object and in the `tags` of the Sigma Correlation Rule. Either `clear`, `green`, `amber`, `amber+strict`, or `red`.
+            * `tags` (optional): in format `NAMESPACE.TAG` (e.g. `threat-actor.someone`). Cannot use the reserved namespaces `attack.`, `cve.` or `tlp.).
+            * `rule_ids` (required): one or more Sigma Base Rule ID's (e.g. `680c2e5b-3704-47e1-9a0c-4f6746211faf`). Do not include the `indicator--` part. Must be valid, else creation will fail.
+
+            In the body of the request you need to pass;
+            
+            * `correlation`: a valid Sigma Correlation Rule in the body of the request, [as per the Sigma specification](https://github.com/SigmaHQ/sigma-specification/blob/main/specification/sigma-correlation-rules-specification.md). The Correlation Rule should conform to the yml syntax (properly indented and escaped).
+
+            The `id` of the Sigma Correlation Rule will be auto-generated and cannot be passed in the request.
+            """
+        ),
+    ),
+    from_prompt=extend_schema(
+        summary="Create A Correlation Rule from an AI prompt",
+        description=textwrap.dedent(
+            """
+            Use this endpoint to create a Correlation Sigma Rule via a prompt.
+
+            The URL parameters accepted are:
+
+            * `author` (optional): A full STIX 2.1 identity object (make sure to properly escape). Will be validated by the STIX2 library. The ID is used to create the Indicator STIX object, and is used as the `author` property in the Sigma Correlation Rule. If not passed, the SIEM Rules Identity object will be used.
+            * `date` (optional): will be used at the `created` time in the Indicator object generated and `date` value in the Sigma Correlation Rule. Default is now. Must be lower than `date`. In format `YYYY-MM-DD` (e.g. `2000-01-31`).
+            * `modified`: will be used at the `modified` time in the Indicator object generated and `modified` value in the Sigma Correlation Rule. Default is now. Must be higher than `date`. In format `YYYY-MM-DD` (e.g. `2000-01-31`).
+            * `tlp_level` (optional): TLP level assigned to the Indicator object and in the `tags` of the Sigma Correlation Rule. Either `clear`, `green`, `amber`, `amber+strict`, or `red`.
+            * `tags` (optional): in format `NAMESPACE.TAG` (e.g. `threat-actor.someone`). Cannot use the reserved namespaces `attack.`, `cve.` or `tlp.).
+            * `rule_ids` (required): one or more Sigma Base Rule ID's (e.g. `680c2e5b-3704-47e1-9a0c-4f6746211faf`). Do not include the `indicator--` part. Must be valid, else creation will fail.
+            * `ai_provider` (required): An AI provider and model to be used for rule generation in format `provider:model` e.g. `openai:gpt-4o`. This is a txt2detection setting.
+
+            In the body of the request you need to pass;
+
+            * `prompt` (required): The prompt you wish to send to the AI with instructions on how to modify or improve the rule. For example; Add MITRE ATT&CK Technique T1134 to this rule.
+
+            The `id` of the Sigma Correlation Rule will be auto-generated and cannot be passed in the request.
+            """
+        ),
+    ),
+    list=extend_schema(
+        summary="Search and retrieve created Correlation Rules",
+        description=textwrap.dedent(
+            """
+            Use this endpoint to retrieve all Correlation Rules that have been created.
+            """
+        ),
+    ),
+    retrieve=extend_schema(
+        summary="Get a Correlation Sigma Rule by ID",
+        description=textwrap.dedent(
+            """
+            Use this endpoint to retrieve a Correlation Rule using its STIX Indicator ID.
+
+            If you do not know the ID of the Correlation Rule you can use the Search and retrieve created Base Rules endpoint.
+            """
+        ),
+    ),
+    objects=extend_schema(
+        summary="Get objects linked to Correlation Sigma Rule",
+        description=textwrap.dedent(
+            """
+            A Correlation Sigma Rule is linked directly to all the Sigma Base Rules is contains.
+
+            Use the endpoint to return all the STIX objects (including relationships) linked to this Correlation Rule. Also includes the Correlation Rule STIX Object.
+            """
+        ),
+    ),
+    versions=extend_schema(
+        summary="Get all Versions of a Correlation Sigma Rule",
+        description=textwrap.dedent(
+            """
+            Correlation Rules can be modified over time. Each modification versions the Correlation Rule.
+
+            Use this endpoint to retrieve all versions of a Correlation Rule using its STIX Indicator ID.
+
+            If you do not know the ID of the Correlation Rule you can use the Search and retrieve created Correlation Rules endpoint.
+
+            You can use the list of versions on the Get Correlation Rule endpoint to see each version of the Rule.
+            """
+        ),
+    )
 )
+
 class CorrelationView(RuleView):
     openapi_tags = ["Correlation Rules"]
     rule_type = "correlation"
