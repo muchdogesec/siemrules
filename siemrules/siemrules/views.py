@@ -438,6 +438,9 @@ class RuleView(viewsets.GenericViewSet):
         correlation_rule = BaseInFilter(
             help_text="Filter the results by the id of correlation rules that contain rule. Pass the full STIX ID of the Indicator object, e.g. `indicator--3fa85f64-5717-4562-b3fc-2c963f66afa6`."
         )
+        report_id = BaseInFilter(
+            help_text="Filter the results by the report_id of the rule. Pass the full STIX ID of the Indicator object, e.g. `report--3fa85f64-5717-4562-b3fc-2c963f66afa6`."
+        )
 
     def get_renderers(self):
         if self.action == "retrieve":
