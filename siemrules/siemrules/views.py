@@ -213,7 +213,7 @@ class FileView(
         )
         created_by_ref = BaseInFilter(
             "identity__id",
-            help_text="Filter the result by only the Files created by this identity. Pass the full STIX ID of the Identity object, e.g. `identity--b1ae1a15-6f4b-431e-b990-1b9678f35e15`.",
+            help_text="Filter the results by only the Files created by this identity. Pass the full STIX ID of the Identity object, e.g. `identity--b1ae1a15-6f4b-431e-b990-1b9678f35e15`.",
         )
 
         def filter_report_id(self, qs, field_name, value: str):
@@ -329,7 +329,7 @@ class JobView(
 
     class filterset_class(FilterSet):
         file_id = BaseInFilter(
-            help_text="Filter the result by the ID of the File the Job was created from, e.g. `2632fd7a-ae33-4d35-9652-425e488c97af`."
+            help_text="Filter the results by the ID of the File the Job was created from, e.g. `2632fd7a-ae33-4d35-9652-425e488c97af`."
         )
 
     filter_backends = [DjangoFilterBackend, Ordering]
@@ -409,10 +409,10 @@ class RuleView(viewsets.GenericViewSet):
 
     class filterset_class(FilterSet):
         file_id = BaseInFilter(
-            help_text="Filter the result by the ID of the File, e.g. `2632fd7a-ae33-4d35-9652-425e488c97af`."
+            help_text="Filter the results by the ID of the File, e.g. `2632fd7a-ae33-4d35-9652-425e488c97af`."
         )
         indicator_id = BaseInFilter(
-            help_text="Filter the result by the ID of the Rule. Pass the full STIX ID of the Indicator object, e.g. `indicator--3fa85f64-5717-4562-b3fc-2c963f66afa6`."
+            help_text="Filter the results by the ID of the Rule. Pass the full STIX ID of the Indicator object, e.g. `indicator--3fa85f64-5717-4562-b3fc-2c963f66afa6`."
         )
         name = CharFilter(
             help_text="Filter by the name of the Rule (automatically created by the AI). Search is wildcard so `exploit` will match `exploited`, `exploits`, etc."
@@ -428,7 +428,7 @@ class RuleView(viewsets.GenericViewSet):
             help_text="Filter the results return rules linked to a particular CVE. Pass the full CVE ID, e.g. `CVE-2024-28374`."
         )
         created_by_ref = BaseInFilter(
-            help_text="Filter the result by only the reports created by this identity. Pass the full STIX ID of the Identity object, e.g. `identity--b1ae1a15-6f4b-431e-b990-1b9678f35e15`."
+            help_text="Filter the results by only the reports created by this identity. Pass the full STIX ID of the Identity object, e.g. `identity--b1ae1a15-6f4b-431e-b990-1b9678f35e15`."
         )
         sort = ChoiceFilter(
             help_text="Sort results by property",
@@ -667,11 +667,11 @@ class RuleView(viewsets.GenericViewSet):
             * `tlp_level` (optional): TLP level assigned to the Indicator object and in the `tags` of the Sigma Correlation Rule. Either `clear`, `green`, `amber`, `amber+strict`, or `red`.
             * `tags` (optional): in format `NAMESPACE.TAG` (e.g. `threat-actor.someone`). Cannot use the reserved namespaces `attack.`, `cve.` or `tlp.).
             * `rule_ids` (required): one or more Sigma Base Rule ID's (e.g. `680c2e5b-3704-47e1-9a0c-4f6746211faf`). Do not include the `indicator--` part. Must be valid, else creation will fail.
-            * `ai_provider` (required): An AI provider and model to be used for rule generation in format `provider:model` e.g. `openai:gpt-4o`. This is a txt2detection setting.
 
             In the body of the request you need to pass;
 
             * `prompt` (required): The prompt you wish to send to the AI with instructions on how to modify or improve the rule. For example; Add MITRE ATT&CK Technique T1134 to this rule.
+            * `ai_provider` (required): An AI provider and model to be used for rule generation in format `provider:model` e.g. `openai:gpt-4o`. This is a txt2detection setting.
 
             The `id` of the Sigma Correlation Rule will be auto-generated and cannot be passed in the request.
             """
@@ -730,7 +730,7 @@ class CorrelationView(RuleView):
         attack_id = None
         file_id = None
         base_rule = BaseInFilter(
-            help_text="Filter the result by the ID of contained base rules. Pass the full STIX ID of the Indicator object, e.g. `indicator--3fa85f64-5717-4562-b3fc-2c963f66afa6`."
+            help_text="Filter the results by the ID of contained base rules. Pass the full STIX ID of the Indicator object, e.g. `indicator--3fa85f64-5717-4562-b3fc-2c963f66afa6`."
         )
 
     def get_renderers(self):
@@ -803,7 +803,15 @@ class CorrelationView(RuleView):
 
             You should only enter the parts of the Correlation Rule you wish to change. Any properties/values not passed will remain unchanged in the rule. To delete a value from a property, pass the property without the value.
 
-            You cannot change the following properties:
+            Enter the properties you want to change in YML format. You can change the following properties
+
+            * `title` (optional): cannot be blank.Used as the rule `title`
+            * `description` (optional) used as the rule `description`
+            * `tlp_level` (optional): TLP level assigned to the Indicator object and in the `tags` of the Sigma Correlation Rule. Either `clear`, `green`, `amber`, `amber+strict`, or `red`.
+            * `tags` (optional): in format `NAMESPACE.TAG` (e.g. `threat-actor.someone`). Cannot use the reserved namespaces `attack.`, `cve.` or `tlp.).
+            * `rule_ids` (required): one or more Sigma Base Rule ID's (e.g. `680c2e5b-3704-47e1-9a0c-4f6746211faf`). Do not include the `indicator--` part. Must be valid, else creation will fail.
+
+            You cannot change the following properties (doing so will result in an error):
 
             * `id`
             * `date`
