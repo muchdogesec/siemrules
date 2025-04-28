@@ -52,7 +52,7 @@ class FileSerializer(serializers.ModelSerializer):
     ], required=False)
     mode = serializers.ChoiceField(choices=list(f2t_core.BaseParser.PARSERS.keys()), help_text="How the File should be processed. This is a file2txt setting.")
     identity = STIXIdentityField(write_only=True, required=False, help_text='This will be used as the `created_by_ref` for all created SDOs and SROs. This is a full STIX Identity JSON. e.g. `{"type":"identity","spec_version":"2.1","id":"identity--b1ae1a15-6f4b-431e-b990-1b9678f35e15","name":"Dummy Identity"}`. If no value is passed, [the Stixify identity object will be used](https://raw.githubusercontent.com/muchdogesec/stix4doge/refs/heads/main/objects/identity/stixify.json). This is a txt2detection setting.')
-    tlp_level = serializers.ChoiceField(choices=TLP_Levels.choices, default=TLP_Levels.RED, help_text='This will be assigned to all SDOs and SROs created. Stixify uses TLPv2. This is a txt2detection setting.')
+    tlp_level = serializers.ChoiceField(choices=TLP_Levels.choices, default=TLP_Levels.RED.value, help_text='This will be assigned to all SDOs and SROs created. Stixify uses TLPv2. This is a txt2detection setting.')
     labels = serializers.ListField(child=serializers.CharField(), required=False, help_text="Will be added to the `labels` of the Report and Indicator SDOs created, and `tags` in the Sigma rule itself.")
     defang = serializers.BooleanField(default=True, help_text="Whether to defang the observables in the text. e.g. turns `1.1.1[.]1` to `1.1.1.1` for extraction. This is a file2txt setting.")
     ai_provider = serializers.CharField(required=True, validators=[validate_model], help_text="An AI provider and model to be used for rule generation in format `provider:model` e.g. `openai:gpt-4o`. This is a txt2detection setting.")
@@ -96,6 +96,7 @@ class FileSigmaSerializer(serializers.ModelSerializer):
     report_id = ReportIDField(source='id', help_text="Only pass a UUIDv4. It will be use to generate the STIX Report ID, e.g. `report--<UUID>`. If not passed, this value will be randomly generated for this file. This is a txt2detection setting.", validators=[
         validators.UniqueValidator(queryset=File.objects.all(), message="File with report id already exists"),
     ], required=False)
+    name = serializers.CharField(help_text='will be assigned as `title` of the rule. Will overwrite existing title', required=False)
     labels = serializers.ListField(child=serializers.CharField(), required=False, help_text=textwrap.dedent("""
     Case-insensitive (will all be converted to lower-case). Allowed `a-z`, `0-9`. e.g.`"namespace.label1" "namespace.label2"` would create 2 labels. Added to both report and indicator objects created and the rule `tags`. Note, if any existing `tags` in the rule, these values will be appended to the list.
     * note: you can use reserved namespaces `cve.` and `attack.` when creating labels to perform external enrichment using Vulmatch and CTI Butler. Created tags will be appended to the list of existing tags.
@@ -107,7 +108,7 @@ class FileSigmaSerializer(serializers.ModelSerializer):
     ignore_embedded_relationships_sro = serializers.BooleanField(default=False, help_text="Default is `false`. If `true` passed, will stop any embedded relationships from being generated from SRO objects (type = `relationship`).")
     ignore_embedded_relationships_smo = serializers.BooleanField(default=False, help_text="Default is `false`. if true passed, will stop any embedded relationships from being generated from SMO objects (type = `marking-definition`, `extension-definition`, `language-content`).")
 
-    tlp_level = serializers.ChoiceField(choices=TLP_Levels.choices, default=TLP_Levels.RED, help_text='If TLP exist in rule, setting a value for this property will overwrite the existing value. When unset, the `tlp.` tag in the report will be turned into a TLP level. Defaults to `clear` if there is no `tlp.` tag in rule.')
+    tlp_level = serializers.ChoiceField(choices=TLP_Levels.choices, default=TLP_Levels.RED.value, help_text='If TLP exist in rule, setting a value for this property will overwrite the existing value. When unset, the `tlp.` tag in the report will be turned into a TLP level. Defaults to `clear` if there is no `tlp.` tag in rule.')
     references = serializers.ListField(child=serializers.URLField(), default=list, help_text="A list of URLs to be append to `references` in the Sigma Rule property")
     created = serializers.DateTimeField(default=None, help_text="By default the `data` and `modified` values in the rule will be used. If no values exist for these, the default behaviour is to use script run time. You can pass  `created` time here which will overwrite `date` and `modified` date in the rule")
     license = serializers.ChoiceField(default=None, choices=list(valid_licenses().items()), allow_null=True, help_text="[License of the rule according the SPDX ID specification](https://spdx.org/licenses/). Will be added to the rule as `license`. Will overwrite any existing `license` value in rule.")
@@ -115,7 +116,7 @@ class FileSigmaSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = File
-        exclude = ['file', 'name', 'defang', 'extract_text_from_image', 'markdown_file', 'mimetype']
+        exclude = ['file', 'defang', 'extract_text_from_image', 'markdown_file', 'mimetype']
         read_only_fields = ["id"]
 
         
