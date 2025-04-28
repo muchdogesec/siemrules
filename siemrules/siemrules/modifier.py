@@ -1,5 +1,6 @@
 from datetime import UTC, datetime
 import io
+from types import SimpleNamespace
 import yaml
 from txt2detection.ai_extractor.utils import (
     ParserWithLogging,
@@ -62,7 +63,8 @@ def yaml_to_detection(modification: str, indicator_types=[]):
     return Detection.model_validate(modification)
 
 
-def get_modification(model, input_text, old_detection, prompt) -> DetectionContainer:
+def get_modification(model, input_text, old_detection: Detection, prompt) -> DetectionContainer:
+    old_detection._bundler = SimpleNamespace(report=SimpleNamespace(created=datetime.now(), modified=datetime.now()))
     assert isinstance(old_detection, Detection), "rule must be of type detection"
     detections = DetectionContainer(success=True, detections=[old_detection])
     return LLMTextCompletionProgram.from_defaults(
@@ -79,7 +81,7 @@ def get_modification(model, input_text, old_detection, prompt) -> DetectionConta
         llm=model.llm,
     )(
         document=input_text,
-        old_rule=detections.model_dump_json(),
+        old_rule=detections.model_dump(mode='json', exclude=['date', 'modified']),
         correction_prompt=prompt,
     )
 
