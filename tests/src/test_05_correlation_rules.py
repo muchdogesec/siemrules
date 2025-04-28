@@ -41,10 +41,12 @@ correlation:
     timespan: 1h
     condition:
         gte: 100
+tags:
+    - tlp.amber
 '''
     with patch("siemrules.worker.tasks.new_correlation_task") as mock_task:
         response = client.post(
-            correlation_url + "upload/", format="sigma", data=rule, content_type='application/sigma+yaml'
+            correlation_url + "create/manual/", format="sigma", data=rule, content_type='application/sigma+yaml'
         )
         assert response.status_code == status.HTTP_200_OK, response.content
         mock_task.assert_called_once()
@@ -90,7 +92,7 @@ def test_get_rules(rule_ids, should_fail):
             CorrelationView().get_rules(rule_ids)
     else:
         rules = CorrelationView().get_rules(rule_ids)
-        assert set(rules) == set(rule_ids)
+        assert set([r['id'] for r in rules]) == set(rule_ids)
 
 def test_important_class_properties():
     assert CorrelationView().rule_type == "correlation"

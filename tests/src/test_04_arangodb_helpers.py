@@ -160,14 +160,15 @@ tlp_levels_visible_to_all = {TLP_LEVEL_STIX_ID_MAPPING[TLP_Levels.CLEAR], TLP_LE
 )
 def test_visible_to(client: django.test.Client, subtests, path):
     key = 'rules' if path != 'reports' else 'objects'
-    resp = client.get(f"api/v1/{path}/objects")
+    path_url = f"api/v1/{path}/objects/"
+    resp = client.get(path_url)
     assert resp.status_code == 200
     objects = resp.data[key]
     created_by_refs = {obj['created_by_ref'] for obj in objects}
     created_by_refs.add("identity--abcdef12-abcd-431e-abcd-1b9678abcdef") # bad identity id should return all green and clears
     for identity_id in created_by_refs:
-        with subtests.test("test visible_to", identity_id=identity_id):
-            resp = client.get(f"api/v1/{path}/objects", query_params=dict(visible_to=identity_id))
+        with subtests.test("test visible_to", identity_id=identity_id, path=path):
+            resp = client.get(path_url, query_params=dict(visible_to=identity_id))
             objects = resp.data[key]
             for obj in objects:
                 assert obj['created_by_ref'] == identity_id or not tlp_levels_visible_to_all.isdisjoint(obj['object_marking_refs'])
