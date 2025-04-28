@@ -384,6 +384,83 @@ class JobView(
             """
         ),
     ),
+    revert=extend_schema(
+        summary="Revert a Base Rule to older version",
+        description=textwrap.dedent(
+            """
+            This endpoint allows you to roll back (revert) the content of a Base Rule to an old version more easily.
+
+            This body requires the following values:
+
+            * `version` The version of the rule you want to roll back (e.g. `2025-04-04T06:12:59.482478Z`). The `version` value is the same as the STIX objects `modified` time. You can see all of the versions of a rule using the version endpoint.
+
+            Note, this will not delete the current version of the rule. It will create a new version with the content of the rule at the point you want to revert to, except for `modified` times, which will match the time of revert.
+            """
+        ),
+    ),
+    versions=extend_schema(
+        summary="Get all Versions of a Base Sigma Rule by ID",
+        description=textwrap.dedent(
+            """
+            Base Rules can be modified over time. Each modification versions the Base Rule.
+
+            Use this endpoint to retrieve all versions of a Base Rule using its STIX Indicator ID.
+
+            If you do not know the ID of the Base Rule you can use the Search and retrieve created Base Rules endpoint.
+
+            You can use the list of versions on the Get Base Rule endpoint to see each version of the Base Rule.
+            """
+        ),
+    ),
+    modify_ai=extend_schema(
+        summary="Use AI to modify a Base Rule by ID",
+        description=textwrap.dedent(
+            """
+            Use this endpoint to get AI to modify a Sigma Rule via a prompt.
+
+            The following key / values are accepted in the body of the request:
+
+            * `prompt` (required): The prompt you wish to send to the AI with instructions on how to modify or improve the rule. For example; Add MITRE ATT&CK Technique T1134 to this rule.
+            * `ai_provider` (required): An AI provider and model to be used for rule generation in format `provider:model` e.g. `openai:gpt-4o`. This is a txt2detection setting.
+            """
+        ),
+    ),
+    modify=extend_schema(
+        summary="Manually edit a Base Sigma Rule by ID",
+        description=textwrap.dedent(
+            """
+            Use this endpoint to modify a Sigma Rule.
+
+            You should only enter the parts of the Sigma Rule you wish to change. Any properties/values not passed will remain unchanged in the rule. To delete a value from a property, pass the property without the value.
+
+            You cannot change the following properties:
+
+            * `id`
+            * `date`
+            * `modified`
+            * `author`
+
+
+            The rule will be validated against the Sigma specification. [You can read the specification here to see available properties and values allowed](https://github.com/SigmaHQ/sigma-specification/blob/main/specification/sigma-rules-specification.md).
+
+            You will recieve an error if validation fails. If any part of the validation fails the rule will not be updated.
+            """
+        ),
+    ),
+    objects=extend_schema(
+        summary="Get objects linked to Base Sigma Rule",
+        description=textwrap.dedent(
+            """
+            A Base Sigma Rule can be directly linked to a range of other STIX objects representing MITRE ATT&CK references, CVE references, or detected observables inside the detection part of the rule.
+
+            Use the endpoint to return all objects linked a Base Sigma Rule, including the Base Sigma Rule.
+            """
+        ),
+        responses=arangodb_helpers.ArangoDBHelper.get_paginated_response_schema(),
+        parameters=arangodb_helpers.ArangoDBHelper.get_schema_operation_parameters() + [
+            OpenApiParameter('version', description="The version of the rule you want to retrieve (e.g. `2025-04-04T06:12:59.482478Z`). The `version` value is the same as the STIX objects `modified` time. You can see all of the versions of a rule using the version endpoint.",)
+        ],
+    ),
 )
 class RuleView(viewsets.GenericViewSet):
     openapi_tags = ["Base Rules"]
@@ -464,18 +541,6 @@ class RuleView(viewsets.GenericViewSet):
         )
 
     @extend_schema(
-        summary="Get all Versions of a Base Sigma Rule by ID",
-        description=textwrap.dedent(
-            """
-            Base Rules can be modified over time. Each modification versions the Base Rule.
-
-            Use this endpoint to retrieve all versions of a Base Rule using its STIX Indicator ID.
-
-            If you do not know the ID of the Base Rule you can use the Search and retrieve created Base Rules endpoint.
-
-            You can use the list of versions on the Get Base Rule endpoint to see each version of the Base Rule.
-            """
-        ),
         responses={
             200: {"type": "array", "items": {"type": "string", "format": "date-time"}}
         },
@@ -487,29 +552,7 @@ class RuleView(viewsets.GenericViewSet):
             rule_type=self.rule_type,
                                                          )
 
-    @extend_schema(
-        request=DRFDetection.drf_serializer,
-        summary="Manually edit a Base Sigma Rule by ID",
-        description=textwrap.dedent(
-            """
-            Use this endpoint to modify a Sigma Rule.
-
-            You should only enter the parts of the Sigma Rule you wish to change. Any properties/values not passed will remain unchanged in the rule. To delete a value from a property, pass the property without the value.
-
-            You cannot change the following properties:
-
-            * `id`
-            * `date`
-            * `modified`
-            * `author`
-
-
-            The rule will be validated against the Sigma specification. [You can read the specification here to see available properties and values allowed](https://github.com/SigmaHQ/sigma-specification/blob/main/specification/sigma-rules-specification.md).
-
-            You will recieve an error if validation fails. If any part of the validation fails the rule will not be updated.
-            """
-        ),
-    )
+    @extend_schema(request=DRFDetection.drf_serializer)
     @decorators.action(methods=["POST"], detail=True, parser_classes=[SigmaRuleParser])
     def modify(self, request, *args, indicator_id=None, **kwargs):
         report, indicator, all_objs = arangodb_helpers.get_objects_by_id(indicator_id)
@@ -541,19 +584,7 @@ class RuleView(viewsets.GenericViewSet):
 
         return self.retrieve(request, indicator_id=indicator_id)
     
-    @extend_schema(request=serializers.AIModifySerializer,
-        summary="Use AI to modify a Base Rule by ID",
-        description=textwrap.dedent(
-            """
-            Use this endpoint to get AI to modify a Sigma Rule via a prompt.
-
-            The following key / values are accepted in the body of the request:
-
-            * `prompt` (required): The prompt you wish to send to the AI with instructions on how to modify or improve the rule. For example; Add MITRE ATT&CK Technique T1134 to this rule.
-            * `ai_provider` (required): An AI provider and model to be used for rule generation in format `provider:model` e.g. `openai:gpt-4o`. This is a txt2detection setting.
-            """
-        ),
-    )
+    @extend_schema(request=serializers.AIModifySerializer)
     @decorators.action(methods=['POST'], detail=True)
     def modify_ai(self, request, *args, indicator_id=None, **kwargs):
         report, indicator, all_objs = arangodb_helpers.get_objects_by_id(indicator_id)
@@ -577,20 +608,7 @@ class RuleView(viewsets.GenericViewSet):
             request, indicator_id, report, indicator, detection_container.detections[0]
         )
     
-    @extend_schema(request=serializers.RuleRevertSerializer,
-        summary="Revert a Base Rule to older version",
-        description=textwrap.dedent(
-            """
-            This endpoint allows you to roll back (revert) the content of a Base Rule to an old version more easily.
-
-            This body requires the following values:
-
-            * `version` The version of the rule you want to roll back (e.g. `2025-04-04T06:12:59.482478Z`). The `version` value is the same as the STIX objects `modified` time. You can see all of the versions of a rule using the version endpoint.
-
-            Note, this will not delete the current version of the rule. It will create a new version with the content of the rule at the point you want to revert to, except for `modified` times, which will match the time of revert.
-            """
-        ),
-    )
+    @extend_schema(request=serializers.RuleRevertSerializer)
     @decorators.action(methods=['PATCH'], detail=True)
     def revert(self, request, *args, indicator_id=None, **kwargs):
         s = serializers.RuleRevertSerializer(data=request.data)
@@ -604,20 +622,6 @@ class RuleView(viewsets.GenericViewSet):
         )
         return Response(status=status.HTTP_204_NO_CONTENT)
 
-    @extend_schema(
-        summary="Get objects linked to Base Sigma Rule",
-        description=textwrap.dedent(
-            """
-            A Base Sigma Rule can be directly linked to a range of other STIX objects representing MITRE ATT&CK references, CVE references, or detected observables inside the detection part of the rule.
-
-            Use the endpoint to return all objects linked a Base Sigma Rule, including the Base Sigma Rule.
-            """
-        ),
-        responses=arangodb_helpers.ArangoDBHelper.get_paginated_response_schema(),
-        parameters=arangodb_helpers.ArangoDBHelper.get_schema_operation_parameters() + [
-            OpenApiParameter('version', description="The version of the rule you want to retrieve (e.g. `2025-04-04T06:12:59.482478Z`). The `version` value is the same as the STIX objects `modified` time. You can see all of the versions of a rule using the version endpoint.",)
-        ],
-    )
     @decorators.action(methods=["GET"], detail=True)
     def objects(self, request, *args, indicator_id=None, **kwargs):
         return arangodb_helpers.get_objects_for_rule(
@@ -718,7 +722,32 @@ class RuleView(viewsets.GenericViewSet):
             You can use the list of versions on the Get Correlation Rule endpoint to see each version of the Rule.
             """
         ),
-    )
+    ),
+    destroy=extend_schema(
+        summary="Delete a Correlation Sigma Rule by ID",
+        description=textwrap.dedent(
+            """
+            Use this endpoint to delete a Rule. All versions of the Rule that exist will be removed.
+
+            This endpoint will remove the Rule from the databases, and any references to it.
+
+            """
+        ),
+    ),
+    revert=extend_schema(
+        summary="Revert a Correlation Rule to older version",
+        description=textwrap.dedent(
+            """
+            This endpoint allows you to roll back (revert) the content of a Correlation Rule to an old version more easily.
+
+            This body requires the following values:
+
+            * `version` The version of the rule you want to roll back (e.g. `2025-04-04T06:12:59.482478Z`). The `version` value is the same as the STIX objects `modified` time. You can see all of the versions of a rule using the version endpoint.
+
+            Note, this will not delete the current version of the rule. It will create a new version with the content of the rule at the point you want to revert to, except for `modified` times, which will match the time of revert.
+            """
+        ),
+    ),
 )
 
 class CorrelationView(RuleView):
