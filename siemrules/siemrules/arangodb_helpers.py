@@ -11,7 +11,7 @@ from django.http import HttpRequest, HttpResponse
 from siemrules import settings
 import typing
 
-from siemrules.siemrules.utils import TLP_LEVEL_STIX_ID_MAPPING
+from siemrules.siemrules.utils import TLP_LEVEL_STIX_ID_MAPPING, TLP_Levels
 from siemrules.worker.tasks import upload_to_arango
 
 if typing.TYPE_CHECKING:
@@ -52,6 +52,12 @@ def get_rules(request: request.Request, paginate=True, all_versions=False, nokee
         version_filter = 'TRUE'
 
 
+            
+    visible_to_filter = ''
+    if q := helper.query.get('visible_to'):
+        binds['visible_to'] = q
+        binds['marking_visible_to_all'] = TLP_LEVEL_STIX_ID_MAPPING[TLP_Levels.GREEN], TLP_LEVEL_STIX_ID_MAPPING[TLP_Levels.CLEAR]
+        visible_to_filter = 'FILTER doc.created_by_ref == @visible_to OR @marking_visible_to_all ANY IN doc.object_marking_refs'
 
     report_ids = helper.query_as_array('report_id')
     if file_ids := helper.query_as_array('file_id'):
@@ -115,6 +121,7 @@ FOR doc IN siemrules_vertex_collection
 FILTER doc.type == 'indicator' AND #version
 
 @filters
+#visible_to
 @sort_stmt
 #LIMIT
 RETURN KEEP(doc, KEYS(doc, #NOKEEP))
@@ -129,6 +136,9 @@ RETURN KEEP(doc, KEYS(doc, #NOKEEP))
             helper.get_sort_stmt(
                 RULES_SORT_FIELDS,
             ),
+        ) \
+        .replace(
+            '#visible_to', visible_to_filter
         )
     limit_str = ''
     if paginate:

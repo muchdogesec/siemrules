@@ -434,6 +434,7 @@ class RuleView(viewsets.GenericViewSet):
             help_text="Sort results by property",
             choices=[(f, f) for f in arangodb_helpers.RULES_SORT_FIELDS],
         )
+        visible_to = CharFilter(help_text="Only show rules that are visible to the Identity id passed. e.g. passing `identity--b1ae1a15-6f4b-431e-b990-1b9678f35e15` would only show rules created by that identity (with any TLP level) or reports created by another identity ID but only if they are marked with `TLP:CLEAR` or `TLP:GREEN`.")
 
     def get_renderers(self):
         if self.action == "retrieve":
