@@ -17,6 +17,8 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import include, path
 from rest_framework import routers
+
+from siemrules.siemrules.identities import IdentityView
 from .siemrules import views, reports
 from drf_spectacular.views import SpectacularAPIView, SpectacularRedocView, SpectacularSwaggerView
 from dogesec_commons.objects import views as arango_views
@@ -36,6 +38,7 @@ router.register('jobs', views.JobView, 'jobs')
 router.register('rules', views.RuleView, 'rules')
 router.register('correlation-rules', views.CorrelationView, 'correlation-rules')
 router.register('reports', reports.ReportView, 'reports')
+router.register('identities', IdentityView, "identity-view")
 
 
 # objects
