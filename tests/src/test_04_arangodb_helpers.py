@@ -11,6 +11,7 @@ from rest_framework import status
 from unittest.mock import patch
 from django.core.files.uploadedfile import SimpleUploadedFile
 from siemrules.siemrules import models, reports
+from siemrules.siemrules.utils import TLP_LEVEL_STIX_ID_MAPPING, TLP_Levels
 from siemrules.worker import tasks
 from tests.src import data as test_data
 from rest_framework.response import Response
@@ -145,3 +146,28 @@ def test_delete_rules():
             assert rule_id not in obj['object_refs'], "rule not removed from report.object_refs"
     for obj in helper.db.collection('siemrules_edge_collection').all():
         assert obj['source_ref'] != rule_id, "relationships to rule not deleted"
+
+
+tlp_levels_visible_to_all = {TLP_LEVEL_STIX_ID_MAPPING[TLP_Levels.CLEAR], TLP_LEVEL_STIX_ID_MAPPING[TLP_Levels.GREEN]}
+
+@pytest.mark.parametrize(
+        "path",
+        [
+            "reports",
+            "correlation-rules",
+            "rules",
+        ]
+)
+def test_visible_to(client: django.test.Client, subtests, path):
+    key = 'rules' if path != 'reports' else 'objects'
+    resp = client.get(f"api/v1/{path}/objects")
+    assert resp.status_code == 200
+    objects = resp.data[key]
+    created_by_refs = {obj['created_by_ref'] for obj in objects}
+    created_by_refs.add("identity--abcdef12-abcd-431e-abcd-1b9678abcdef") # bad identity id should return all green and clears
+    for identity_id in created_by_refs:
+        with subtests.test("test visible_to", identity_id=identity_id):
+            resp = client.get(f"api/v1/{path}/objects", query_params=dict(visible_to=identity_id))
+            objects = resp.data[key]
+            for obj in objects:
+                assert obj['created_by_ref'] == identity_id or not tlp_levels_visible_to_all.isdisjoint(obj['object_marking_refs'])
