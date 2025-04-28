@@ -510,7 +510,7 @@ class RuleView(viewsets.GenericViewSet):
             """
         ),
     )
-    @decorators.action(methods=["POST"], detail=True, parser_classes=[SigmaRuleParser])
+    @decorators.action(methods=["POST"], detail=True, parser_classes=[SigmaRuleParser], url_path="modify/manual")
     def modify(self, request, *args, indicator_id=None, **kwargs):
         report, indicator, all_objs = arangodb_helpers.get_objects_by_id(indicator_id)
 
@@ -554,7 +554,7 @@ class RuleView(viewsets.GenericViewSet):
             """
         ),
     )
-    @decorators.action(methods=['POST'], detail=True)
+    @decorators.action(methods=['POST'], detail=True, url_path="modify/ai")
     def modify_ai(self, request, *args, indicator_id=None, **kwargs):
         report, indicator, all_objs = arangodb_helpers.get_objects_by_id(indicator_id)
         s = serializers.AIModifySerializer(data=request.data)
@@ -591,7 +591,7 @@ class RuleView(viewsets.GenericViewSet):
             """
         ),
     )
-    @decorators.action(methods=['PATCH'], detail=True)
+    @decorators.action(methods=['PATCH'], detail=True, url_path="modify/revert")
     def revert(self, request, *args, indicator_id=None, **kwargs):
         s = serializers.RuleRevertSerializer(data=request.data)
         s.is_valid(raise_exception=True)
@@ -821,7 +821,7 @@ class CorrelationView(RuleView):
             """
         ),
     )
-    @decorators.action(methods=["POST"], detail=True, parser_classes=[SigmaRuleParser])
+    @decorators.action(methods=['POST'], detail=True, url_path="modify/manual")
     def modify(self, request, *args, indicator_id=None, **kwargs):
         report, indicator, all_objs = arangodb_helpers.get_objects_by_id(indicator_id)
         old_rule = correlations.correlations.yaml_to_rule(
@@ -857,7 +857,7 @@ class CorrelationView(RuleView):
             """
         ),
     )
-    @decorators.action(methods=['POST'], detail=True)
+    @decorators.action(methods=['POST'], detail=True, url_path="modify/ai")
     def modify_ai(self, request, *args, indicator_id=None, **kwargs):
         report, indicator, all_objs = arangodb_helpers.get_objects_by_id(indicator_id)
         s = serializers.AIModifySerializer(data=request.data)
