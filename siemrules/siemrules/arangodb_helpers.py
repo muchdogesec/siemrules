@@ -78,7 +78,16 @@ def get_rules(request: request.Request, paginate=True, all_versions=False, nokee
         )
         indicator_ids = list(set(matched_ids).intersection(indicator_ids or matched_ids))
 
-    if indicator_ids or base_rules:
+    if correlation_rules := helper.query_as_array('correlation_rule'):
+        matched_ids = helper.execute_query(
+            "FOR doc IN siemrules_edge_collection FILTER doc.source_ref IN @correlation_rules AND doc.relationship_type == 'contains-rule' RETURN doc.target_ref",
+            paginate=False,
+            bind_vars=dict(correlation_rules=correlation_rules)
+        )
+        indicator_ids = list(set(matched_ids).intersection(indicator_ids or matched_ids))
+    
+
+    if indicator_ids or base_rules or correlation_rules:
         binds['indicator_ids'] = indicator_ids
         filters.append(
             "FILTER doc.id in @indicator_ids"
