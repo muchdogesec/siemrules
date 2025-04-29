@@ -510,7 +510,7 @@ class RuleView(viewsets.GenericViewSet):
             """
         ),
     )
-    @decorators.action(methods=["POST"], detail=True, parser_classes=[SigmaRuleParser])
+    @decorators.action(methods=["POST"], detail=True, parser_classes=[SigmaRuleParser], url_path="modify/manual")
     def modify(self, request, *args, indicator_id=None, **kwargs):
         report, indicator, all_objs = arangodb_helpers.get_objects_by_id(indicator_id)
 
@@ -554,7 +554,7 @@ class RuleView(viewsets.GenericViewSet):
             """
         ),
     )
-    @decorators.action(methods=['POST'], detail=True)
+    @decorators.action(methods=['POST'], detail=True, url_path="modify/ai")
     def modify_ai(self, request, *args, indicator_id=None, **kwargs):
         report, indicator, all_objs = arangodb_helpers.get_objects_by_id(indicator_id)
         s = serializers.AIModifySerializer(data=request.data)
@@ -591,7 +591,7 @@ class RuleView(viewsets.GenericViewSet):
             """
         ),
     )
-    @decorators.action(methods=['PATCH'], detail=True)
+    @decorators.action(methods=['PATCH'], detail=True, url_path="modify/revert")
     def revert(self, request, *args, indicator_id=None, **kwargs):
         s = serializers.RuleRevertSerializer(data=request.data)
         s.is_valid(raise_exception=True)
@@ -628,7 +628,7 @@ class RuleView(viewsets.GenericViewSet):
 
 
 @extend_schema_view(
-    upload=extend_schema(
+    create_from_sigma=extend_schema(
         summary="Create a Correlation Sigma Rule using YML",
         description=textwrap.dedent(
             """
@@ -653,7 +653,7 @@ class RuleView(viewsets.GenericViewSet):
             """
         ),
     ),
-    from_prompt=extend_schema(
+    create_from_prompt=extend_schema(
         summary="Create A Correlation Rule from an AI prompt",
         description=textwrap.dedent(
             """
@@ -760,8 +760,8 @@ class CorrelationView(RuleView):
         return indicators
 
     @extend_schema(request=DRFCorrelationRule.drf_serializer)
-    @decorators.action(methods=['POST'], detail=False, serializer_class=JobSerializer)
-    def upload(self, request, *args, **kwargs):
+    @decorators.action(methods=['POST'], detail=False, serializer_class=JobSerializer, url_path="create/manual")
+    def create_from_sigma(self, request, *args, **kwargs):
         rule_s = DRFCorrelationRule.drf_serializer(data=request.data)
         rule_s.is_valid(raise_exception=True)
         rule = DRFCorrelationRule.model_validate(rule_s.data)
@@ -777,8 +777,8 @@ class CorrelationView(RuleView):
     
 
     @extend_schema(request=CorrelationRuleSerializer)
-    @decorators.action(methods=['POST'], detail=False, serializer_class=JobSerializer)
-    def from_prompt(self, request, *args, **kwargs):
+    @decorators.action(methods=['POST'], detail=False, serializer_class=JobSerializer, url_path="create/ai")
+    def create_from_prompt(self, request, *args, **kwargs):
         s = CorrelationRuleSerializer(data=request.data)
         s.is_valid(raise_exception=True)
         related_indicators = []
@@ -789,10 +789,6 @@ class CorrelationView(RuleView):
         job_s = CorrelationJobSerializer(job_instance)
         tasks.new_correlation_task(job_instance, s.validated_data, related_indicators, s.validated_data)
         return Response(job_s.data)
-    
-    modify = None
-    modify_ai = None
-
 
     @extend_schema(
         request=correlations.serializers.DRFCorrelationRuleModify.drf_serializer,
@@ -821,7 +817,7 @@ class CorrelationView(RuleView):
             """
         ),
     )
-    @decorators.action(methods=["POST"], detail=True, parser_classes=[SigmaRuleParser])
+    @decorators.action(methods=['POST'], detail=True, url_path="modify/manual")
     def modify(self, request, *args, indicator_id=None, **kwargs):
         report, indicator, all_objs = arangodb_helpers.get_objects_by_id(indicator_id)
         old_rule = correlations.correlations.yaml_to_rule(
@@ -857,7 +853,7 @@ class CorrelationView(RuleView):
             """
         ),
     )
-    @decorators.action(methods=['POST'], detail=True)
+    @decorators.action(methods=['POST'], detail=True, url_path="modify/ai")
     def modify_ai(self, request, *args, indicator_id=None, **kwargs):
         report, indicator, all_objs = arangodb_helpers.get_objects_by_id(indicator_id)
         s = serializers.AIModifySerializer(data=request.data)
