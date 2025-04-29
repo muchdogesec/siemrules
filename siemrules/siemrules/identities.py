@@ -23,7 +23,7 @@ from drf_spectacular.utils import extend_schema, extend_schema_view
         summary="Delete all objects associated with identity",
         description=textwrap.dedent(
             """
-            This endpoint will delete all Files, Reports, Rules and any other STIX objects created using this identity.
+            This endpoint will delete all Files, Reports, Rules and any other STIX objects created using this identity. It will also delete the Identity object selected.
             """
         ),
     ),
