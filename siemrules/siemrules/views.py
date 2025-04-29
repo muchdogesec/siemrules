@@ -434,6 +434,13 @@ class RuleView(viewsets.GenericViewSet):
             help_text="Sort results by property",
             choices=[(f, f) for f in arangodb_helpers.RULES_SORT_FIELDS],
         )
+        visible_to = CharFilter(help_text="Only show rules that are visible to the Identity id passed. e.g. passing `identity--b1ae1a15-6f4b-431e-b990-1b9678f35e15` would only show rules created by that identity (with any TLP level) or reports created by another identity ID but only if they are marked with `TLP:CLEAR` or `TLP:GREEN`.")
+        correlation_rule = BaseInFilter(
+            help_text="Filter the results by the id of correlation rules that contain rule. Pass the full STIX ID of the Indicator object, e.g. `indicator--3fa85f64-5717-4562-b3fc-2c963f66afa6`."
+        )
+        report_id = BaseInFilter(
+            help_text="Filter the results by the report_id of the rule. Pass the full STIX ID of the Indicator object, e.g. `report--3fa85f64-5717-4562-b3fc-2c963f66afa6`."
+        )
 
     def get_renderers(self):
         if self.action == "retrieve":
@@ -736,6 +743,7 @@ class CorrelationView(RuleView):
         cve_id = None
         attack_id = None
         file_id = None
+        correlation_rule = None
         base_rule = BaseInFilter(
             help_text="Filter the results by the ID of contained base rules. Pass the full STIX ID of the Indicator object, e.g. `indicator--3fa85f64-5717-4562-b3fc-2c963f66afa6`."
         )
