@@ -3,6 +3,7 @@ import textwrap
 from django.core.files.uploadedfile import InMemoryUploadedFile, SimpleUploadedFile
 from rest_framework import serializers, validators
 import txt2detection
+import txt2detection.models
 import txt2detection.utils
 import txt2detection.utils
 from siemrules.siemrules.models import File, Job, FileImage, TLP_Levels
@@ -66,7 +67,7 @@ class FileSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = File
-        exclude = ['markdown_file']
+        exclude = ['markdown_file', 'status', 'level']
         read_only_fields = ['id']
 
     
@@ -114,6 +115,8 @@ class FileSigmaSerializer(serializers.ModelSerializer):
     license = serializers.ChoiceField(default=None, choices=list(valid_licenses().items()), allow_null=True, help_text="[License of the rule according the SPDX ID specification](https://spdx.org/licenses/). Will be added to the rule as `license`. Will overwrite any existing `license` value in rule.")
     references = serializers.ListField(child=serializers.URLField(), default=list, help_text='A list of URLs to be added as `references` in the Sigma Rule property and in the `external_references` property of the Indicator and Report STIX object created. e.g `"https://www.google.com/"`, `"https://www.facebook.com/"`. Will appended to any existing `references` in the rule.')
 
+    status = serializers.ChoiceField(required=False, choices=[(tag.name, tag.value) for tag in txt2detection.models.Statuses], help_text="If passed, will overwrite any existing `status` recorded in the rule")
+    level  = serializers.ChoiceField(required=False, choices=[(level.name, level.value) for level in txt2detection.models.Level], help_text="If passed, will overwrite any existing `level` recorded in the rule")
     class Meta:
         model = File
         exclude = ['file', 'defang', 'extract_text_from_image', 'markdown_file', 'mimetype']

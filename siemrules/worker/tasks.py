@@ -83,6 +83,8 @@ def run_txt2detection(file: models.File):
         input_text=input_str,
         reference_urls=file.references,
         license=file.license,
+        level=file.level,
+        status=file.status,
         **kwargs,
     )
     file.name = bundler.report.name
