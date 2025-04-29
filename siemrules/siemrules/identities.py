@@ -40,6 +40,12 @@ class IdentityView(viewsets.ViewSet):
         "name_descending",
         "name_ascending",
     ]
+    SYSTEM_IDENTITIES = [
+        "identity--72e906ce-ca1b-5d73-adcd-9ea9eb66a1b4",
+        "identity--9779a2db-f98c-5f4b-8d08-8ee04e02dbb5",
+        "identity--a4d70b75-6f4a-5d19-9137-da863edd33d7",
+    ]
+    
     openapi_tags = ["Identities"]
     skip_list_view = True
     lookup_url_kwarg = "identity_id"
@@ -103,19 +109,20 @@ class IdentityView(viewsets.ViewSet):
         helper = ArangoDBHelper(settings.VIEW_NAME, self.request)
         binds = {
             "@view": settings.VIEW_NAME,
+            "system_identities": self.SYSTEM_IDENTITIES,
         }
         more_filters = []
         if name := helper.query.get('name'):
             binds['name'] = "%" + name.replace('%', r'\%') + "%"
             more_filters.append('FILTER doc.name LIKE @name')
+        more_filters.append("FILTER doc.id NOT IN @system_identities")
 
         query = """
         FOR doc IN @@view
         SEARCH doc.type == "identity" AND doc._is_latest == TRUE
         #more_filters
 
-        COLLECT id = doc.id INTO docs
-        LET doc = docs[0].doc
+        COLLECT id = doc.id INTO docs LET doc = docs[0].doc
         #sort_stmt
         LIMIT @offset, @count
         RETURN KEEP(doc, KEYS(doc, TRUE))
@@ -126,4 +133,19 @@ class IdentityView(viewsets.ViewSet):
                 self.SORT_PROPERTIES
             )
         ).replace('#more_filters', '\n'.join(more_filters))
+        return helper.execute_query(query, bind_vars=binds)
+        
+    def retrieve(self, request, *args, identity_id=None, **kwargs):
+        helper = ArangoDBHelper(settings.VIEW_NAME, self.request)
+        binds = {
+            "@view": settings.VIEW_NAME,
+            "identity_id": identity_id,
+        }
+        query = """
+        FOR doc IN @@view
+        SEARCH doc.type == "identity" AND doc._is_latest == TRUE AND doc.id == @identity_id
+        COLLECT id = doc.id INTO docs LET doc = docs[0].doc
+        LIMIT @offset, @count
+        RETURN KEEP(doc, KEYS(doc, TRUE))
+        """
         return helper.execute_query(query, bind_vars=binds)
