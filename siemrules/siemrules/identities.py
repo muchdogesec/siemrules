@@ -43,6 +43,7 @@ class IdentityView(viewsets.ViewSet):
     SYSTEM_IDENTITIES = [
         "identity--72e906ce-ca1b-5d73-adcd-9ea9eb66a1b4",
         "identity--9779a2db-f98c-5f4b-8d08-8ee04e02dbb5",
+        "identity--a4d70b75-6f4a-5d19-9137-da863edd33d7",
     ]
     
     openapi_tags = ["Identities"]
