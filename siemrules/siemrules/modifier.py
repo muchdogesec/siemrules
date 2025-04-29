@@ -58,6 +58,7 @@ class DRFDetection(DRFBaseModel, Detection):
                 raise validators.ValidationError("Got unknown fields: {}".format(unknown_keys))
 
 def yaml_to_detection(modification: str, indicator_types=[]):
+    indicator_types = indicator_types or []
     modification = yaml.safe_load(io.StringIO(modification))
     modification.update(indicator_types=indicator_types)
     return Detection.model_validate(modification)

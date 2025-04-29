@@ -538,7 +538,7 @@ class RuleView(viewsets.GenericViewSet):
             raise ParseError(f"cannot find report associated with rule `{indicator_id}`")
         
         old_detection = yaml_to_detection(
-            indicator["pattern"], indicator["indicator_types"]
+            indicator["pattern"], indicator.get("indicator_types", [])
         )
         data = {**old_detection.model_dump(exclude=['created', 'modified', 'date']), **request.data}
         s = DRFDetection.drf_serializer(data=data)
@@ -580,7 +580,7 @@ class RuleView(viewsets.GenericViewSet):
         s = serializers.AIModifySerializer(data=request.data)
         s.is_valid(raise_exception=True)
         old_detection = yaml_to_detection(
-            indicator["pattern"], indicator["indicator_types"]
+            indicator["pattern"], indicator.get("indicator_types", [])
         )
         input_text = report["description"]
         input_text = "<SKIPPED INPUT>"
@@ -878,7 +878,7 @@ class CorrelationView(RuleView):
         s = serializers.AIModifySerializer(data=request.data)
         s.is_valid(raise_exception=True)
         old_detection = yaml_to_detection(
-            indicator["pattern"], indicator["indicator_types"]
+            indicator["pattern"], indicator.get("indicator_types", [])
         )
         input_text = report["description"]
         input_text = "<SKIPPED INPUT>"
