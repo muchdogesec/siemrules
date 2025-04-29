@@ -141,7 +141,7 @@ class SchemaViewCached(SpectacularAPIView):
             """
             This endpoint will delete a File using its ID. It will also delete the markdown, images and original file stored for this File.
 
-            IMPORTANT: this request does NOT delete the Report SDO created from the file, or any other STIX objects created from this file during extractions. To delete these, use the delete report endpoint.
+            IMPORTANT: this request WILL delete the Report SDO created from the file, any any other STIX objects created from this file during extractions.
             """
         ),
     ),
@@ -298,6 +298,10 @@ class FileView(
 
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
+    
+    def destroy(self, request, *args, file_id=None, **kwargs):
+        reports.can_remove_report(reports.ReportView.path_param_as_report_id(file_id))
+        return super().destroy(request, *args, **kwargs)
 
 
 @extend_schema_view(
@@ -754,8 +758,6 @@ class CorrelationView(RuleView):
         return super().get_renderers()
 
     def get_parsers(self):
-        if self.request and "/upload/" in self.request.path:
-            return [SigmaRuleParser()]
         return super().get_parsers()
 
     def get_rules(self, rule_ids):
@@ -775,7 +777,7 @@ class CorrelationView(RuleView):
         return indicators
 
     @extend_schema(request=DRFCorrelationRule.drf_serializer)
-    @decorators.action(methods=['POST'], detail=False, serializer_class=JobSerializer, url_path="create/manual")
+    @decorators.action(methods=['POST'], detail=False, serializer_class=JobSerializer, url_path="create/manual", parser_classes=[SigmaRuleParser])
     def create_from_sigma(self, request, *args, **kwargs):
         rule_s = DRFCorrelationRule.drf_serializer(data=request.data)
         rule_s.is_valid(raise_exception=True)
