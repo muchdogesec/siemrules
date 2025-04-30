@@ -15,6 +15,7 @@ from txt2detection.models import (
     DetectionContainer,
     BaseDetection,
     AIDetection,
+    SigmaRuleDetection,
     Statuses,
     SigmaTag,
     Level
@@ -81,20 +82,26 @@ class ModifierDetection(BaseDetection):
 
 class DRFDetection(DRFBaseModel, ModifierDetection):
     drf_config = {"validate_pydantic": True}
+
     @staticmethod
-    def is_valid(s):
-        if initial_data := getattr(s, 'initial_data', dict()):
-            initial_data.pop('indicator_types', [])
+    def is_valid(s, initial_data):
             unknown_keys = set(initial_data.keys()) - set(s.fields.keys())
             if unknown_keys:
                 raise validators.ValidationError("Got unknown fields: {}".format(unknown_keys))
             
+    @classmethod
+    def merge_detection(cls, old_detection: BaseDetection, request_data: dict):
+        for k in ['tags', 'falsepositives', 'references']:
+            v = request_data.pop(k, [])
+            if v != None:
+                request_data.update({k: [*getattr(old_detection, k, []), *v]})
+        return {**old_detection.model_dump(exclude=['created', 'modified', 'date'], exclude_unset=True, exclude_none=True), **request_data}
 
 def yaml_to_detection(modification: str, indicator_types=[]):
     indicator_types = indicator_types or []
     modification = yaml.safe_load(io.StringIO(modification))
     modification.update(indicator_types=indicator_types)
-    return Detection.model_validate(modification)
+    return SigmaRuleDetection.model_validate(modification)
 
 
 def get_modification(model, input_text, old_detection: Detection, prompt) -> DetectionContainer:
