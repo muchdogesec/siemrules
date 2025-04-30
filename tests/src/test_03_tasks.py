@@ -1,24 +1,16 @@
 import copy
-import io
-import typing
 from unittest.mock import patch, MagicMock, mock_open
 from unittest import mock
 import uuid
 import pytest
-import tempfile
-from django.core.files.uploadedfile import InMemoryUploadedFile, SimpleUploadedFile
+from django.core.files.uploadedfile import InMemoryUploadedFile
 from siemrules.siemrules import models
-from siemrules.siemrules.models import Job, File
+from siemrules.siemrules.models import File
 from siemrules.worker.tasks import (
     new_task, process_post, save_file, run_txt2detection, run_file2txt, upload_to_arango, job_completed_with_error, upload_objects
 )
 import stix2
 
-@pytest.fixture
-@pytest.mark.django_db
-def job():
-    file = File.objects.create(name="test.txt", file=SimpleUploadedFile("test.txt", b"dummy content", content_type="text/plain"))
-    return Job.objects.create(file=file)
 
 @pytest.mark.django_db
 def test_new_task(job):

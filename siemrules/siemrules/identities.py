@@ -100,13 +100,7 @@ class IdentityView(viewsets.ViewSet):
         logging.info(f'removing {len(objects)} objects')
         for collection, documents in self.classify_objects(objects).items():
             logging.info(f'removing {len(documents)} documents from {collection}')
-            helper.execute_query(
-                '''
-                FOR _key IN @documents
-                REMOVE {_key} IN @@collection
-                RETURN NULL
-                ''', paginate=False, bind_vars={'@collection': collection, 'documents': documents}
-            )
+            helper.db.collection(collection).delete_many([dict(_key=key) for key in documents], silent=True)
         File.objects.filter(identity__id=identity_id).delete()
         return response.Response(status=status.HTTP_204_NO_CONTENT)
     
