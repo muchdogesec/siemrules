@@ -1,6 +1,8 @@
 from datetime import UTC, datetime
 import io
 from types import SimpleNamespace
+from typing import Annotated, Any, Optional
+from pydantic import Field
 import yaml
 from txt2detection.ai_extractor.utils import (
     ParserWithLogging,
@@ -11,6 +13,8 @@ from txt2detection.utils import parse_model
 from txt2detection.models import (
     Detection,
     DetectionContainer,
+    BaseDetection,
+    AIDetection,
 )
 
 from llama_index.core import PromptTemplate, ChatPromptTemplate
@@ -22,7 +26,6 @@ from rest_framework import serializers, validators
 
 
 def modify_indicator(report, indicator: dict, detection: Detection):
-    detection.detection_id = indicator['id'].replace('indicator--', '')
     bundler = Bundler(
         "name",
         None,
@@ -33,31 +36,37 @@ def modify_indicator(report, indicator: dict, detection: Detection):
         report_id=report['id'].replace('report--', ''),
         modified=datetime.now(UTC)
     )
+    if isinstance(detection, DRFDetection):
+        detection = AIDetection.model_validate(detection.model_dump())
+    
+    detection.detection_id = indicator['id'].replace('indicator--', '')
     bundler.report.external_references.clear()
     bundler.report.external_references.extend(report['external_references'])
     bundler.report.object_marking_refs.clear()
     bundler.report.object_marking_refs.extend(report['object_marking_refs'])
-    bundler.bundle_detections(DetectionContainer(success=True, detections=[detection]))
+    container = DetectionContainer(success=True, detections=[detection])
+    bundler.bundle.objects.clear() # remove any default object
+    bundler.bundle_detections(container)
     retval = []
     for obj in bundler.bundle_dict['objects']:
-        if obj['id'] not in report['object_refs']:
-            continue
         retval.append(obj)
         obj['object_marking_refs'] = indicator['object_marking_refs']
     return retval
 
 
-
-class DRFDetection(DRFBaseModel, Detection):
+class DRFDetection(DRFBaseModel, BaseDetection):
     drf_config = {"validate_pydantic": True}
     @staticmethod
     def is_valid(s):
-        if hasattr(s, 'initial_data'):
-            unknown_keys = set(s.initial_data.keys()) - set(s.fields.keys())
+        if initial_data := getattr(s, 'initial_data', dict()):
+            initial_data.pop('indicator_types', [])
+            unknown_keys = set(initial_data.keys()) - set(s.fields.keys())
             if unknown_keys:
                 raise validators.ValidationError("Got unknown fields: {}".format(unknown_keys))
+            
 
 def yaml_to_detection(modification: str, indicator_types=[]):
+    indicator_types = indicator_types or []
     modification = yaml.safe_load(io.StringIO(modification))
     modification.update(indicator_types=indicator_types)
     return Detection.model_validate(modification)
@@ -65,7 +74,7 @@ def yaml_to_detection(modification: str, indicator_types=[]):
 
 def get_modification(model, input_text, old_detection: Detection, prompt) -> DetectionContainer:
     old_detection._bundler = SimpleNamespace(report=SimpleNamespace(created=datetime.now(), modified=datetime.now()))
-    assert isinstance(old_detection, Detection), "rule must be of type detection"
+    assert isinstance(old_detection, BaseDetection), "rule must be of type detection"
     detections = DetectionContainer(success=True, detections=[old_detection])
     return LLMTextCompletionProgram.from_defaults(
         output_parser=ParserWithLogging(DetectionContainer),
