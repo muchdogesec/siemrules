@@ -38,6 +38,12 @@ if typing.TYPE_CHECKING:
 def report_id_as_id(report_id):
     return ReportView.path_param_as_uuid(report_id).removeprefix('report--')
 
+def can_remove_report(report_id):
+    rules = arangodb_helpers.get_rules(arangodb_helpers.request_from_queries(report_id=report_id), paginate=False)
+    related_correlations = arangodb_helpers.related_correlation_rules([rule['id'] for rule in rules])
+    if related_correlations:
+        raise validators.ValidationError(f'sorry, you cannot delete this file because it is linked to {len(related_correlations)} correlation(s)')
+
 def remove_report(report_id: str):
     helper = ArangoDBHelper(settings.VIEW_NAME, request.Request(HttpRequest()))
     report_id = ReportView.path_param_as_report_id(report_id)
@@ -97,16 +103,6 @@ def remove_report(report_id: str):
         description=textwrap.dedent(
             """
             This endpoint returns all STIX objects that are linked to the report. This includes the Report itself, the Rules created from it, MITRE ATT&CK, and NVD CVE objects, as well as the STIX Relationship objects that link them.
-            """
-        ),
-    ),
-    destroy=extend_schema(
-        summary="Delete all STIX objects for a Report ID",
-        description=textwrap.dedent(
-            """
-            This endpoint will delete a Report using its ID. It will also delete all the STIX objects (Rules) extracted from the Report.
-
-            IMPORTANT: this request does NOT delete the file this Report was generated from. To delete the file, use the delete file endpoint.
             """
         ),
     ),
@@ -185,20 +181,7 @@ class ReportView(viewsets.ViewSet):
         except Exception as e:
             raise validators.ValidationError({self.lookup_url_kwarg: f'`{report_id}`: {e}'})
         return uuid_part
-
-    @extend_schema()
-    def destroy(self, request, *args, **kwargs):
-        report_id = kwargs.get(self.lookup_url_kwarg)
-        report_uuid = self.path_param_as_uuid(report_id)
-
-        rules = arangodb_helpers.get_rules(arangodb_helpers.request_from_queries(report_id=report_id), paginate=False)
-        related_correlations = arangodb_helpers.related_correlation_rules([rule['id'] for rule in rules])
-        if related_correlations:
-            raise validators.ValidationError(f'sorry, you cannot delete this report because it is linked to {len(related_correlations)} correlation(s)')
-
-        File.objects.filter(id=report_uuid).delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
-
+    
     def get_reports(self, id=None):
         helper = ArangoDBHelper(settings.VIEW_NAME, self.request)
         filters = []
