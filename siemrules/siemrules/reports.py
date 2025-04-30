@@ -38,6 +38,12 @@ if typing.TYPE_CHECKING:
 def report_id_as_id(report_id):
     return ReportView.path_param_as_uuid(report_id).removeprefix('report--')
 
+def can_remove_report(report_id):
+    rules = arangodb_helpers.get_rules(arangodb_helpers.request_from_queries(report_id=report_id), paginate=False)
+    related_correlations = arangodb_helpers.related_correlation_rules([rule['id'] for rule in rules])
+    if related_correlations:
+        raise validators.ValidationError(f'sorry, you cannot delete this file because it is linked to {len(related_correlations)} correlation(s)')
+
 def remove_report(report_id: str):
     helper = ArangoDBHelper(settings.VIEW_NAME, request.Request(HttpRequest()))
     report_id = ReportView.path_param_as_report_id(report_id)
@@ -100,16 +106,6 @@ def remove_report(report_id: str):
             """
         ),
     ),
-    destroy=extend_schema(
-        summary="Delete all STIX objects for a Report ID",
-        description=textwrap.dedent(
-            """
-            This endpoint will delete a Report using its ID. It will also delete all the STIX objects (Rules) extracted from the Report.
-
-            IMPORTANT: this request does NOT delete the file this Report was generated from. To delete the file, use the delete file endpoint.
-            """
-        ),
-    ),
 )
 class ReportView(viewsets.ViewSet):
     openapi_tags = ["Reports"]
@@ -153,6 +149,7 @@ class ReportView(viewsets.ViewSet):
             OpenApiParameter('labels', description="searches the `labels` property for the value entered. Search is wildcard so `exploit` will match `exploited`, `exploits`, etc."),
             OpenApiParameter('created_max', description="Maximum value of `created` value to filter by in format `YYYY-MM-DD`."),
             OpenApiParameter('created_min', description="Minimum value of `created` value to filter by in format `YYYY-MM-DD`."),
+            OpenApiParameter('visible_to', description="Only show reports that are visible to the Identity id passed. e.g. passing `identity--b1ae1a15-6f4b-431e-b990-1b9678f35e15` would only show reports created by that identity (with any TLP level) or reports created by another identity ID but only if they are marked with `TLP:CLEAR` or `TLP:GREEN`."),
             OpenApiParameter('sort', description="Sort results by property", enum=SORT_PROPERTIES),
         ],
     )
@@ -184,21 +181,7 @@ class ReportView(viewsets.ViewSet):
         except Exception as e:
             raise validators.ValidationError({self.lookup_url_kwarg: f'`{report_id}`: {e}'})
         return uuid_part
-
-    @extend_schema()
-    def destroy(self, request, *args, **kwargs):
-        report_id = kwargs.get(self.lookup_url_kwarg)
-        report_uuid = self.path_param_as_uuid(report_id)
-
-        rules = arangodb_helpers.get_rules(arangodb_helpers.request_from_queries(report_id=report_id), paginate=False)
-        related_correlations = arangodb_helpers.related_correlation_rules([rule['id'] for rule in rules])
-        if related_correlations:
-            raise validators.ValidationError(f'sorry, you cannot delete this report because it is linked to {len(related_correlations)} correlation(s)')
-        raise Exception()
-
-        File.objects.filter(id=report_uuid).delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
-
+    
     def get_reports(self, id=None):
         helper = ArangoDBHelper(settings.VIEW_NAME, self.request)
         filters = []
@@ -234,19 +217,27 @@ class ReportView(viewsets.ViewSet):
             bind_vars['created_min'] = term
             filters.append("FILTER doc.created >= @created_min")
 
+        
+        visible_to_filter = ''
+        if q := helper.query.get('visible_to'):
+            bind_vars['visible_to'] = q
+            bind_vars['marking_visible_to_all'] = TLP_LEVEL_STIX_ID_MAPPING[TLP_Levels.GREEN], TLP_LEVEL_STIX_ID_MAPPING[TLP_Levels.CLEAR]
+            visible_to_filter = 'FILTER doc.created_by_ref == @visible_to OR @marking_visible_to_all ANY IN doc.object_marking_refs'
+
         query = """
             FOR doc in @@collection
             FILTER doc.type == @type AND doc._is_latest
             // <other filters>
             @filters
             // </other filters>
+            #visible_to
             #sort_statement
             LIMIT @offset, @count
             RETURN KEEP(doc, KEYS(doc, true))
         """
         query = query.replace(
                 '#sort_statement', helper.get_sort_stmt(self.SORT_PROPERTIES)
-            )
+            ).replace('#visible_to', visible_to_filter)
         resp = helper.execute_query(query.replace('@filters', '\n'.join(filters)), bind_vars=bind_vars)
         resp.data['objects'] = list(resp.data['objects'])
         return resp

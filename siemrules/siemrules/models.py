@@ -69,6 +69,9 @@ class File(models.Model):
     ignore_embedded_relationships_sro = models.BooleanField(default=False)
     ignore_embedded_relationships_smo = models.BooleanField(default=False)
 
+    status = models.CharField(max_length=24, null=True, default=None)
+    level = models.CharField(max_length=24, null=True, default=None)
+
     
     @property
     def report_id(self):

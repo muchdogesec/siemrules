@@ -83,8 +83,17 @@ def run_txt2detection(file: models.File):
         input_text=input_str,
         reference_urls=file.references,
         license=file.license,
+        level=file.level,
+        status=file.status,
         **kwargs,
     )
+    file.name = bundler.report.name
+    file.labels = bundler.report.labels
+    file.tlp_level = bundler.tlp_level.name
+    file.references = bundler.reference_urls
+    file.license = bundler.license
+    file.save()
+
     return bundler.bundle_dict
 
 def run_file2txt(file: models.File):

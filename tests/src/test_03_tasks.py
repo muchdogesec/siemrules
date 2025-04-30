@@ -1,4 +1,6 @@
+import copy
 import io
+import typing
 from unittest.mock import patch, MagicMock, mock_open
 from unittest import mock
 import uuid
@@ -61,6 +63,9 @@ def test_run_txt2detection():
     mock_file.ai_provider = 'openai'
     mock_file.labels = []
     mock_file.references = mock_file.license = 'random'
+    mock_file.level = "level"
+    mock_file.status = "status"
+    mock_file_copy = copy.copy(mock_file)
 
     # Mock dependencies
     with mock.patch("siemrules.worker.tasks.parse_ai_model") as mock_parse_ai_model, \
@@ -78,10 +83,10 @@ def test_run_txt2detection():
         mock_run_txt2detection.return_value = mock_bundler
 
         # Run the function
-        result = run_txt2detection(mock_file)
+        result = run_txt2detection(mock_file_copy)
         ##########
-        mock_parse_ai_model.assert_called_once_with(mock_file.ai_provider)
-        mock_parse_stix.assert_called_once_with(mock_file.identity)
+        mock_parse_ai_model.assert_called_once_with(mock_file_copy.ai_provider)
+        mock_parse_stix.assert_called_once_with(mock_file_copy.identity)
         mock_run_txt2detection.assert_called_once_with(
             name=mock_file.name,
             identity=mock_stix_identity,
@@ -92,6 +97,8 @@ def test_run_txt2detection():
             labels=mock_file.labels,
             reference_urls=mock_file.references,
             license=mock_file.license,
+            level=mock_file.level,
+            status=mock_file.status,
         )
 
         assert result == {"mocked": "detection_output"}
