@@ -1,8 +1,8 @@
-from datetime import UTC, datetime
+from datetime import UTC, datetime, date as dt_date
 import io
 from types import SimpleNamespace
 from typing import Annotated, Any, Optional
-from pydantic import Field
+from pydantic import Field, HttpUrl, computed_field
 import yaml
 from txt2detection.ai_extractor.utils import (
     ParserWithLogging,
@@ -15,6 +15,9 @@ from txt2detection.models import (
     DetectionContainer,
     BaseDetection,
     AIDetection,
+    Statuses,
+    SigmaTag,
+    Level
 )
 
 from llama_index.core import PromptTemplate, ChatPromptTemplate
@@ -36,15 +39,14 @@ def modify_indicator(report, indicator: dict, detection: Detection):
         report_id=report['id'].replace('report--', ''),
         modified=datetime.now(UTC)
     )
-    if isinstance(detection, DRFDetection):
-        detection = AIDetection.model_validate(detection.model_dump())
     
     detection.detection_id = indicator['id'].replace('indicator--', '')
     bundler.report.external_references.clear()
     bundler.report.external_references.extend(report['external_references'])
     bundler.report.object_marking_refs.clear()
     bundler.report.object_marking_refs.extend(report['object_marking_refs'])
-    container = DetectionContainer(success=True, detections=[detection])
+    container = DetectionContainer(success=True, detections=[])
+    container.detections.append(detection)
     bundler.bundle.objects.clear() # remove any default object
     bundler.bundle_detections(container)
     retval = []
@@ -54,7 +56,30 @@ def modify_indicator(report, indicator: dict, detection: Detection):
     return retval
 
 
-class DRFDetection(DRFBaseModel, BaseDetection):
+class ModifierDetection(BaseDetection):
+    title: Optional[str]
+    description: Optional[str] = None
+    status: Optional[Statuses] = None
+    level: Optional[Level] = None
+    tags: list[SigmaTag]
+    license: Optional[str] = None
+    falsepositives: Optional[list[str]] = None
+    references: Optional[list[HttpUrl]] = None
+    logsource: Optional[dict] = None
+    detection: dict
+
+    @computed_field(alias="date")
+    @property
+    def date(self) -> dt_date:
+        return self._bundler.report.created.date()
+
+    @computed_field
+    @property
+    def modified(self) -> dt_date:
+        return self._bundler.report.modified.date()
+
+
+class DRFDetection(DRFBaseModel, ModifierDetection):
     drf_config = {"validate_pydantic": True}
     @staticmethod
     def is_valid(s):
