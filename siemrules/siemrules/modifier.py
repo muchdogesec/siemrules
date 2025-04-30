@@ -57,7 +57,7 @@ def modify_indicator(report, indicator: dict, detection: Detection):
 
 
 class ModifierDetection(BaseDetection):
-    title: Optional[str]
+    title: str
     description: Optional[str] = None
     status: Optional[Statuses] = None
     level: Optional[Level] = None
@@ -65,7 +65,7 @@ class ModifierDetection(BaseDetection):
     license: Optional[str] = None
     falsepositives: Optional[list[str]] = None
     references: Optional[list[HttpUrl]] = None
-    logsource: Optional[dict] = None
+    logsource: dict = None
     detection: dict
 
     @computed_field(alias="date")
