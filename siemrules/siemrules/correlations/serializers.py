@@ -19,8 +19,11 @@ from txt2detection.models import SigmaTag
 class DRFCorrelationRule(DRFBaseModel, CorrelationRule):
     drf_config = {"validate_pydantic": True}
 
+def default_tags_factory():
+    return ['tlp.clear']
+
 class DRFCorrelationRuleModify(DRFBaseModel, BaseRuleModel):
-    tags: Optional[list[SigmaTag]] = Field(default_factory=list)
+    tags: Optional[list[SigmaTag]] = Field(default_factory=default_tags_factory)
     drf_config = {"validate_pydantic": True}
 
     @staticmethod

@@ -574,18 +574,16 @@ class RuleView(viewsets.GenericViewSet):
         old_detection = yaml_to_detection(
             indicator["pattern"], indicator.get("indicator_types", [])
         )
-        data = {**old_detection.model_dump(exclude=['created', 'modified', 'date']), **request.data}
+        data = DRFDetection.merge_detection(old_detection, request.data)
         s = DRFDetection.drf_serializer(data=data)
         s.is_valid(raise_exception=True)
-        DRFDetection.is_valid(s)
+        DRFDetection.is_valid(s, request.data)
         detection = DRFDetection.model_validate(s.data)
 
         return self.modify_resp(request, indicator_id, report, indicator, detection)
 
     def modify_resp(self, request, indicator_id, report, indicator, detection):
         new_objects = modify_indicator(report, indicator, detection)
-        file_id = report["id"].removeprefix("report--")
-        print(file_id, report["id"])
         arangodb_helpers.modify_rule(
             indicator["id"],
             indicator["modified"],
