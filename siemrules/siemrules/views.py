@@ -435,19 +435,32 @@ class JobView(
             """
             Use this endpoint to modify a Sigma Rule.
 
-            You should only enter the parts of the Sigma Rule you wish to change. Any properties/values not passed will remain unchanged in the rule. To delete a value from a property, pass the property without the value.
+            You can enter the following properties. You should only enter the parts of the Sigma Rule you wish to change. Any properties/values not passed will remain unchanged in the rule.
+
+            To delete a property entirely from a rule (if not required property), pass the property without a value (you cannot do this on required field)
+
+            * `title` (string, cannot be blank if passed): `title` of the rule. Will overwrite any existing value.
+            * `description` (string): the `description` of the rule. Will overwrite any existing value.
+            * `status` (dictionary): the `status` of the rule, either `stable`, `test`, `experimental`, `deprecated`, `unsupported`. Will overwrite any existing value.
+            * `level` (dictionary): the `level` of the rule, either `informational`, `low`, `medium`, `high`, `critical`
+            * `tags` (string): case-insensitive (will all be converted to lower-case). Allowed `a-z`, `0-9`. Must use a namespaces (`NAMESPACE.TAG_VALUE`). e.g.`"namespace.label1" "namespace.label_2"` would create 2 labels. Added to both report and indicator objects created and the rule `tags`. Will append to any existing values EXCEPT for TLP. To delete all tags, first pass this property as empty, then perform your updates.
+                * you can use reserved namespaces `cve.` and `attack.` when creating labels to perform external enrichment using Vulmatch and CTI Butler. All Indicators will be linked to these objects (AI enrichments link individual rules). Created tags will be appended to the list of AI generated tags.
+                * note: you can use the namespace `tlp.`. A rule can only have one TLP level, so this will overwrite the existing TLP tag of the rule.
+            * `license` (dictionary): [License of the rule according the SPDX ID specification](https://spdx.org/licenses/). Will overwrite any existing value.
+            * `falsepositives` (list of strings): the `falsepositives` displayed in the rule. Will append to any existing values. To delete all `falsepositives`, first pass this property as empty, then perform your updates.
+            * `references` (list of urls): the `references` displayed in the rule. Must be URLs. Will append to any existing values. To delete all `references`, first pass this property as empty, then perform your updates.
+            * `logsource` (valid Sigma logsource): [a valid Sigma `logsource` entry](https://github.com/SigmaHQ/sigma-specification/blob/main/specification/sigma-rules-specification.md)
+            * `detection` (valid Sigma detection): [a valid Sigma `detection` entry](https://github.com/SigmaHQ/sigma-specification/blob/main/specification/sigma-rules-specification.md)
 
             You cannot change the following properties:
 
-            * `id`
-            * `date`
-            * `modified`
-            * `author`
+            * `id`: is fixed across all versions of the rule
+            * `date`: the `date` value will remain the same, showing the date the rule was first created
+            * `modified`: the `modified` time will be auto-updated based on the time of this modification
+            * `author`: the `author` value will remain the same. If you wish to use a new `author` value, you must create a new rule
 
 
-            The rule will be validated against the Sigma specification. [You can read the specification here to see available properties and values allowed](https://github.com/SigmaHQ/sigma-specification/blob/main/specification/sigma-rules-specification.md).
-
-            You will recieve an error if validation fails. If any part of the validation fails the rule will not be updated.
+            The rule will be validated against the Sigma specification. You will receive an error if validation fails. If any part of the validation fails the rule will not be updated.
             """
         ),
     ),
@@ -748,6 +761,49 @@ class RuleView(viewsets.GenericViewSet):
             * `version` The version of the rule you want to roll back (e.g. `2025-04-04T06:12:59.482478Z`). The `version` value is the same as the STIX objects `modified` time. You can see all of the versions of a rule using the version endpoint.
 
             Note, this will not delete the current version of the rule. It will create a new version with the content of the rule at the point you want to revert to, except for `modified` times, which will match the time of revert.
+            """
+        ),
+    ),
+    modify=extend_schema(
+        summary="Manually edit a Correlation Rule by ID",
+        description=textwrap.dedent(
+            """
+            Use this endpoint to modify a Correlation Rule.
+
+            You should only enter the parts of the Correlation Rule you wish to change. Any properties/values not passed will remain unchanged in the rule. To delete a value from a property, pass the property without the value.
+
+            Enter the properties you want to change in YML format. You can change the following properties
+
+            * `title` (optional): cannot be blank.Used as the rule `title`
+            * `description` (optional) used as the rule `description`
+            * `tlp_level` (optional): TLP level assigned to the Indicator object and in the `tags` of the Sigma Correlation Rule. Either `clear`, `green`, `amber`, `amber+strict`, or `red`.
+            * `tags` (optional): in format `NAMESPACE.TAG` (e.g. `threat-actor.someone`). Cannot use the reserved namespaces `attack.`, `cve.` or `tlp.).
+            * `rule_ids` (required): one or more Sigma Base Rule ID's (e.g. `680c2e5b-3704-47e1-9a0c-4f6746211faf`). Do not include the `indicator--` part. Must be valid, else creation will fail.
+
+            You cannot change the following properties (doing so will result in an error):
+
+            * `id`: is fixed across all versions of the Correlation Rule
+            * `date`: the `date` value will remain the same, showing the date the Correlation Rule was first created
+            * `modified`: the `modified` time will be auto-updated based on the time of this modification
+            * `author`: the `author` value will remain the same. If you wish to use a new `author` value, you must create a new Correlation Rule
+
+            The rule will be validated against the Sigma specification. [You can read the specification here to see available properties and values allowed](https://github.com/SigmaHQ/sigma-specification/blob/main/specification/sigma-correlation-rules-specification.md).
+
+            You will receive an error if validation fails. If any part of the validation fails the rule will not be updated.
+            
+            """
+        ),
+    ),
+    modify_ai=extend_schema(
+        summary="Use AI to modify a rule by ID",
+        description=textwrap.dedent(
+            """
+            Use this endpoint to get AI to modify a Sigma Rule via a prompt.
+
+            The following key / values are accepted in the body of the request:
+
+            * `prompt` (required): The prompt you wish to send to the AI with instructions on how to modify or improve the rule. For example; Add MITRE ATT&CK Technique T1134 to this rule.
+            * `ai_provider` (required): An AI provider and model to be used for rule generation in format `provider:model` e.g. `openai:gpt-4o`. This is a txt2detection setting.
             """
         ),
     ),
