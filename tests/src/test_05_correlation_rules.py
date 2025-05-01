@@ -93,7 +93,3 @@ def test_get_rules(rule_ids, should_fail):
     else:
         rules = CorrelationView().get_rules(rule_ids)
         assert set([r['id'] for r in rules]) == set(rule_ids)
-
-def test_important_class_properties():
-    assert CorrelationView().rule_type == "correlation"
-    assert RuleView().rule_type == 'base'

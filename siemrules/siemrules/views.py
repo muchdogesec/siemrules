@@ -416,7 +416,7 @@ class JobView(
             """
         ),
     ),
-    modify_ai=extend_schema(
+    modify_base_rule_from_prompt=extend_schema(
         summary="Use AI to modify a Base Rule by ID",
         description=textwrap.dedent(
             """
@@ -429,7 +429,7 @@ class JobView(
             """
         ),
     ),
-    modify=extend_schema(
+    modify_base_rule_manual=extend_schema(
         summary="Manually edit a Base Sigma Rule by ID",
         description=textwrap.dedent(
             """
@@ -492,11 +492,6 @@ class RuleView(viewsets.GenericViewSet):
         OpenApiParameter(
             lookup_url_kwarg,
             location=OpenApiParameter.PATH,
-            # type=dict(
-            #     # pattern=lookup_value_regex,
-            #     type='str',
-            #     format='path',
-            # ),
             description="The `id` of the Indicator. e.g. `indicator--3fa85f64-5717-4562-b3fc-2c963f66afa6`. Note the UUID part of the STIX `id` used here will match the `id` in the Sigma rule.",
         )
     ]
@@ -535,19 +530,18 @@ class RuleView(viewsets.GenericViewSet):
         report_id = BaseInFilter(
             help_text="Filter the results by the report_id of the rule. Pass the full STIX ID of the Indicator object, e.g. `report--3fa85f64-5717-4562-b3fc-2c963f66afa6`."
         )
+        rule_type = ChoiceFilter(
+            choices=[("base-rule", "Base Rule"), ("correlation-rule", "Correlation Rule")],
+            help_text="Filter the results by rule_type. default: shows all type"
+        )
 
     def get_renderers(self):
         if self.action == "retrieve":
             return [renderers.JSONRenderer(), SigmaRuleRenderer()]
         return super().get_renderers()
 
-    def get_parsers(self):
-        if getattr(self, "action", "") == "modify":
-            return [SigmaRuleParser()]
-        return super().get_parsers()
-
     def list(self, request, *args, **kwargs):
-        return arangodb_helpers.get_rules(request, rule_type=self.rule_type)
+        return arangodb_helpers.get_rules(request)
 
     @extend_schema(
         parameters=[
@@ -561,7 +555,6 @@ class RuleView(viewsets.GenericViewSet):
     def retrieve(self, request, *args, indicator_id=None, **kwargs):
         return arangodb_helpers.get_single_rule(
             indicator_id, version=request.query_params.get("version"),
-            rule_type=self.rule_type,
         )
 
     @extend_schema(
@@ -573,12 +566,11 @@ class RuleView(viewsets.GenericViewSet):
     def versions(self, request, *args, indicator_id=None, **kwargs):
         return arangodb_helpers.get_single_rule_versions(
             indicator_id,
-            rule_type=self.rule_type,
-                                                         )
+        )
 
     @extend_schema(request=DRFDetection.drf_serializer)
-    @decorators.action(methods=["POST"], detail=True, parser_classes=[SigmaRuleParser], url_path="modify/manual")
-    def modify(self, request, *args, indicator_id=None, **kwargs):
+    @decorators.action(methods=["POST"], detail=True, parser_classes=[SigmaRuleParser], url_path="modify/base-rule/manual")
+    def modify_base_rule_manual(self, request, *args, indicator_id=None, **kwargs):
         report, indicator, all_objs = arangodb_helpers.get_objects_by_id(indicator_id)
 
         if not report:
@@ -593,9 +585,9 @@ class RuleView(viewsets.GenericViewSet):
         DRFDetection.is_valid(s, request.data)
         detection = DRFDetection.model_validate(s.data)
 
-        return self.modify_resp(request, indicator_id, report, indicator, detection)
+        return self.do_modify_base_rule(request, indicator_id, report, indicator, detection)
 
-    def modify_resp(self, request, indicator_id, report, indicator, detection):
+    def do_modify_base_rule(self, request, indicator_id, report, indicator, detection):
         new_objects = modify_indicator(report, indicator, detection)
         arangodb_helpers.modify_rule(
             indicator["id"],
@@ -607,8 +599,8 @@ class RuleView(viewsets.GenericViewSet):
         return self.retrieve(request, indicator_id=indicator_id)
     
     @extend_schema(request=serializers.AIModifySerializer)
-    @decorators.action(methods=['POST'], detail=True, url_path="modify/ai")
-    def modify_ai(self, request, *args, indicator_id=None, **kwargs):
+    @decorators.action(methods=['POST'], detail=True, url_path="modify/base-rule/ai")
+    def modify_base_rule_from_prompt(self, request, *args, indicator_id=None, **kwargs):
         report, indicator, all_objs = arangodb_helpers.get_objects_by_id(indicator_id)
         s = serializers.AIModifySerializer(data=request.data)
         s.is_valid(raise_exception=True)
@@ -626,7 +618,7 @@ class RuleView(viewsets.GenericViewSet):
         if not detection_container.success:
             raise exceptions.ParseError("txt2detection: failed to execute")
 
-        return self.modify_resp(
+        return self.do_modify_base_rule(
             request, indicator_id, report, indicator, detection_container.detections[0]
         )
     
@@ -635,12 +627,11 @@ class RuleView(viewsets.GenericViewSet):
     def revert(self, request, *args, indicator_id=None, **kwargs):
         s = serializers.RuleRevertSerializer(data=request.data)
         s.is_valid(raise_exception=True)
-        rev = arangodb_helpers.delete_rule(indicator_id, rule_type=self.rule_type, rule_date=s.initial_data['version'], delete=False)
+        rev = arangodb_helpers.delete_rule(indicator_id, rule_date=s.initial_data['version'], delete=False)
         return self.retrieve(request, indicator_id=indicator_id)
 
     def destroy(self, request, *args, indicator_id=None, **kwargs):
         arangodb_helpers.delete_rule(indicator_id, 
-            rule_type=self.rule_type,
         )
         return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -648,7 +639,100 @@ class RuleView(viewsets.GenericViewSet):
     def objects(self, request, *args, indicator_id=None, **kwargs):
         return arangodb_helpers.get_objects_for_rule(
             indicator_id, version=request.query_params.get("version"),
-            rule_type=self.rule_type,
+        )
+    
+@extend_schema_view(
+    modify_correlation_manual=extend_schema(
+        summary="Manually edit a Correlation Rule by ID",
+        description=textwrap.dedent(
+            """
+            Use this endpoint to modify a Correlation Rule.
+
+            You should only enter the parts of the Correlation Rule you wish to change. Any properties/values not passed will remain unchanged in the rule. To delete a value from a property, pass the property without the value.
+
+            Enter the properties you want to change in YML format. You can change the following properties
+
+            * `title` (optional): cannot be blank.Used as the rule `title`
+            * `description` (optional) used as the rule `description`
+            * `tlp_level` (optional): TLP level assigned to the Indicator object and in the `tags` of the Sigma Correlation Rule. Either `clear`, `green`, `amber`, `amber+strict`, or `red`.
+            * `tags` (optional): in format `NAMESPACE.TAG` (e.g. `threat-actor.someone`). Cannot use the reserved namespaces `attack.`, `cve.` or `tlp.).
+            * `rule_ids` (required): one or more Sigma Base Rule ID's (e.g. `680c2e5b-3704-47e1-9a0c-4f6746211faf`). Do not include the `indicator--` part. Must be valid, else creation will fail.
+
+            You cannot change the following properties (doing so will result in an error):
+
+            * `id`: is fixed across all versions of the Correlation Rule
+            * `date`: the `date` value will remain the same, showing the date the Correlation Rule was first created
+            * `modified`: the `modified` time will be auto-updated based on the time of this modification
+            * `author`: the `author` value will remain the same. If you wish to use a new `author` value, you must create a new Correlation Rule
+
+            The rule will be validated against the Sigma specification. [You can read the specification here to see available properties and values allowed](https://github.com/SigmaHQ/sigma-specification/blob/main/specification/sigma-correlation-rules-specification.md).
+
+            You will receive an error if validation fails. If any part of the validation fails the rule will not be updated.
+            
+            """
+        ),
+    ),
+    modify_correlation_from_prompt=extend_schema(
+        summary="Use AI to modify a rule by ID",
+        description=textwrap.dedent(
+            """
+            Use this endpoint to get AI to modify a Sigma Rule via a prompt.
+
+            The following key / values are accepted in the body of the request:
+
+            * `prompt` (required): The prompt you wish to send to the AI with instructions on how to modify or improve the rule. For example; Add MITRE ATT&CK Technique T1134 to this rule.
+            * `ai_provider` (required): An AI provider and model to be used for rule generation in format `provider:model` e.g. `openai:gpt-4o`. This is a txt2detection setting.
+            """
+        ),
+    ),
+)
+class RuleViewWithCorrelationModifier(RuleView):
+    @extend_schema(request=correlations.serializers.DRFCorrelationRuleModify.drf_serializer)
+    @decorators.action(methods=['POST'], detail=True, url_path="modify/correlation-rule/manual")
+    def modify_correlation_manual(self, request, *args, indicator_id=None, **kwargs):
+        report, indicator, all_objs = arangodb_helpers.get_objects_by_id(indicator_id)
+        old_rule = correlations.correlations.yaml_to_rule(
+            indicator["pattern"]
+        )
+        print(f"{old_rule=}")
+        new_rule = correlations.serializers.DRFCorrelationRuleModify.serialize_rule_from(old_rule, request.data)
+        print(new_rule)
+
+        return self.do_modify_correlation(request, indicator_id, report, indicator, new_rule)
+
+    def do_modify_correlation(self, request, indicator_id, report, indicator, rule):
+        new_objects = correlations.correlations.add_rule_indicator(rule, [], indicator['labels'][0].split('.')[-1], dict(modified=datetime.now(UTC)))
+        arangodb_helpers.modify_rule(
+            indicator["id"],
+            indicator["modified"],
+            new_objects[0]["modified"],
+            new_objects,
+        )
+
+        return self.retrieve(request, indicator_id=indicator_id)
+    
+    @extend_schema(request=serializers.AIModifySerializer)
+    @decorators.action(methods=['POST'], detail=True, url_path="modify/correlation-rule/ai")
+    def modify_correlation_from_prompt(self, request, *args, indicator_id=None, **kwargs):
+        report, indicator, all_objs = arangodb_helpers.get_objects_by_id(indicator_id)
+        s = serializers.AIModifySerializer(data=request.data)
+        s.is_valid(raise_exception=True)
+        old_detection = yaml_to_detection(
+            indicator["pattern"], indicator.get("indicator_types", [])
+        )
+        input_text = report["description"]
+        input_text = "<SKIPPED INPUT>"
+        detection_container = get_modification(
+            parse_model(s.data["ai_provider"]),
+            input_text,
+            old_detection,
+            s.data["prompt"],
+        )
+        if not detection_container.success:
+            raise exceptions.ParseError("txt2detection: failed to execute")
+
+        return self.do_modify_correlation(
+            request, indicator_id, report, indicator, detection_container.detections[0]
         )
     
 
@@ -697,121 +781,25 @@ class RuleView(viewsets.GenericViewSet):
             """
         ),
     ),
-    list=extend_schema(
-        summary="Search and retrieve created Correlation Rules",
-        description=textwrap.dedent(
-            """
-            Use this endpoint to retrieve all Correlation Rules that have been created.
-            """
-        ),
-    ),
-    retrieve=extend_schema(
-        summary="Get a Correlation Sigma Rule by ID",
-        description=textwrap.dedent(
-            """
-            Use this endpoint to retrieve a Correlation Rule using its STIX Indicator ID.
-
-            If you do not know the ID of the Correlation Rule you can use the Search and retrieve created Base Rules endpoint.
-            """
-        ),
-    ),
-    objects=extend_schema(
-        summary="Get objects linked to Correlation Sigma Rule",
-        description=textwrap.dedent(
-            """
-            A Correlation Sigma Rule is linked directly to all the Sigma Base Rules is contains.
-
-            Use the endpoint to return all the STIX objects (including relationships) linked to this Correlation Rule. Also includes the Correlation Rule STIX Object.
-            """
-        ),
-    ),
-    versions=extend_schema(
-        summary="Get all Versions of a Correlation Sigma Rule",
-        description=textwrap.dedent(
-            """
-            Correlation Rules can be modified over time. Each modification versions the Correlation Rule.
-
-            Use this endpoint to retrieve all versions of a Correlation Rule using its STIX Indicator ID.
-
-            If you do not know the ID of the Correlation Rule you can use the Search and retrieve created Correlation Rules endpoint.
-
-            You can use the list of versions on the Get Correlation Rule endpoint to see each version of the Rule.
-            """
-        ),
-    ),
-    destroy=extend_schema(
-        summary="Delete a Correlation Sigma Rule by ID",
-        description=textwrap.dedent(
-            """
-            Use this endpoint to delete a Rule. All versions of the Rule that exist will be removed.
-
-            This endpoint will remove the Rule from the databases, and any references to it.
-
-            """
-        ),
-    ),
-    revert=extend_schema(
-        summary="Revert a Correlation Rule to older version",
-        description=textwrap.dedent(
-            """
-            This endpoint allows you to roll back (revert) the content of a Correlation Rule to an old version more easily.
-
-            This body requires the following values:
-
-            * `version` The version of the rule you want to roll back (e.g. `2025-04-04T06:12:59.482478Z`). The `version` value is the same as the STIX objects `modified` time. You can see all of the versions of a rule using the version endpoint.
-
-            Note, this will not delete the current version of the rule. It will create a new version with the content of the rule at the point you want to revert to, except for `modified` times, which will match the time of revert.
-            """
-        ),
-    ),
-    modify=extend_schema(
-        summary="Manually edit a Correlation Rule by ID",
-        description=textwrap.dedent(
-            """
-            Use this endpoint to modify a Correlation Rule.
-
-            You should only enter the parts of the Correlation Rule you wish to change. Any properties/values not passed will remain unchanged in the rule. To delete a value from a property, pass the property without the value.
-
-            Enter the properties you want to change in YML format. You can change the following properties
-
-            * `title` (optional): cannot be blank.Used as the rule `title`
-            * `description` (optional) used as the rule `description`
-            * `tlp_level` (optional): TLP level assigned to the Indicator object and in the `tags` of the Sigma Correlation Rule. Either `clear`, `green`, `amber`, `amber+strict`, or `red`.
-            * `tags` (optional): in format `NAMESPACE.TAG` (e.g. `threat-actor.someone`). Cannot use the reserved namespaces `attack.`, `cve.` or `tlp.).
-            * `rule_ids` (required): one or more Sigma Base Rule ID's (e.g. `680c2e5b-3704-47e1-9a0c-4f6746211faf`). Do not include the `indicator--` part. Must be valid, else creation will fail.
-
-            You cannot change the following properties (doing so will result in an error):
-
-            * `id`: is fixed across all versions of the Correlation Rule
-            * `date`: the `date` value will remain the same, showing the date the Correlation Rule was first created
-            * `modified`: the `modified` time will be auto-updated based on the time of this modification
-            * `author`: the `author` value will remain the same. If you wish to use a new `author` value, you must create a new Correlation Rule
-
-            The rule will be validated against the Sigma specification. [You can read the specification here to see available properties and values allowed](https://github.com/SigmaHQ/sigma-specification/blob/main/specification/sigma-correlation-rules-specification.md).
-
-            You will receive an error if validation fails. If any part of the validation fails the rule will not be updated.
-            
-            """
-        ),
-    ),
-    modify_ai=extend_schema(
-        summary="Use AI to modify a rule by ID",
-        description=textwrap.dedent(
-            """
-            Use this endpoint to get AI to modify a Sigma Rule via a prompt.
-
-            The following key / values are accepted in the body of the request:
-
-            * `prompt` (required): The prompt you wish to send to the AI with instructions on how to modify or improve the rule. For example; Add MITRE ATT&CK Technique T1134 to this rule.
-            * `ai_provider` (required): An AI provider and model to be used for rule generation in format `provider:model` e.g. `openai:gpt-4o`. This is a txt2detection setting.
-            """
-        ),
-    ),
 )
 
-class CorrelationView(RuleView):
+class CorrelationView(viewsets.GenericViewSet):
     openapi_tags = ["Correlation Rules"]
     rule_type = "correlation"
+
+    serializer_class = serializers.RuleSerializer
+    lookup_url_kwarg = "indicator_id"
+
+    lookup_value_regex = r'indicator--[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'
+
+    openapi_path_params = [
+        OpenApiParameter(
+            lookup_url_kwarg,
+            location=OpenApiParameter.PATH,
+            description="The `id` of the Indicator. e.g. `indicator--3fa85f64-5717-4562-b3fc-2c963f66afa6`. Note the UUID part of the STIX `id` used here will match the `id` in the Sigma rule.",
+        )
+    ]
+
 
     class filterset_class(RuleView.filterset_class):
         cve_id = None
@@ -876,51 +864,3 @@ class CorrelationView(RuleView):
         job_s = CorrelationJobSerializer(job_instance)
         tasks.new_correlation_task(job_instance, s.validated_data, related_indicators, s.validated_data)
         return Response(job_s.data)
-
-    @extend_schema(request=correlations.serializers.DRFCorrelationRuleModify.drf_serializer)
-    @decorators.action(methods=['POST'], detail=True, url_path="modify/manual")
-    def modify(self, request, *args, indicator_id=None, **kwargs):
-        report, indicator, all_objs = arangodb_helpers.get_objects_by_id(indicator_id)
-        old_rule = correlations.correlations.yaml_to_rule(
-            indicator["pattern"]
-        )
-        print(f"{old_rule=}")
-        new_rule = correlations.serializers.DRFCorrelationRuleModify.serialize_rule_from(old_rule, request.data)
-        print(new_rule)
-
-        return self.modify_resp(request, indicator_id, report, indicator, new_rule)
-
-    def modify_resp(self, request, indicator_id, report, indicator, rule):
-        new_objects = correlations.correlations.add_rule_indicator(rule, [], indicator['labels'][0].split('.')[-1], dict(modified=datetime.now(UTC)))
-        arangodb_helpers.modify_rule(
-            indicator["id"],
-            indicator["modified"],
-            new_objects[0]["modified"],
-            new_objects,
-        )
-
-        return self.retrieve(request, indicator_id=indicator_id)
-    
-    @extend_schema(request=serializers.AIModifySerializer)
-    @decorators.action(methods=['POST'], detail=True, url_path="modify/ai")
-    def modify_ai(self, request, *args, indicator_id=None, **kwargs):
-        report, indicator, all_objs = arangodb_helpers.get_objects_by_id(indicator_id)
-        s = serializers.AIModifySerializer(data=request.data)
-        s.is_valid(raise_exception=True)
-        old_detection = yaml_to_detection(
-            indicator["pattern"], indicator.get("indicator_types", [])
-        )
-        input_text = report["description"]
-        input_text = "<SKIPPED INPUT>"
-        detection_container = get_modification(
-            parse_model(s.data["ai_provider"]),
-            input_text,
-            old_detection,
-            s.data["prompt"],
-        )
-        if not detection_container.success:
-            raise exceptions.ParseError("txt2detection: failed to execute")
-
-        return self.modify_resp(
-            request, indicator_id, report, indicator, detection_container.detections[0]
-        )

@@ -123,15 +123,12 @@ class TestRuleView:
             mock_get_rules.return_value = Response()
             response = client.get(self.url)
             mock_get_rules.assert_called_once()
-            # mock_get_rules.assert_called_once_with(response.request, rule_type=RuleView.rule_type)
-            assert mock_get_rules.mock_calls[0].kwargs['rule_type'] == RuleView.rule_type
 
     def test_retrieve_rule(self, client):
         with patch("siemrules.siemrules.arangodb_helpers.get_single_rule") as mock_get:
             mock_get.return_value = Response()
             response = client.get(f"{self.url}{self.rule_id}/")
             mock_get.assert_called_once()
-            assert mock_get.mock_calls[0].kwargs['rule_type'] == RuleView.rule_type
 
     @pytest.mark.parametrize(
         ["format", "expected_content_type"],
