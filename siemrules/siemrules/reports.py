@@ -61,20 +61,10 @@ def remove_report(report_id: str):
     for key in out:
         collection, key = key.split('/', 2)
         collections[collection] = collections.get(collection, [])
-        collections[collection].append(key)
-
-    deletion_query = """
-        FOR _key in @objects
-        REMOVE {_key} IN @@collection
-        RETURN _key
-    """
+        collections[collection].append(dict(_key=key))
 
     for collection, objects in collections.items():
-        bind_vars = {
-            "@collection": collection,
-            "objects": objects,
-        }
-        helper.execute_query(deletion_query, bind_vars, paginate=False)
+        helper.db.collection(collection).delete_many(objects, silent=True)
 
 
 @extend_schema_view(

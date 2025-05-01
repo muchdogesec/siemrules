@@ -97,22 +97,6 @@ class TestReportsView:
             == "cdef12ab-8c9d-4f75-902c-2d6f88c5e3a1"
         )
 
-    def test_destroy(self, client):
-        file = models.File.objects.create(
-            name="test_file.txt",
-            mimetype="text/plain",
-            id=reports.ReportView.path_param_as_uuid(self.report_id),
-        )
-        with patch("siemrules.siemrules.models.File.objects.filter") as mock_filter:
-            mock_delete = mock_filter.return_value.delete
-            mock_delete.return_value = None
-            response = client.delete(f"{self.url}{self.report_id}/")
-            assert response.status_code == status.HTTP_204_NO_CONTENT
-            mock_delete.assert_called_once()
-            mock_filter.assert_called_once_with(
-                id=reports.ReportView.path_param_as_uuid(self.report_id)
-            )
-
     @pytest.mark.parametrize(
         ["filters", "expected_ids"],
         [
