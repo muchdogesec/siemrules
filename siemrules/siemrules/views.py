@@ -230,7 +230,7 @@ class FileView(
         serializer.is_valid(raise_exception=True)
         temp_file = request.FILES["file"]
         file_instance = serializer.save(mimetype=temp_file.content_type)
-        job_instance = models.Job.objects.create(file=file_instance, type=models.JobType.FILE)
+        job_instance = models.Job.objects.create(file=file_instance, type=models.JobType.FILE_FILE)
         job_serializer = JobSerializer(job_instance)
         tasks.new_task(job_instance)
         return Response(job_serializer.data)
@@ -247,7 +247,7 @@ class FileView(
         if temp_file.content_type != "application/x-yaml":
             validators.ValidationError("file content-type must be application/x-yaml")
         file_instance = serializer.save(mimetype=temp_file.content_type)
-        job_instance = models.Job.objects.create(file=file_instance)
+        job_instance = models.Job.objects.create(file=file_instance, type=models.JobType.FILE_SIGMA)
         job_serializer = JobSerializer(job_instance)
         tasks.new_task(job_instance)
         return Response(job_serializer.data)
@@ -263,7 +263,7 @@ class FileView(
         serializer = serializers.FilePromptSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         file_instance = serializer.save(mimetype="text/plain")
-        job_instance = models.Job.objects.create(file=file_instance)
+        job_instance = models.Job.objects.create(file=file_instance, type=models.JobType.FILE_TEXT)
         job_serializer = JobSerializer(job_instance)
         tasks.new_task(job_instance)
         return Response(job_serializer.data)
@@ -694,14 +694,18 @@ class RuleViewWithCorrelationModifier(RuleView):
         old_rule = correlations.correlations.yaml_to_rule(
             indicator["pattern"]
         )
-        print(f"{old_rule=}")
         new_rule = correlations.serializers.DRFCorrelationRuleModify.serialize_rule_from(old_rule, request.data)
-        print(new_rule)
 
         return self.do_modify_correlation(request, indicator_id, report, indicator, new_rule)
 
     def do_modify_correlation(self, request, indicator_id, report, indicator, rule):
-        new_objects = correlations.correlations.add_rule_indicator(rule, [], indicator['labels'][0].split('.')[-1], dict(modified=datetime.now(UTC)))
+        for ref in indicator.get('external_references', []):
+            if ref['source_name'] == "siemrules-type":
+                rule_type = ref['external_id']
+                break
+        else:
+            rule_type = "correlation.modify"
+        new_objects = correlations.correlations.add_rule_indicator(rule, [], rule_type, dict(modified=datetime.now(UTC)))
         arangodb_helpers.modify_rule(
             indicator["id"],
             indicator["modified"],
@@ -844,7 +848,7 @@ class CorrelationView(viewsets.GenericViewSet):
         if rule.correlation.rules:
             related_indicators = self.get_rules(rule.correlation.rules)
 
-        job_instance = models.Job.objects.create(type=models.JobType.CORRELATION, data=dict(input_form='sigma'))
+        job_instance = models.Job.objects.create(type=models.JobType.CORRELATION_SIGMA, data=dict(input_form='sigma'))
         job_s = CorrelationJobSerializer(job_instance)
 
         tasks.new_correlation_task(job_instance, rule, related_indicators, {})
@@ -860,7 +864,7 @@ class CorrelationView(viewsets.GenericViewSet):
         if s.validated_data['rules']:
             related_indicators = self.get_rules(s.validated_data['rules'])
 
-        job_instance = models.Job.objects.create(type=models.JobType.CORRELATION, data=dict(input_form='ai_prompt', **s.data))
+        job_instance = models.Job.objects.create(type=models.JobType.CORRELATION_PROMPT, data=dict(input_form='ai_prompt', **s.data))
         job_s = CorrelationJobSerializer(job_instance)
         tasks.new_correlation_task(job_instance, s.validated_data, related_indicators, s.validated_data)
         return Response(job_s.data)

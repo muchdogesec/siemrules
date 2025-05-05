@@ -42,11 +42,11 @@ def new_task(job: Job):
     )
 
 def new_correlation_task(job: Job, correlation: RuleModel, related_indicators, data):
-    assert job.type == JobType.CORRELATION
-    match job.data['input_form']:
-        case 'sigma':
+    assert job.type in [JobType.CORRELATION_PROMPT, JobType.CORRELATION_SIGMA], f"unsupported {job.type=}"
+    match job.type:
+        case JobType.CORRELATION_SIGMA:
             task = process_correlation.s(job.id, correlation.model_dump(by_alias=True), related_indicators)
-        case 'ai_prompt':
+        case JobType.CORRELATION_PROMPT:
             task = process_correlation_ai.s(job.id, data, related_indicators)
         case _:
             raise validators.ValidationError('Unknown job type')
@@ -72,6 +72,13 @@ def run_txt2detection(file: models.File):
     else:
         input_str = file.markdown_file.read().decode()
         provider = parse_ai_model(file.ai_provider)
+
+    job: Job = file.job
+    kwargs.update(
+        external_refs=[
+            dict(source_name="siemrules-type", external_id=job.type)
+        ]
+    )
 
     bundler: txt2detectionBundler = txt2detection.run_txt2detection(
         name=file.name,
@@ -181,7 +188,7 @@ def process_correlation(job_id, correlation: RuleModel, related_indicators):
     upload_correlation(correlation, related_indicators, job)
 
 def upload_correlation(correlation, related_indicators, job: Job):
-    objects = correlations.add_rule_indicator(correlation, related_indicators, job.data['input_form'], job.data)
+    objects = correlations.add_rule_indicator(correlation, related_indicators, job.type, job.data)
     upload_objects(job, make_bundle(objects), None, stix2arango_note=f"siemrules-correlation")
 
 @shared_task

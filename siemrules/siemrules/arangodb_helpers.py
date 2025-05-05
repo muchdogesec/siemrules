@@ -119,13 +119,14 @@ def get_rules(request: request.Request, paginate=True, all_versions=False, nokee
                 FILTER doc.external_references[? ANY FILTER CURRENT.source_name == 'cve' AND CURRENT.external_id IN @cve_ids]
             ''')
     
-    # if rule_type := helper.query.get('rule_type'):
-    #     filters.append('FILTER doc.external_references[? ANY CURRENT.source_name == "siemrules-type" AND STARTS_WITH(CURRENT.external_id, CONCAT("siemrules.", @rule_type))]')
-    #     binds.update(rule_type=rule_type)
-
     if rule_type := helper.query.get('rule_type'):
-        filters.append('FILTER (doc.labels[0] LIKE "siemrules.correlation-rule%") == @show_correlation_rules')
-        binds.update(show_correlation_rules=rule_type == 'correlation-rule')
+        match rule_type:
+            case 'base-rule':
+                rule_type = 'file'
+            case 'correlation-rule':
+                rule_type = 'correlation'
+        filters.append('FILTER doc.external_references[? ANY FILTER CURRENT.source_name == "siemrules-type" AND STARTS_WITH(CURRENT.external_id, @rule_type)]')
+        binds.update(rule_type=rule_type)
 
     query = """
 

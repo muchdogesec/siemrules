@@ -116,7 +116,12 @@ BUNDLE_1 = {
                     "external_id": "TA0001",
                     "url": "https://attack.mitre.org/tactics/TA0001",
                     "source_name": "mitre-attack"
-                }
+                },
+
+                {
+                    "source_name": "siemrules-type",
+                    "external_id": "file.file"
+                },
             ],
         },
         {
@@ -290,6 +295,10 @@ BUNDLE_2 = {
                 "marking-definition--a4d70b75-6f4a-5d19-9137-da863edd33d7"
             ],
             "external_references": [
+                {
+                    "source_name": "siemrules-type",
+                    "external_id": "file.sigma"
+                },
                 {
                     "external_id": "TA0005",
                     "url": "https://attack.mitre.org/tactics/TA0005",
@@ -879,9 +888,6 @@ BUNDLE_3 = {
                 "malicious-activity"
             ],
             "name": "Detection of Stored Cross-Site Scripting in Exclusive Addons for Elementor",
-            "labels": [
-                "siemrules.text"
-            ],
             "pattern_type": "sigma",
             "pattern": "id: 2683daab-aa64-52ff-a001-3ea5aee9dd72\ntitle: Detection of Stored Cross-Site Scripting in Exclusive Addons for Elementor\ndescription: Detects attempts to exploit the stored XSS vulnerability in the Exclusive\n    Addons for Elementor plugin for WordPress, allowing attackers with contributor\n    access or higher to inject arbitrary scripts.\nlevel: low\ndetection:\n    condition: selection\n    selection:\n        event_type: web_application_attack\n        plugin_name: Exclusive Addons for Elementor\n        plugin_version: 2.6.9\n        attack_type: stored_xss\nlogsource:\n    category: webserver\n    product: wordpress\nfalsepositives:\n- Legitimate use of data attributes in web pages by authorized users.\n- Custom scripts added by site administrators for functionality.\ntags:\n- tlp.amber\n- attack.execution\n- cve.2024-1234\n- siemrules.text\nconfidence: 85\nauthor: identity--a4d70b75-6f4a-5d19-9137-da863edd33d7\nstatus: experimental\nreferences:\n- https://goo.gl/ref1/\n- https://goo.gl/ref3/\n",
             "valid_from": "2025-03-01T00:00:01.000Z",
@@ -890,6 +896,10 @@ BUNDLE_3 = {
                 "marking-definition--a4d70b75-6f4a-5d19-9137-da863edd33d7"
             ],
             "external_references": [
+                {
+                    "source_name": "siemrules-type",
+                    "external_id": "file.text"
+                },
                 {
                     "external_id": "TA0002",
                     "url": "https://attack.mitre.org/tactics/TA0002",

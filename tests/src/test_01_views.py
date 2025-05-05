@@ -49,12 +49,11 @@ class TestFileView:
             assert response.status_code == status.HTTP_200_OK, response.content
             mock_task.assert_called_once()
             job: models.Job = mock_task.mock_calls[0].args[0]
-            assert job.type == models.JobType.FILE
+            assert job.type == models.JobType.FILE_FILE
             assert job.file.file.read() == mock_file_content
             assert job.file.mode == file_data["mode"]
             assert job.file.name == file_data["name"]
             assert job.file.ai_provider == file_data["ai_provider"]
-            assert 'siemrules.file' in job.file.labels, "must contain labels to differentiate from text_input"
 
     def test_file_create__text(self, client: django.test.Client):
         mock_file_content = b"dummy content"
@@ -69,12 +68,11 @@ class TestFileView:
             mock_task.assert_called_once()
             job: models.Job = mock_task.mock_calls[0].args[0]
             file: models.File = job.file
-            assert job.type == models.JobType.FILE
+            assert job.type == models.JobType.FILE_TEXT
             assert file.file.read() == mock_file_content
             assert file.mode == "txt"
             assert file.name == file_data["name"]
             assert file.ai_provider == file_data["ai_provider"]
-            assert 'siemrules.text' in file.labels, "must contain labels to differentiate from upload"
 
     def test_retrieve_file(self, client):
         response = client.get(f"{self.url}{self.file.id}/")
@@ -183,10 +181,10 @@ class TestRuleView:
         rule_id = "indicator--2683daab-aa64-52ff-a001-3ea5aee9dd72"
         rule_url = f"{self.url}{rule_id}/"
 
-        versions = client.get(rule_url + "versions/").data
-        expected_version = random.choice(versions)
-        response = client.patch(rule_url + "revert/", data=dict(version=expected_version), content_type="application/json")
-        assert response.data['modified'] == expected_version
-        response = client.patch(rule_url)
+        versions_resp = client.get(rule_url + "versions/")
+        assert versions_resp.status_code == 200, versions_resp.json()
+        expected_version = random.choice(versions_resp.data)
+        response = client.patch(rule_url + "modify/revert/", data=dict(version=expected_version), content_type="application/json")
+        assert response.status_code == 200, response.json()
         assert response.data['modified'] == expected_version
 

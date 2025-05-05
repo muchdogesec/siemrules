@@ -155,7 +155,7 @@ tlp_levels_visible_to_all = {TLP_LEVEL_STIX_ID_MAPPING[TLP_Levels.CLEAR], TLP_LE
 )
 def test_visible_to(client: django.test.Client, subtests, path):
     key = 'rules' if path != 'reports' else 'objects'
-    path_url = f"api/v1/{path}/objects/"
+    path_url = f"/api/v1/{path}/"
     resp = client.get(path_url)
     assert resp.status_code == 200
     objects = resp.data[key]

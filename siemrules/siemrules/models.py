@@ -107,12 +107,17 @@ class JobState(models.TextChoices):
     COMPLETED = "completed"
 
 class JobType(models.TextChoices):
-    FILE = "file"
-    CORRELATION = "correlation"
+    FILE_SIGMA = "file.sigma"
+    FILE_FILE = "file.file"
+    FILE_TEXT = "file.text"
+    CORRELATION_SIGMA = "correlation.sigma"
+    CORRELATION_PROMPT = "correlation.prompt"
+    # BASE_MODIFY = "base-rule.modify"
+    # CORRELATION_MODIFY = "correlation.modify"
 
 
 class Job(models.Model):
-    type = models.CharField(choices=JobType.choices, max_length=20, default=JobType.FILE)
+    type = models.CharField(choices=JobType.choices, max_length=20, default=JobType.FILE_SIGMA)
     file = models.OneToOneField(File, on_delete=models.CASCADE, default=None, null=True)
     id = models.UUIDField(default=uuid.uuid4, primary_key=True)
     state = models.CharField(choices=JobState.choices, max_length=20, default=JobState.PENDING)

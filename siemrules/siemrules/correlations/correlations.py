@@ -51,7 +51,7 @@ def add_rule_indicator(rule: RuleModel, related_indicators = None, correlation_r
         "modified": job_data.get('modified', rule.modified or rule.date),
         "indicator_types": [],
         "name": rule.title,
-        "labels": [f"siemrules.correlation-rule.{correlation_rule_type}"],
+        "labels": [],
         "pattern_type": 'sigma',
         "pattern": rule_str,
         "valid_from": rule.date,
@@ -59,6 +59,9 @@ def add_rule_indicator(rule: RuleModel, related_indicators = None, correlation_r
             rule.tlp_level.value['id'],
             "marking-definition--97ba4e8b-04f6-57e8-8f6e-3a0f0a7dc0fb"
         ],
+        "external_references": [
+            dict(source_name="siemrules-type", external_id=correlation_rule_type)
+        ]
     }
     
     logging.debug(f"===== rule {indicator_id} =====")
@@ -97,7 +100,6 @@ def rules_from_indicators(indicators: list[dict]):
     ]
 
 def generate_correlation_with_ai(model: BaseAIExtractor, user_prompt, related_indicators) -> AIRuleModel:
-    print(model, type(model))
     return LLMTextCompletionProgram.from_defaults(
         output_parser=ParserWithLogging(AIRuleModel),
         prompt=ChatPromptTemplate(CORRELATION_RULES_PROMPT),

@@ -51,7 +51,7 @@ tags:
         assert response.status_code == status.HTTP_200_OK, response.content
         mock_task.assert_called_once()
         job: models.Job = mock_task.mock_calls[0].args[0]
-        assert job.type == models.JobType.CORRELATION
+        assert job.type == models.JobType.CORRELATION_SIGMA
         assert job.data['input_form'] == 'sigma'
 
 
@@ -69,12 +69,12 @@ def test_correlation_create__prompt(client: django.test.Client):
     }
     with patch("siemrules.worker.tasks.new_correlation_task") as mock_task:
         response = client.post(
-            correlation_url + "from_prompt/", format="sigma", data=rule
+            correlation_url + "create/ai/", format="sigma", data=rule
         )
         assert response.status_code == status.HTTP_200_OK, response.content
         mock_task.assert_called_once()
         job: models.Job = mock_task.mock_calls[0].args[0]
-        assert job.type == models.JobType.CORRELATION
+        assert job.type == models.JobType.CORRELATION_PROMPT
         assert job.data['input_form'] == 'ai_prompt'
 
 
@@ -92,4 +92,4 @@ def test_get_rules(rule_ids, should_fail):
             CorrelationView().get_rules(rule_ids)
     else:
         rules = CorrelationView().get_rules(rule_ids)
-        assert set([r['id'] for r in rules]) == set(rule_ids)
+        assert set([r['id'][11:] for r in rules]) == set(rule_ids)

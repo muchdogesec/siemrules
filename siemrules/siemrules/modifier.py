@@ -38,7 +38,10 @@ def modify_indicator(report, indicator: dict, detection: Detection):
         report['labels'],
         datetime(2020, 1, 1),
         report_id=report['id'].replace('report--', ''),
-        modified=datetime.now(UTC)
+        modified=datetime.now(UTC),
+        external_refs=[
+            ref for ref in indicator.get('external_references', []) if ref['source_name'] == "siemrules-type"
+        ]
     )
     
     detection.detection_id = indicator['id'].replace('indicator--', '')
