@@ -688,7 +688,7 @@ class RuleView(viewsets.GenericViewSet):
 )
 class RuleViewWithCorrelationModifier(RuleView):
     @extend_schema(request=correlations.serializers.DRFCorrelationRuleModify.drf_serializer)
-    @decorators.action(methods=['POST'], detail=True, url_path="modify/correlation-rule/manual")
+    @decorators.action(methods=['POST'], detail=True, url_path="modify/correlation-rule/manual", parser_classes=[SigmaRuleParser])
     def modify_correlation_manual(self, request, *args, indicator_id=None, **kwargs):
         report, indicator, all_objs = arangodb_helpers.get_objects_by_id(indicator_id)
         old_rule = correlations.correlations.yaml_to_rule(
