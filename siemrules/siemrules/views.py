@@ -691,6 +691,51 @@ class RuleView(viewsets.GenericViewSet):
             """
         ),
     ),
+
+    create_from_sigma=extend_schema(
+        summary="Create a Correlation Sigma Rule using YML",
+        description=textwrap.dedent(
+            """
+            This endpoint is useful if you're comfortable writing a Sigma Correlation Rule.
+
+            The body of the request accepts:
+
+            * `title` (required): used as the rule `title`
+            * `description` (optional) used as the rule `description`
+            * `author` (optional): A full STIX 2.1 identity object (make sure to properly escape). Will be validated by the STIX2 library. The ID is used to create the Indicator STIX object, and is used as the `author` property in the Sigma Correlation Rule. If not passed, the SIEM Rules Identity object will be used.
+            * `date` (optional): will be used at the `created` time in the Indicator object generated and `date` value in the Sigma Correlation Rule. Default is now. Must be lower than `date`. In format `YYYY-MM-DD` (e.g. `2000-01-31`).
+            * `modified`: will be used at the `modified` time in the Indicator object generated and `modified` value in the Sigma Correlation Rule. Default is now. Must be higher than `date`. In format `YYYY-MM-DD` (e.g. `2000-01-31`).
+            * `tlp_level` (optional): TLP level assigned to the Indicator object and in the `tags` of the Sigma Correlation Rule. Either `clear`, `green`, `amber`, `amber+strict`, or `red`.
+            * `tags` (optional): in format `NAMESPACE.TAG` (e.g. `threat-actor.someone`). Cannot use the reserved namespaces `attack.`, `cve.` or `tlp.).
+            * `rule_ids` (required): one or more Sigma Base Rule ID's (e.g. `680c2e5b-3704-47e1-9a0c-4f6746211faf`). Do not include the `indicator--` part. Must be valid, else creation will fail.
+            * `correlation`: a valid Sigma Correlation Rule in the body of the request, [as per the Sigma specification](https://github.com/SigmaHQ/sigma-specification/blob/main/specification/sigma-correlation-rules-specification.md). The Correlation Rule should conform to the yml syntax (properly indented and escaped).
+
+            The `id` of the Sigma Correlation Rule will be auto-generated and cannot be passed in the request.
+            """
+        ),
+    ),
+    create_from_prompt=extend_schema(
+        summary="Create A Correlation Rule from an AI prompt",
+        description=textwrap.dedent(
+            """
+            Use this endpoint to create a Correlation Sigma Rule via a prompt.
+
+            The body of the request accepts:
+
+            * `author` (optional): A full STIX 2.1 identity object (make sure to properly escape). Will be validated by the STIX2 library. The ID is used to create the Indicator STIX object, and is used as the `author` property in the Sigma Correlation Rule. If not passed, the SIEM Rules Identity object will be used.
+            * `date` (optional): will be used at the `created` time in the Indicator object generated and `date` value in the Sigma Correlation Rule. Default is now. Must be lower than `date`. In format `YYYY-MM-DD` (e.g. `2000-01-31`).
+            * `modified`: will be used at the `modified` time in the Indicator object generated and `modified` value in the Sigma Correlation Rule. Default is now. Must be higher than `date`. In format `YYYY-MM-DD` (e.g. `2000-01-31`).
+            * `tlp_level` (optional): TLP level assigned to the Indicator object and in the `tags` of the Sigma Correlation Rule. Either `clear`, `green`, `amber`, `amber+strict`, or `red`.
+            * `tags` (optional): in format `NAMESPACE.TAG` (e.g. `threat-actor.someone`). Cannot use the reserved namespaces `attack.`, `cve.` or `tlp.).
+            * `rule_ids` (required): one or more Sigma Base Rule ID's (e.g. `680c2e5b-3704-47e1-9a0c-4f6746211faf`). Do not include the `indicator--` part. Must be valid, else creation will fail.
+            * `prompt` (required): The prompt you wish to send to the AI with instructions on how to modify or improve the rule. For example; Add MITRE ATT&CK Technique T1134 to this rule.
+            * `ai_provider` (required): An AI provider and model to be used for rule generation in format `provider:model` e.g. `openai:gpt-4o`. This is a txt2detection setting.
+
+            The `id` of the Sigma Correlation Rule will be auto-generated and cannot be passed in the request.
+            """
+        ),
+    ),
+    
 )
 class RuleViewWithCorrelationModifier(RuleView):
     @extend_schema(
@@ -750,86 +795,7 @@ class RuleViewWithCorrelationModifier(RuleView):
         return self.do_modify_correlation(
             request, indicator_id, report, indicator, detection_container.detections[0]
         )
-    
 
-
-@extend_schema_view(
-    create_from_sigma=extend_schema(
-        summary="Create a Correlation Sigma Rule using YML",
-        description=textwrap.dedent(
-            """
-            This endpoint is useful if you're comfortable writing a Sigma Correlation Rule.
-
-            The body of the request accepts:
-
-            * `title` (required): used as the rule `title`
-            * `description` (optional) used as the rule `description`
-            * `author` (optional): A full STIX 2.1 identity object (make sure to properly escape). Will be validated by the STIX2 library. The ID is used to create the Indicator STIX object, and is used as the `author` property in the Sigma Correlation Rule. If not passed, the SIEM Rules Identity object will be used.
-            * `date` (optional): will be used at the `created` time in the Indicator object generated and `date` value in the Sigma Correlation Rule. Default is now. Must be lower than `date`. In format `YYYY-MM-DD` (e.g. `2000-01-31`).
-            * `modified`: will be used at the `modified` time in the Indicator object generated and `modified` value in the Sigma Correlation Rule. Default is now. Must be higher than `date`. In format `YYYY-MM-DD` (e.g. `2000-01-31`).
-            * `tlp_level` (optional): TLP level assigned to the Indicator object and in the `tags` of the Sigma Correlation Rule. Either `clear`, `green`, `amber`, `amber+strict`, or `red`.
-            * `tags` (optional): in format `NAMESPACE.TAG` (e.g. `threat-actor.someone`). Cannot use the reserved namespaces `attack.`, `cve.` or `tlp.).
-            * `rule_ids` (required): one or more Sigma Base Rule ID's (e.g. `680c2e5b-3704-47e1-9a0c-4f6746211faf`). Do not include the `indicator--` part. Must be valid, else creation will fail.
-            * `correlation`: a valid Sigma Correlation Rule in the body of the request, [as per the Sigma specification](https://github.com/SigmaHQ/sigma-specification/blob/main/specification/sigma-correlation-rules-specification.md). The Correlation Rule should conform to the yml syntax (properly indented and escaped).
-
-            The `id` of the Sigma Correlation Rule will be auto-generated and cannot be passed in the request.
-            """
-        ),
-    ),
-    create_from_prompt=extend_schema(
-        summary="Create A Correlation Rule from an AI prompt",
-        description=textwrap.dedent(
-            """
-            Use this endpoint to create a Correlation Sigma Rule via a prompt.
-
-            The body of the request accepts:
-
-            * `author` (optional): A full STIX 2.1 identity object (make sure to properly escape). Will be validated by the STIX2 library. The ID is used to create the Indicator STIX object, and is used as the `author` property in the Sigma Correlation Rule. If not passed, the SIEM Rules Identity object will be used.
-            * `date` (optional): will be used at the `created` time in the Indicator object generated and `date` value in the Sigma Correlation Rule. Default is now. Must be lower than `date`. In format `YYYY-MM-DD` (e.g. `2000-01-31`).
-            * `modified`: will be used at the `modified` time in the Indicator object generated and `modified` value in the Sigma Correlation Rule. Default is now. Must be higher than `date`. In format `YYYY-MM-DD` (e.g. `2000-01-31`).
-            * `tlp_level` (optional): TLP level assigned to the Indicator object and in the `tags` of the Sigma Correlation Rule. Either `clear`, `green`, `amber`, `amber+strict`, or `red`.
-            * `tags` (optional): in format `NAMESPACE.TAG` (e.g. `threat-actor.someone`). Cannot use the reserved namespaces `attack.`, `cve.` or `tlp.).
-            * `rule_ids` (required): one or more Sigma Base Rule ID's (e.g. `680c2e5b-3704-47e1-9a0c-4f6746211faf`). Do not include the `indicator--` part. Must be valid, else creation will fail.
-            * `prompt` (required): The prompt you wish to send to the AI with instructions on how to modify or improve the rule. For example; Add MITRE ATT&CK Technique T1134 to this rule.
-            * `ai_provider` (required): An AI provider and model to be used for rule generation in format `provider:model` e.g. `openai:gpt-4o`. This is a txt2detection setting.
-
-            The `id` of the Sigma Correlation Rule will be auto-generated and cannot be passed in the request.
-            """
-        ),
-    ),
-)
-
-class CorrelationView(viewsets.GenericViewSet):
-    openapi_tags = ["Correlation Rules"]
-    rule_type = "correlation"
-
-    serializer_class = serializers.RuleSerializer
-    lookup_url_kwarg = "indicator_id"
-
-    lookup_value_regex = r'indicator--[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'
-
-    openapi_path_params = [
-        OpenApiParameter(
-            lookup_url_kwarg,
-            location=OpenApiParameter.PATH,
-            description="The `id` of the Indicator. e.g. `indicator--3fa85f64-5717-4562-b3fc-2c963f66afa6`. Note the UUID part of the STIX `id` used here will match the `id` in the Sigma rule.",
-        )
-    ]
-
-
-    class filterset_class(RuleView.filterset_class):
-        cve_id = None
-        attack_id = None
-        file_id = None
-        correlation_rule = None
-        base_rule = BaseInFilter(
-            help_text="Filter the results by the ID of contained base rules. Pass the full STIX ID of the Indicator object, e.g. `indicator--3fa85f64-5717-4562-b3fc-2c963f66afa6`."
-        )
-
-    def get_renderers(self):
-        if self.action == "retrieve":
-            return [renderers.JSONRenderer(), SigmaRuleRenderer()]
-        return super().get_renderers()
 
     def get_parsers(self):
         return super().get_parsers()
@@ -854,7 +820,7 @@ class CorrelationView(viewsets.GenericViewSet):
         request=DRFCorrelationRule.drf_serializer,
         responses={200: serializers.JobSerializer, 400: DEFAULT_400_ERROR},
     )
-    @decorators.action(methods=['POST'], detail=False, serializer_class=JobSerializer, url_path="create/manual", parser_classes=[SigmaRuleParser])
+    @decorators.action(methods=['POST'], detail=False, serializer_class=JobSerializer, url_path="create/correlation-rule/manual", parser_classes=[SigmaRuleParser])
     def create_from_sigma(self, request, *args, **kwargs):
         rule_s = DRFCorrelationRule.drf_serializer(data=request.data)
         rule_s.is_valid(raise_exception=True)
@@ -874,7 +840,7 @@ class CorrelationView(viewsets.GenericViewSet):
         request=CorrelationRuleSerializer,
         responses={200: serializers.JobSerializer, 400: DEFAULT_400_ERROR},
     )
-    @decorators.action(methods=['POST'], detail=False, serializer_class=JobSerializer, url_path="create/ai")
+    @decorators.action(methods=['POST'], detail=False, serializer_class=JobSerializer, url_path="create/correlation-rule/ai")
     def create_from_prompt(self, request, *args, **kwargs):
         s = CorrelationRuleSerializer(data=request.data)
         s.is_valid(raise_exception=True)

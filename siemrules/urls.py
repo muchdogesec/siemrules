@@ -36,7 +36,6 @@ router = routers.SimpleRouter()
 router.register('files', views.FileView, 'files')
 router.register('jobs', views.JobView, 'jobs')
 router.register('rules', views.RuleViewWithCorrelationModifier, 'rules')
-router.register('correlation-rules', views.CorrelationView, 'correlation-rules')
 router.register('reports', reports.ReportView, 'reports')
 router.register('identities', IdentityView, "identity-view")
 
