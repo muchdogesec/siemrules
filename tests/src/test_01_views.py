@@ -177,14 +177,31 @@ class TestRuleView:
                 assert rule_resp.data["modified"] == version or response.data[0]
 
     
+   
+    
     def test_revert_rule(self, client: django.test.Client):
-        rule_id = "indicator--2683daab-aa64-52ff-a001-3ea5aee9dd72"
+        rule_id = "indicator--8af82832-2abd-5765-903c-01d414dae1e9"
         rule_url = f"{self.url}{rule_id}/"
 
         versions_resp = client.get(rule_url + "versions/")
         assert versions_resp.status_code == 200, versions_resp.json()
-        expected_version = random.choice(versions_resp.data)
-        response = client.patch(rule_url + "modify/revert/", data=dict(version=expected_version), content_type="application/json")
-        assert response.status_code == 200, response.json()
-        assert response.data['modified'] == expected_version
+        versions_before_revert = list(versions_resp.data)
+        revert_version = random.choice(versions_before_revert)
+        object_before_revert = client.get(rule_url, query_params=dict(version=revert_version)).json()
 
+        response = client.patch(rule_url + "modify/revert/", data=dict(version=revert_version), content_type="application/json")
+        assert response.status_code == 200, response.json()
+        object_after_revert = response.json()
+        assert object_after_revert['modified'] > max(versions_before_revert), "object_after_revert must be newer than all previously existing objects"
+
+        
+        versions_resp = client.get(rule_url + "versions/")
+        assert versions_resp.status_code == 200, versions_resp.json()
+        versions_after_revert = list(versions_resp.data)
+        assert len(versions_after_revert) == len(versions_before_revert) + 1, "count(versions_after_revert) must be count(versions_before_revert)+1"
+        assert set(versions_after_revert).issuperset(versions_before_revert), "versions_after_revert must be a superset of versions_before_revert"
+
+        for k in object_before_revert.keys():
+            if k in ['external_references', 'modified']:
+                continue
+            assert object_before_revert[k] == object_after_revert[k]
