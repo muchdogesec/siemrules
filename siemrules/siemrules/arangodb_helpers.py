@@ -225,7 +225,8 @@ def get_objects_by_id(indicator_id):
 
 from stix2arango.stix2arango import Stix2Arango
 
-def make_upload(report_id, bundle):
+def make_upload(report_id, bundle, s2a_kwargs=None):
+    s2a_kwargs = s2a_kwargs or {}
     file_id = report_id.removeprefix('report--')
     s2a = Stix2Arango(
         file=None,
@@ -236,6 +237,7 @@ def make_upload(report_id, bundle):
         username=settings.ARANGODB_USERNAME,
         password=settings.ARANGODB_PASSWORD,
         ignore_embedded_relationships=False,
+        **s2a_kwargs
         )
     s2a.arangodb_extra_data = dict(_stixify_report_id=report_id)
     s2a.run(data=bundle)
@@ -351,25 +353,67 @@ def delete_rule(indicator_id, rule_date='', delete=True):
     else: #revert
         if not revert_key_id:
             raise ParseError(f"cannot find rule `{indicator_id}` @ {rule_date}")
+        
+        do_reversion(helper, revert_key_id)
 
         helper.execute_query('''
                 LET vertex_deletions = (
                     FOR d in @vertices
-                     UPDATE {_key: d._key} WITH  {_is_latest: d._id == @revision_id} IN siemrules_vertex_collection
+                     UPDATE {_key: d._key} WITH  {_is_latest: FALSE} IN siemrules_vertex_collection
                     RETURN TRUE
                 )
 
                 LET edge_deletions = (
                     FOR d in @edges
-                    UPDATE {_key: d._key} WITH {_is_latest: d._from == @revision_id} IN siemrules_edge_collection
+                    UPDATE {_key: d._key} WITH {_is_latest: FALSE} IN siemrules_edge_collection
                     RETURN TRUE
                 )
                 RETURN {vertex_deletions, edge_deletions}
                 
-        ''', bind_vars=dict(revision_id=revert_key_id, vertices=rules, edges=rels), paginate=False)
+        ''', bind_vars=dict(vertices=rules, edges=rels), paginate=False)
 
     return True
 
+def do_reversion(helper, revision_id):
+    objects: list[dict] = helper.execute_query('''
+                LET vertex_obj = DOCUMENT(@revision_id)
+
+                LET edge_objects = (
+                    FOR d in siemrules_edge_collection
+                    FILTER d._from == @revision_id AND d._is_ref != TRUE
+                    RETURN d
+                )
+                FOR doc IN UNION([vertex_obj], edge_objects)
+                RETURN doc
+                
+        ''', bind_vars=dict(revision_id=revision_id), paginate=False)
+    
+    indicator = objects[0]
+    version = indicator['modified']
+    
+    for obj in objects:
+        obj.pop("_record_modified", None)
+        obj.pop("_record_created", None)
+        obj.pop("_record_md5_hash", None)
+        obj.pop("_from", None)
+        obj.pop("_from", None)
+        for k in [
+            '_record_modified',
+            '_record_created',
+            '_record_md5_hash',
+            '_from',
+            '_id',
+            '_key',
+        ]:
+            obj.pop(k, None)
+        obj['_is_latest'] = True
+        obj['modified'] = datetime.now(UTC).isoformat().replace('+00:00', 'Z')
+    ext_refs: list[dict] = [ref for ref in indicator.get('external_references', []) if ref['source_name'] != 'siemrules-reverted-to']
+    ext_refs.append(dict(source_name='siemrules-reverted-to', description=version))
+    indicator['external_references'] = ext_refs
+
+    make_upload(indicator.get('_stixify_report_id', ''), {'objects': objects, 'type': 'bundle', 'id': f'bundle--{uuid.uuid4()}'}, s2a_kwargs=dict(always_latest=True))
+            
 
 def related_correlation_rules(indicator_ids):
     helper = ArangoDBHelper(settings.VIEW_NAME, request_from_queries())
