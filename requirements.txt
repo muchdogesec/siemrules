@@ -63,6 +63,8 @@ llama-index-core==0.12.10.post1
 llama-index-llms-anthropic==0.6.3
 llama-index-llms-gemini==0.4.3
 llama-index-llms-openai==0.3.13
+llama-index-llms-deepseek==0.1.1
+llama-index-llms-openrouter==0.3.1
 marshmallow==3.25.1
 mistune==3.1.0
 multidict==6.1.0
