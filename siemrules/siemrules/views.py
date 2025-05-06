@@ -568,7 +568,10 @@ class RuleView(viewsets.GenericViewSet):
             indicator_id,
         )
 
-    @extend_schema(request=DRFDetection.drf_serializer)
+    @extend_schema(
+        request=DRFDetection.drf_serializer,
+        responses={200: serializers.RuleSerializer, 400: DEFAULT_400_ERROR},
+    )
     @decorators.action(methods=["POST"], detail=True, parser_classes=[SigmaRuleParser], url_path="modify/base-rule/manual")
     def modify_base_rule_manual(self, request, *args, indicator_id=None, **kwargs):
         report, indicator, all_objs = arangodb_helpers.get_objects_by_id(indicator_id)
@@ -598,7 +601,10 @@ class RuleView(viewsets.GenericViewSet):
 
         return self.retrieve(request, indicator_id=indicator_id)
     
-    @extend_schema(request=serializers.AIModifySerializer)
+    @extend_schema(
+        request=serializers.AIModifySerializer,
+        responses={200: serializers.RuleSerializer, 400: DEFAULT_400_ERROR},
+    )
     @decorators.action(methods=['POST'], detail=True, url_path="modify/base-rule/ai")
     def modify_base_rule_from_prompt(self, request, *args, indicator_id=None, **kwargs):
         report, indicator, all_objs = arangodb_helpers.get_objects_by_id(indicator_id)
@@ -687,7 +693,10 @@ class RuleView(viewsets.GenericViewSet):
     ),
 )
 class RuleViewWithCorrelationModifier(RuleView):
-    @extend_schema(request=correlations.serializers.DRFCorrelationRuleModify.drf_serializer)
+    @extend_schema(
+        request=correlations.serializers.DRFCorrelationRuleModify.drf_serializer,
+        responses={200: serializers.RuleSerializer, 400: DEFAULT_400_ERROR},
+    )
     @decorators.action(methods=['POST'], detail=True, url_path="modify/correlation-rule/manual", parser_classes=[SigmaRuleParser])
     def modify_correlation_manual(self, request, *args, indicator_id=None, **kwargs):
         report, indicator, all_objs = arangodb_helpers.get_objects_by_id(indicator_id)
@@ -715,7 +724,10 @@ class RuleViewWithCorrelationModifier(RuleView):
 
         return self.retrieve(request, indicator_id=indicator_id)
     
-    @extend_schema(request=serializers.AIModifySerializer)
+    @extend_schema(
+        request=serializers.AIModifySerializer,
+        responses={200: serializers.RuleSerializer, 400: DEFAULT_400_ERROR},
+    )
     @decorators.action(methods=['POST'], detail=True, url_path="modify/correlation-rule/ai")
     def modify_correlation_from_prompt(self, request, *args, indicator_id=None, **kwargs):
         report, indicator, all_objs = arangodb_helpers.get_objects_by_id(indicator_id)
@@ -838,7 +850,10 @@ class CorrelationView(viewsets.GenericViewSet):
             )
         return indicators
 
-    @extend_schema(request=DRFCorrelationRule.drf_serializer)
+    @extend_schema(
+        request=DRFCorrelationRule.drf_serializer,
+        responses={200: serializers.JobSerializer, 400: DEFAULT_400_ERROR},
+    )
     @decorators.action(methods=['POST'], detail=False, serializer_class=JobSerializer, url_path="create/manual", parser_classes=[SigmaRuleParser])
     def create_from_sigma(self, request, *args, **kwargs):
         rule_s = DRFCorrelationRule.drf_serializer(data=request.data)
@@ -855,7 +870,10 @@ class CorrelationView(viewsets.GenericViewSet):
         return Response(job_s.data)
     
 
-    @extend_schema(request=CorrelationRuleSerializer)
+    @extend_schema(
+        request=CorrelationRuleSerializer,
+        responses={200: serializers.JobSerializer, 400: DEFAULT_400_ERROR},
+    )
     @decorators.action(methods=['POST'], detail=False, serializer_class=JobSerializer, url_path="create/ai")
     def create_from_prompt(self, request, *args, **kwargs):
         s = CorrelationRuleSerializer(data=request.data)
