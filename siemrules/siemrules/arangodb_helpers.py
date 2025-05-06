@@ -39,7 +39,7 @@ def fix_report_id(report_id: str):
         return report_id
     return "report--"+report_id
 
-def get_rules(request: request.Request, paginate=True, all_versions=False, nokeep=True, rule_type="base"):
+def get_rules(request: request.Request, paginate=True, all_versions=False, nokeep=True):
     helper = ArangoDBHelper(settings.VIEW_NAME, request, result_key="rules")
     binds = {}
     filters = []
@@ -119,10 +119,14 @@ def get_rules(request: request.Request, paginate=True, all_versions=False, nokee
                 FILTER doc.external_references[? ANY FILTER CURRENT.source_name == 'cve' AND CURRENT.external_id IN @cve_ids]
             ''')
     
-
-    filters.append('FILTER (doc.labels[0] LIKE "siemrules.correlation-rule%") == @show_correlation_rules')
-    binds.update(show_correlation_rules=rule_type == 'correlation')
-
+    if rule_type := helper.query.get('rule_type'):
+        match rule_type:
+            case 'base-rule':
+                rule_type = 'file'
+            case 'correlation-rule':
+                rule_type = 'correlation'
+        filters.append('FILTER doc.external_references[? ANY FILTER CURRENT.source_name == "siemrules-type" AND STARTS_WITH(CURRENT.external_id, @rule_type)]')
+        binds.update(rule_type=rule_type)
 
     query = """
 
@@ -161,24 +165,24 @@ def request_from_queries(**queries):
     r.query_params.update(queries)
     return r
 
-def get_single_rule(indicator_id, rule_type="base", version=None):
+def get_single_rule(indicator_id, version=None):
     r = request_from_queries(indicator_id=indicator_id, version=version)
-    rules = get_rules(r, paginate=False, rule_type=rule_type)
+    rules = get_rules(r, paginate=False)
     if not rules:
         raise NotFound(f"no rule with id `{indicator_id}`")
     return Response(rules[0])
 
-def get_single_rule_versions(indicator_id, rule_type="base"):
+def get_single_rule_versions(indicator_id):
     r = request_from_queries(indicator_id=indicator_id)
-    rules = get_rules(r, paginate=False, all_versions=True, rule_type=rule_type)
+    rules = get_rules(r, paginate=False, all_versions=True)
     if not rules:
         raise NotFound(f"no rule with id `{indicator_id}`")
     return Response(sorted([rule['modified'] for rule in rules], reverse=True))
 
-def get_objects_for_rule(indicator_id, version=None, rule_type="base"):
+def get_objects_for_rule(indicator_id, version=None):
     r = request_from_queries(indicator_id=indicator_id, version=version)
     helper = ArangoDBHelper(settings.VIEW_NAME, r)
-    rules = get_rules(r, paginate=False, nokeep=False, rule_type=rule_type)
+    rules = get_rules(r, paginate=False, nokeep=False)
     if not rules:
         raise NotFound(f"no rule with id `{indicator_id}`")
     rule = rules[0]
@@ -278,7 +282,7 @@ def modify_rule(indicator_id, old_modified, new_modified, new_objects):
         
 
     
-def delete_rule(indicator_id, rule_type="base", rule_date='', delete=True):
+def delete_rule(indicator_id, rule_date='', delete=True):
     helper = ArangoDBHelper(settings.VIEW_NAME, request_from_queries())
     new_modified = format_datetime(datetime.now(UTC))
     objects = helper.execute_query('''
@@ -303,9 +307,6 @@ def delete_rule(indicator_id, rule_type="base", rule_date='', delete=True):
 
     if not rules:
         raise NotFound(f"no rules with id `{indicator_id}`")
-    
-    if rule_type == 'base' and not report:
-        raise ParseError(f"cannot find report associated with rule `{indicator_id}`")
 
     rels = helper.execute_query('''
             FOR doc IN siemrules_edge_collection
@@ -341,7 +342,7 @@ def delete_rule(indicator_id, rule_type="base", rule_date='', delete=True):
         ''', bind_vars=dict(keys=[obj['_key'] for obj in rules+rels]), paginate=False)
 
         # remove rule from report
-        if  rule_type == 'base':
+        if  report:
             report['object_refs'].remove(indicator_id)
             for obj in rules:
                 with contextlib.suppress(Exception):

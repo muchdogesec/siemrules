@@ -72,8 +72,6 @@ class FileSerializer(serializers.ModelSerializer):
 
     
     def create(self, validated_data):
-        labels = validated_data['labels'] = validated_data.get('labels') or []
-        labels.insert(0, self.type_label)
         return super().create(validated_data)
 
 
@@ -121,12 +119,6 @@ class FileSigmaSerializer(serializers.ModelSerializer):
         model = File
         exclude = ['file', 'defang', 'extract_text_from_image', 'markdown_file', 'mimetype']
         read_only_fields = ["id"]
-
-        
-    def create(self, validated_data):
-        labels = validated_data['labels'] = validated_data.get('labels') or []
-        labels.insert(0, self.type_label)
-        return super().create(validated_data)
 
 class ImageSerializer(serializers.ModelSerializer):
     url = serializers.SerializerMethodField()

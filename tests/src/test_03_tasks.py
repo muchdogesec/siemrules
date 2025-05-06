@@ -10,6 +10,8 @@ from siemrules.worker.tasks import (
     new_task, process_post, save_file, run_txt2detection, run_file2txt, upload_to_arango, job_completed_with_error, upload_objects
 )
 import stix2
+from .utils import job
+
 
 
 @pytest.mark.django_db
@@ -57,6 +59,7 @@ def test_run_txt2detection():
     mock_file.references = mock_file.license = 'random'
     mock_file.level = "level"
     mock_file.status = "status"
+    mock_file.job = mock.Mock(spec=models.Job)
     mock_file_copy = copy.copy(mock_file)
 
     # Mock dependencies
@@ -91,6 +94,7 @@ def test_run_txt2detection():
             license=mock_file.license,
             level=mock_file.level,
             status=mock_file.status,
+            external_refs=[{'source_name': 'siemrules-type', 'external_id': mock_file.job.type}]
         )
 
         assert result == {"mocked": "detection_output"}

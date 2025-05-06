@@ -1,6 +1,7 @@
 from rest_framework import viewsets, parsers, decorators, mixins, renderers
 from django.db import models
 import yaml
+from rest_framework.exceptions import ParseError
 
 from siemrules.siemrules.modifier import yaml_to_detection
 
@@ -33,5 +34,5 @@ class SigmaRuleParser(parsers.BaseParser):
     def parse(self, stream, media_type=None, parser_context=None):
         try:
             return yaml.safe_load(stream)
-        except:
-            raise
+        except Exception as e:
+            raise ParseError(f"parse yaml error: {e}") from e

@@ -77,5 +77,6 @@ def test_modify_rule(client: django.test.Client, modification):
     with patch('txt2detection.bundler.Bundler.get_attack_objects') as get_attack_objects, patch('txt2detection.bundler.Bundler.get_cve_objects') as get_cve_objects:
         get_attack_objects.return_value = [obj for obj in all_objects() if obj['type'] != 'indicator' and obj.get('external_references') and obj['external_references'][0]['external_id'] in indicator_refs and obj['external_references'][0]['source_name'] == 'mitre-attack']
         get_cve_objects.return_value = [obj for obj in all_objects() if obj['type'] != 'indicator' and obj.get('external_references') and obj['external_references'][0]['external_id'] in indicator_refs and obj['external_references'][0]['source_name'] == 'cve']
-        resp = client.post(f'/api/v1/rules/{indicator_id}/modify/manual/', data=modification['sigma'], content_type='application/sigma+yaml')
+        resp = client.post(f'/api/v1/rules/{indicator_id}/modify/base-rule/manual/', data=modification['sigma'], content_type='application/sigma+yaml')
+        assert resp.status_code == 200, resp.json()
         time.sleep(1)

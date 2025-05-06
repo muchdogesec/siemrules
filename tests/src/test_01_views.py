@@ -49,12 +49,11 @@ class TestFileView:
             assert response.status_code == status.HTTP_200_OK, response.content
             mock_task.assert_called_once()
             job: models.Job = mock_task.mock_calls[0].args[0]
-            assert job.type == models.JobType.FILE
+            assert job.type == models.JobType.FILE_FILE
             assert job.file.file.read() == mock_file_content
             assert job.file.mode == file_data["mode"]
             assert job.file.name == file_data["name"]
             assert job.file.ai_provider == file_data["ai_provider"]
-            assert 'siemrules.file' in job.file.labels, "must contain labels to differentiate from text_input"
 
     def test_file_create__text(self, client: django.test.Client):
         mock_file_content = b"dummy content"
@@ -69,12 +68,11 @@ class TestFileView:
             mock_task.assert_called_once()
             job: models.Job = mock_task.mock_calls[0].args[0]
             file: models.File = job.file
-            assert job.type == models.JobType.FILE
+            assert job.type == models.JobType.FILE_TEXT
             assert file.file.read() == mock_file_content
             assert file.mode == "txt"
             assert file.name == file_data["name"]
             assert file.ai_provider == file_data["ai_provider"]
-            assert 'siemrules.text' in file.labels, "must contain labels to differentiate from upload"
 
     def test_retrieve_file(self, client):
         response = client.get(f"{self.url}{self.file.id}/")
@@ -123,15 +121,12 @@ class TestRuleView:
             mock_get_rules.return_value = Response()
             response = client.get(self.url)
             mock_get_rules.assert_called_once()
-            # mock_get_rules.assert_called_once_with(response.request, rule_type=RuleView.rule_type)
-            assert mock_get_rules.mock_calls[0].kwargs['rule_type'] == RuleView.rule_type
 
     def test_retrieve_rule(self, client):
         with patch("siemrules.siemrules.arangodb_helpers.get_single_rule") as mock_get:
             mock_get.return_value = Response()
             response = client.get(f"{self.url}{self.rule_id}/")
             mock_get.assert_called_once()
-            assert mock_get.mock_calls[0].kwargs['rule_type'] == RuleView.rule_type
 
     @pytest.mark.parametrize(
         ["format", "expected_content_type"],
@@ -182,14 +177,31 @@ class TestRuleView:
                 assert rule_resp.data["modified"] == version or response.data[0]
 
     
+   
+    
     def test_revert_rule(self, client: django.test.Client):
-        rule_id = "indicator--2683daab-aa64-52ff-a001-3ea5aee9dd72"
+        rule_id = "indicator--8af82832-2abd-5765-903c-01d414dae1e9"
         rule_url = f"{self.url}{rule_id}/"
 
-        versions = client.get(rule_url + "versions/").data
-        expected_version = random.choice(versions)
-        response = client.patch(rule_url + "revert/", data=dict(version=expected_version), content_type="application/json")
-        assert response.data['modified'] == expected_version
-        response = client.patch(rule_url)
-        assert response.data['modified'] == expected_version
+        versions_resp = client.get(rule_url + "versions/")
+        assert versions_resp.status_code == 200, versions_resp.json()
+        versions_before_revert = list(versions_resp.data)
+        revert_version = random.choice(versions_before_revert)
+        object_before_revert = client.get(rule_url, query_params=dict(version=revert_version)).json()
 
+        response = client.patch(rule_url + "modify/revert/", data=dict(version=revert_version), content_type="application/json")
+        assert response.status_code == 200, response.json()
+        object_after_revert = response.json()
+        assert object_after_revert['modified'] > max(versions_before_revert), "object_after_revert must be newer than all previously existing objects"
+
+        
+        versions_resp = client.get(rule_url + "versions/")
+        assert versions_resp.status_code == 200, versions_resp.json()
+        versions_after_revert = list(versions_resp.data)
+        assert len(versions_after_revert) == len(versions_before_revert) + 1, "count(versions_after_revert) must be count(versions_before_revert)+1"
+        assert set(versions_after_revert).issuperset(versions_before_revert), "versions_after_revert must be a superset of versions_before_revert"
+
+        for k in object_before_revert.keys():
+            if k in ['external_references', 'modified']:
+                continue
+            assert object_before_revert[k] == object_after_revert[k]
