@@ -6,7 +6,7 @@ import uuid
 
 from django.conf import settings
 
-from siemrules.siemrules.correlations.prompts import CORRELATION_RULES_PROMPT
+from siemrules.siemrules.correlations.prompts import CORRELATION_MODIFICATION_PROMPT, CORRELATION_RULES_PROMPT
 if typing.TYPE_CHECKING:
     from siemrules import settings
 from siemrules.siemrules.correlations.models import AIRuleModel, RuleModel
@@ -108,6 +108,21 @@ def generate_correlation_with_ai(model: BaseAIExtractor, user_prompt, related_in
     )(
         rules=rules_from_indicators(related_indicators),
         user_prompt=user_prompt,
+    )
+
+
+def get_modification(model, input_text, old_detection: RuleModel, prompt) -> RuleModel:
+    # old_detection._bundler = SimpleNamespace(report=SimpleNamespace(created=datetime.now(), modified=datetime.now()))
+    assert isinstance(old_detection, RuleModel), "rule must be of type detection"
+    return LLMTextCompletionProgram.from_defaults(
+        output_parser=ParserWithLogging(RuleModel),
+        prompt=ChatPromptTemplate(CORRELATION_MODIFICATION_PROMPT),
+        verbose=True,
+        llm=model.llm,
+    )(
+        document=input_text,
+        old_rule=old_detection.model_dump(mode='json', exclude=['date', 'modified']),
+        correction_prompt=prompt,
     )
 
 

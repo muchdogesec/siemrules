@@ -759,6 +759,7 @@ class RuleViewWithCorrelationModifier(RuleView):
                 break
         else:
             rule_type = "correlation.modify"
+        _, _, rule.rule_id = indicator_id.rpartition('--')
         new_objects = correlations.correlations.add_rule_indicator(rule, [], rule_type, dict(modified=datetime.now(UTC)))
         arangodb_helpers.modify_rule(
             indicator["id"],
@@ -778,22 +779,18 @@ class RuleViewWithCorrelationModifier(RuleView):
         report, indicator, all_objs = arangodb_helpers.get_objects_by_id(indicator_id)
         s = serializers.AIModifySerializer(data=request.data)
         s.is_valid(raise_exception=True)
-        old_detection = yaml_to_detection(
-            indicator["pattern"], indicator.get("indicator_types", [])
+        old_detection = correlations.correlations.yaml_to_rule(
+            indicator["pattern"]
         )
-        input_text = report["description"]
-        input_text = "<SKIPPED INPUT>"
-        detection_container = get_modification(
+        new_rule = correlations.correlations.get_modification(
             parse_model(s.data["ai_provider"]),
-            input_text,
+            "",
             old_detection,
             s.data["prompt"],
         )
-        if not detection_container.success:
-            raise exceptions.ParseError("txt2detection: failed to execute")
 
         return self.do_modify_correlation(
-            request, indicator_id, report, indicator, detection_container.detections[0]
+            request, indicator_id, report, indicator, new_rule
         )
 
 

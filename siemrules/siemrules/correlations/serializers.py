@@ -46,7 +46,7 @@ class DRFCorrelationRuleModify(DRFBaseModel, BaseRuleModel):
     def serialize_rule_from(cls, old_rule: CorrelationRule, data: dict):
         data = {**old_rule.model_dump(exclude=['created', 'modified', 'date', "author"], by_alias=True), **data}
         tlp_level = tlp_from_tags(old_rule.tags)
-        set_tlp_level_in_tags(data['tags'], tlp_level)
+        set_tlp_level_in_tags(data['tags'], tlp_level.name)
         s = cls.drf_serializer(data=data)
         s.is_valid(raise_exception=True)
         cls.is_valid(s)

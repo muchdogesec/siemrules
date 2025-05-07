@@ -10,6 +10,7 @@ from django.http import HttpRequest, HttpResponse
 # from django.conf import settings
 from siemrules import settings
 import typing
+from stix2.serialization import serialize as stix2_serialize
 
 from siemrules.siemrules.utils import TLP_LEVEL_STIX_ID_MAPPING, TLP_Levels
 from siemrules.worker.tasks import upload_to_arango
@@ -267,7 +268,7 @@ def modify_rule(indicator_id, old_modified, new_modified, new_objects):
             
     ''', bind_vars=dict(keys=[obj['_key'] for obj in all_objs]), paginate=False)
 
-    make_upload(obj.get('_stixify_report_id', ''), {'objects': new_objects, 'type': 'bundle', 'id': f'bundle--{uuid.uuid4()}'})
+    make_upload(obj.get('_stixify_report_id', ''), make_bundle(new_objects))
 
     if report:
         object_refs: list = report['object_refs'] + [obj['id'] for obj in new_objects]
@@ -412,8 +413,11 @@ def do_reversion(helper, revision_id):
     ext_refs.append(dict(source_name='siemrules-reverted-to', description=version))
     indicator['external_references'] = ext_refs
 
-    make_upload(indicator.get('_stixify_report_id', ''), {'objects': objects, 'type': 'bundle', 'id': f'bundle--{uuid.uuid4()}'}, s2a_kwargs=dict(always_latest=True))
+    make_upload(indicator.get('_stixify_report_id', ''), make_bundle(objects), s2a_kwargs=dict(always_latest=True))
             
+
+def make_bundle(objects):
+    return json.loads(stix2_serialize(dict(type="bundle", id="bundle--"+str(uuid.uuid4()), objects=objects)))
 
 def related_correlation_rules(indicator_ids):
     helper = ArangoDBHelper(settings.VIEW_NAME, request_from_queries())
