@@ -120,13 +120,7 @@ class RuleModel(BaseRuleModel):
     
     @property
     def tlp_level(self):
-        for tag in self.tags:
-            ns, _, level = tag.partition(".")
-            if ns != "tlp":
-                continue
-            if tlp_level := TLP_LEVEL.get(level.replace("-", "_")):
-                return tlp_level
-        return None
+        return tlp_from_tags(self.tags)
     
     @property
     def rule_id(self):
@@ -135,6 +129,25 @@ class RuleModel(BaseRuleModel):
     @rule_id.setter
     def rule_id(self, rule_id):
         self._rule_id = rule_id
+
+
+def tlp_from_tags(tags):
+    for tag in tags:
+        ns, _, level = tag.partition(".")
+        if ns != "tlp":
+            continue
+        if tlp_level := TLP_LEVEL.get(level.replace("-", "_")):
+            return tlp_level
+    return None
+
+def set_tlp_level_in_tags(tags, level):
+    level = str(level)
+    for i, tag in enumerate(tags):
+        if tag.startswith('tlp.'):
+            tags.remove(tag)
+    tags.append('tlp.'+level.replace("_", "-"))
+    return tags
+
 
 class AIRuleModel(BaseRuleModel):
     pass
