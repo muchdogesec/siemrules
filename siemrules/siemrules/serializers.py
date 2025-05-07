@@ -135,7 +135,7 @@ class ImageSerializer(serializers.ModelSerializer):
         return None
 
 class JobSerializer(serializers.ModelSerializer):
-    report_id = ReportIDField(source='file.id')
+    report_id = ReportIDField(source='file_id')
     class Meta:
         model = Job
         exclude = ['data']
