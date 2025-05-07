@@ -691,69 +691,7 @@ class RuleView(viewsets.GenericViewSet):
             """
         ),
     ),
-)
-class RuleViewWithCorrelationModifier(RuleView):
-    @extend_schema(
-        request=correlations.serializers.DRFCorrelationRuleModify.drf_serializer,
-        responses={200: serializers.RuleSerializer, 400: DEFAULT_400_ERROR},
-    )
-    @decorators.action(methods=['POST'], detail=True, url_path="modify/correlation-rule/manual", parser_classes=[SigmaRuleParser])
-    def modify_correlation_manual(self, request, *args, indicator_id=None, **kwargs):
-        report, indicator, all_objs = arangodb_helpers.get_objects_by_id(indicator_id)
-        old_rule = correlations.correlations.yaml_to_rule(
-            indicator["pattern"]
-        )
-        new_rule = correlations.serializers.DRFCorrelationRuleModify.serialize_rule_from(old_rule, request.data)
 
-        return self.do_modify_correlation(request, indicator_id, report, indicator, new_rule)
-
-    def do_modify_correlation(self, request, indicator_id, report, indicator, rule):
-        for ref in indicator.get('external_references', []):
-            if ref['source_name'] == "siemrules-type":
-                rule_type = ref['external_id']
-                break
-        else:
-            rule_type = "correlation.modify"
-        new_objects = correlations.correlations.add_rule_indicator(rule, [], rule_type, dict(modified=datetime.now(UTC)))
-        arangodb_helpers.modify_rule(
-            indicator["id"],
-            indicator["modified"],
-            new_objects[0]["modified"],
-            new_objects,
-        )
-
-        return self.retrieve(request, indicator_id=indicator_id)
-    
-    @extend_schema(
-        request=serializers.AIModifySerializer,
-        responses={200: serializers.RuleSerializer, 400: DEFAULT_400_ERROR},
-    )
-    @decorators.action(methods=['POST'], detail=True, url_path="modify/correlation-rule/ai")
-    def modify_correlation_from_prompt(self, request, *args, indicator_id=None, **kwargs):
-        report, indicator, all_objs = arangodb_helpers.get_objects_by_id(indicator_id)
-        s = serializers.AIModifySerializer(data=request.data)
-        s.is_valid(raise_exception=True)
-        old_detection = yaml_to_detection(
-            indicator["pattern"], indicator.get("indicator_types", [])
-        )
-        input_text = report["description"]
-        input_text = "<SKIPPED INPUT>"
-        detection_container = get_modification(
-            parse_model(s.data["ai_provider"]),
-            input_text,
-            old_detection,
-            s.data["prompt"],
-        )
-        if not detection_container.success:
-            raise exceptions.ParseError("txt2detection: failed to execute")
-
-        return self.do_modify_correlation(
-            request, indicator_id, report, indicator, detection_container.detections[0]
-        )
-    
-
-
-@extend_schema_view(
     create_from_sigma=extend_schema(
         summary="Create a Correlation Sigma Rule using YML",
         description=textwrap.dedent(
@@ -797,39 +735,64 @@ class RuleViewWithCorrelationModifier(RuleView):
             """
         ),
     ),
+    
 )
-
-class CorrelationView(viewsets.GenericViewSet):
-    openapi_tags = ["Correlation Rules"]
-    rule_type = "correlation"
-
-    serializer_class = serializers.RuleSerializer
-    lookup_url_kwarg = "indicator_id"
-
-    lookup_value_regex = r'indicator--[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'
-
-    openapi_path_params = [
-        OpenApiParameter(
-            lookup_url_kwarg,
-            location=OpenApiParameter.PATH,
-            description="The `id` of the Indicator. e.g. `indicator--3fa85f64-5717-4562-b3fc-2c963f66afa6`. Note the UUID part of the STIX `id` used here will match the `id` in the Sigma rule.",
+class RuleViewWithCorrelationModifier(RuleView):
+    @extend_schema(
+        request=correlations.serializers.DRFCorrelationRuleModify.drf_serializer,
+        responses={200: serializers.RuleSerializer, 400: DEFAULT_400_ERROR},
+    )
+    @decorators.action(methods=['POST'], detail=True, url_path="modify/correlation-rule/manual", parser_classes=[SigmaRuleParser])
+    def modify_correlation_manual(self, request, *args, indicator_id=None, **kwargs):
+        report, indicator, all_objs = arangodb_helpers.get_objects_by_id(indicator_id)
+        old_rule = correlations.correlations.yaml_to_rule(
+            indicator["pattern"]
         )
-    ]
+        new_rule = correlations.serializers.DRFCorrelationRuleModify.serialize_rule_from(old_rule, request.data)
 
+        return self.do_modify_correlation(request, indicator_id, report, indicator, new_rule)
 
-    class filterset_class(RuleView.filterset_class):
-        cve_id = None
-        attack_id = None
-        file_id = None
-        correlation_rule = None
-        base_rule = BaseInFilter(
-            help_text="Filter the results by the ID of contained base rules. Pass the full STIX ID of the Indicator object, e.g. `indicator--3fa85f64-5717-4562-b3fc-2c963f66afa6`."
+    def do_modify_correlation(self, request, indicator_id, report, indicator, rule):
+        for ref in indicator.get('external_references', []):
+            if ref['source_name'] == "siemrules-type":
+                rule_type = ref['external_id']
+                break
+        else:
+            rule_type = "correlation.modify"
+        _, _, rule.rule_id = indicator_id.rpartition('--')
+        new_objects = correlations.correlations.add_rule_indicator(rule, [], rule_type, dict(modified=datetime.now(UTC)))
+        arangodb_helpers.modify_rule(
+            indicator["id"],
+            indicator["modified"],
+            new_objects[0]["modified"],
+            new_objects,
         )
 
-    def get_renderers(self):
-        if self.action == "retrieve":
-            return [renderers.JSONRenderer(), SigmaRuleRenderer()]
-        return super().get_renderers()
+        return self.retrieve(request, indicator_id=indicator_id)
+    
+    @extend_schema(
+        request=serializers.AIModifySerializer,
+        responses={200: serializers.RuleSerializer, 400: DEFAULT_400_ERROR},
+    )
+    @decorators.action(methods=['POST'], detail=True, url_path="modify/correlation-rule/ai")
+    def modify_correlation_from_prompt(self, request, *args, indicator_id=None, **kwargs):
+        report, indicator, all_objs = arangodb_helpers.get_objects_by_id(indicator_id)
+        s = serializers.AIModifySerializer(data=request.data)
+        s.is_valid(raise_exception=True)
+        old_detection = correlations.correlations.yaml_to_rule(
+            indicator["pattern"]
+        )
+        new_rule = correlations.correlations.get_modification(
+            parse_model(s.data["ai_provider"]),
+            "",
+            old_detection,
+            s.data["prompt"],
+        )
+
+        return self.do_modify_correlation(
+            request, indicator_id, report, indicator, new_rule
+        )
+
 
     def get_parsers(self):
         return super().get_parsers()
@@ -854,7 +817,7 @@ class CorrelationView(viewsets.GenericViewSet):
         request=DRFCorrelationRule.drf_serializer,
         responses={200: serializers.JobSerializer, 400: DEFAULT_400_ERROR},
     )
-    @decorators.action(methods=['POST'], detail=False, serializer_class=JobSerializer, url_path="create/manual", parser_classes=[SigmaRuleParser])
+    @decorators.action(methods=['POST'], detail=False, serializer_class=JobSerializer, url_path="create/correlation-rule/manual", parser_classes=[SigmaRuleParser])
     def create_from_sigma(self, request, *args, **kwargs):
         rule_s = DRFCorrelationRule.drf_serializer(data=request.data)
         rule_s.is_valid(raise_exception=True)
@@ -874,7 +837,7 @@ class CorrelationView(viewsets.GenericViewSet):
         request=CorrelationRuleSerializer,
         responses={200: serializers.JobSerializer, 400: DEFAULT_400_ERROR},
     )
-    @decorators.action(methods=['POST'], detail=False, serializer_class=JobSerializer, url_path="create/ai")
+    @decorators.action(methods=['POST'], detail=False, serializer_class=JobSerializer, url_path="create/correlation-rule/ai")
     def create_from_prompt(self, request, *args, **kwargs):
         s = CorrelationRuleSerializer(data=request.data)
         s.is_valid(raise_exception=True)
