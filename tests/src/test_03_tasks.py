@@ -5,10 +5,12 @@ import uuid
 import pytest
 from django.core.files.uploadedfile import InMemoryUploadedFile
 from siemrules.siemrules import models
+from siemrules.siemrules.correlations.models import RuleModel
 from siemrules.siemrules.models import File
 from siemrules.worker.tasks import (
-    new_task, process_post, save_file, run_txt2detection, run_file2txt, upload_to_arango, job_completed_with_error, upload_objects
+    new_correlation_task, new_task, process_post, save_file, run_txt2detection, run_file2txt, upload_to_arango, job_completed_with_error, upload_objects
 )
+from siemrules.worker import tasks
 import stix2
 from .utils import job
 
@@ -25,6 +27,74 @@ def test_new_task(job):
 
         mock_process_post.assert_called_once_with(file.file.name, job.id)
         mock_error_task.assert_called_once_with(job.id)
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    "job_type",
+    [models.JobType.CORRELATION_PROMPT, models.JobType.CORRELATION_SIGMA],
+)
+def test_new_correlation_task(job: models.Job, job_type):
+    related_indicators = mock.Mock()
+    data = mock.Mock()
+    correlation = mock.Mock()
+    job.type = job_type
+    with patch("siemrules.worker.tasks.process_correlation.s") as mock_process_correlation, \
+        patch("siemrules.worker.tasks.process_correlation_ai.s") as mock_process_correlation_ai, \
+         patch("siemrules.worker.tasks.job_completed_with_error.si") as mock_error_task:
+        new_correlation_task(job, correlation, related_indicators, data)
+        if job.type == models.JobType.CORRELATION_PROMPT:
+            mock_process_correlation_ai.assert_called_once_with(job.id, data, related_indicators)
+        if job.type == models.JobType.CORRELATION_SIGMA:
+            mock_process_correlation.assert_called_once_with(job.id, correlation.model_dump(), related_indicators)
+        mock_error_task.assert_called_once_with(job.id)
+
+@pytest.mark.django_db
+def test_process_correlation(job):
+    correlation = mock.Mock()
+    related_indicators = mock.Mock()
+    with patch("siemrules.siemrules.correlations.models.RuleModel.model_validate") as mock_model_validate, \
+        patch("siemrules.worker.tasks.upload_correlation") as mock_upload_correlation:
+
+        tasks.process_correlation(job.id, correlation, related_indicators)
+        mock_model_validate.assert_called_once_with(correlation)
+        mock_upload_correlation.assert_called_once_with(mock_model_validate.return_value, related_indicators, job)
+    
+@pytest.mark.django_db
+def test_upload_correlation(job):
+    correlation = mock.Mock()
+    related_indicators = mock.Mock()
+    with patch("siemrules.siemrules.correlations.correlations.add_rule_indicator") as mock_add_rule_indicator, \
+        patch("siemrules.worker.tasks.upload_objects") as mock_upload_objects:
+        mock_add_rule_indicator.return_value = []
+        tasks.upload_correlation(correlation, related_indicators, job)
+        mock_add_rule_indicator.assert_called_once_with(correlation, related_indicators, job.type, job.data)
+        mock_upload_objects.assert_called_once()
+        mock_upload_objects.assert_called_once_with(job, mock_upload_objects.call_args[0][1], None, stix2arango_note=f"siemrules-correlation")
+
+@pytest.mark.django_db
+def test_process_correlation_ai(job):
+    data = dict(author="some author", created="rule.date", modified="rule.modified", tlp_level="green", ai_provider="openai", prompt="some prompt")
+    related_indicators = mock.Mock()
+    with patch("siemrules.siemrules.correlations.models.RuleModel.model_validate") as mock_model_validate, \
+        patch("siemrules.siemrules.correlations.correlations.generate_correlation_with_ai") as mock_generate_with_ai, \
+        patch("siemrules.worker.tasks.parse_ai_model") as mock_parse_ai_model, \
+        patch("siemrules.worker.tasks.upload_correlation") as mock_upload_correlation:
+        mdump = mock_generate_with_ai.return_value.model_dump
+        mdump.return_value = {}
+
+        tasks.process_correlation_ai(job.id, data, related_indicators)
+        mock_generate_with_ai.assert_called_once_with(mock_parse_ai_model.return_value, data['prompt'], related_indicators)
+        mock_model_validate.assert_called_once_with(
+            dict(
+                **mdump.return_value,
+                author="some author",
+                date="rule.date",
+                modified="rule.modified",
+                tags=["tlp.green"],
+            )
+        )
+        mock_upload_correlation.assert_called_once_with(mock_model_validate.return_value, related_indicators, job)
 
 @pytest.mark.django_db
 def test_save_file():

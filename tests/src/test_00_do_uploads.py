@@ -12,6 +12,7 @@ from rest_framework import status
 from unittest.mock import patch
 from django.core.files.uploadedfile import SimpleUploadedFile
 from siemrules.siemrules import models, reports
+from siemrules.siemrules.correlations.models import RuleModel
 from siemrules.worker import tasks
 from tests.src import data as test_data
 from rest_framework.response import Response
@@ -80,3 +81,24 @@ def test_modify_rule(client: django.test.Client, modification):
         resp = client.post(f'/api/v1/rules/{indicator_id}/modify/base-rule/manual/', data=modification['sigma'], content_type='application/sigma+yaml')
         assert resp.status_code == 200, resp.json()
         time.sleep(1)
+
+@pytest.mark.parametrize(
+        "rule",
+        [test_data.CORRELATION_RULE_1]
+)
+@pytest.mark.django_db
+def test_upload_correlation(client, rule):
+    rule_id, rule = rule
+    correlation_url = '/api/v1/rules/'
+    from siemrules.worker.celery import app
+    app.conf.task_always_eager = True
+
+    with patch.object(RuleModel, "rule_id", rule_id):
+        response = client.post(
+            correlation_url + "create/correlation-rule/manual/", format="sigma", data=rule, content_type='application/sigma+yaml'
+        )
+        assert response.status_code == 200
+        resp = client.get(
+            correlation_url + f"indicator--{rule_id}/"
+        )
+        assert resp.status_code == 200

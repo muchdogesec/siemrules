@@ -52,7 +52,7 @@ def new_correlation_task(job: Job, correlation: RuleModel, related_indicators, d
             raise validators.ValidationError('Unknown job type')
     # process_correlation(job.id, correlation.model_dump(by_alias=True), related_indicators)
     ( 
-        task| job_completed_with_error.si(job.id)).apply_async(
+        task | job_completed_with_error.si(job.id)).apply_async(
         countdown=POLL_INTERVAL, root_id=str(job.id), task_id=str(job.id)
     )
 
