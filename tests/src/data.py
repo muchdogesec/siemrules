@@ -1078,3 +1078,22 @@ MODIFY_2 = {
 description: This description has been modified twice
         """,
 }
+
+CORRELATION_RULE_1 = (
+    "0e95725d-7320-415d-80f7-004da920fc11", 
+'''
+title: Many failed logins
+description: "my description"
+correlation:
+    type: event_count
+    rules:
+        - 9e2536b0-988b-598d-8cc3-407f9f13fc61
+    group-by:
+        - ComputerName
+    timespan: 1h
+    condition:
+        gte: 100
+tags:
+    - tlp.amber
+'''
+)
