@@ -95,7 +95,7 @@ def run_txt2detection(file: models.File):
         **kwargs,
     )
     file.name = bundler.report.name
-    file.labels = bundler.report.labels
+    file.labels = bundler.report.get('labels', [])
     file.tlp_level = bundler.tlp_level.name
     file.references = bundler.reference_urls
     file.license = bundler.license
