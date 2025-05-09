@@ -102,15 +102,16 @@ class FileImage(models.Model):
 
 
 class JobState(models.TextChoices):
-    PENDING = "pending"
+    PENDING    = "pending"
     PROCESSING = "processing"
-    COMPLETED = "completed"
+    FAILED     = "failed"
+    COMPLETED  = "completed"
 
 class JobType(models.TextChoices):
-    FILE_SIGMA = "file.sigma"
-    FILE_FILE = "file.file"
-    FILE_TEXT = "file.text"
-    CORRELATION_SIGMA = "correlation.sigma"
+    FILE_SIGMA         = "file.sigma"
+    FILE_FILE          = "file.file"
+    FILE_TEXT          = "file.text"
+    CORRELATION_SIGMA  = "correlation.sigma"
     CORRELATION_PROMPT = "correlation.prompt"
     # BASE_MODIFY = "base-rule.modify"
     # CORRELATION_MODIFY = "correlation.modify"

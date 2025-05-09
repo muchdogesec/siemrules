@@ -8,7 +8,7 @@ from siemrules.siemrules import models
 from siemrules.siemrules.correlations.models import RuleModel
 from siemrules.siemrules.models import File
 from siemrules.worker.tasks import (
-    new_correlation_task, new_task, process_post, save_file, run_txt2detection, run_file2txt, upload_to_arango, job_completed_with_error, upload_objects
+    new_correlation_task, new_task, process_report, run_txt2detection, run_file2txt, upload_to_arango, job_completed, upload_objects
 )
 from siemrules.worker import tasks
 import stix2
@@ -20,12 +20,12 @@ from .utils import job
 def test_new_task(job):
     file = job.file
 
-    with patch("siemrules.worker.tasks.process_post.s") as mock_process_post, \
-         patch("siemrules.worker.tasks.job_completed_with_error.si") as mock_error_task:
+    with patch("siemrules.worker.tasks.process_report.s") as mock_process_report, \
+         patch("siemrules.worker.tasks.job_completed.si") as mock_error_task:
         
         new_task(job)
 
-        mock_process_post.assert_called_once_with(file.file.name, job.id)
+        mock_process_report.assert_called_once_with(file.file.name, job.id)
         mock_error_task.assert_called_once_with(job.id)
 
 
@@ -41,7 +41,7 @@ def test_new_correlation_task(job: models.Job, job_type):
     job.type = job_type
     with patch("siemrules.worker.tasks.process_correlation.s") as mock_process_correlation, \
         patch("siemrules.worker.tasks.process_correlation_ai.s") as mock_process_correlation_ai, \
-         patch("siemrules.worker.tasks.job_completed_with_error.si") as mock_error_task:
+         patch("siemrules.worker.tasks.job_completed.si") as mock_error_task:
         new_correlation_task(job, correlation, related_indicators, data)
         if job.type == models.JobType.CORRELATION_PROMPT:
             mock_process_correlation_ai.assert_called_once_with(job.id, data, related_indicators)
@@ -95,26 +95,6 @@ def test_process_correlation_ai(job):
             )
         )
         mock_upload_correlation.assert_called_once_with(mock_model_validate.return_value, related_indicators, job)
-
-@pytest.mark.django_db
-def test_save_file():
-    file_content = b"dummy content"
-    file = InMemoryUploadedFile(
-        file=mock_open(read_data=file_content)(),
-        field_name="file",
-        name="test.txt",
-        content_type="text/plain",
-        size=12,
-        charset=None
-    )
-
-    with patch("tempfile.mkstemp", return_value=(123, "/tmp/mockfile.txt")), \
-         patch("os.write") as mock_write:
-        
-        filename = save_file(file)
-        
-        assert filename == "/tmp/mockfile.txt"
-        mock_write.assert_called_once_with(123, file_content)
 
 @pytest.mark.django_db
 def test_run_txt2detection():
@@ -239,12 +219,12 @@ def test_upload_objects(job):
         mock_s2a_instance.run.assert_called_once()
 
 @pytest.mark.django_db
-def test_job_completed_with_error(job):
+def test_job_completed(job):
     job.state=models.JobState.PENDING
     job.save()
 
     with mock.patch('siemrules.siemrules.models.Job.objects.get', return_value=job):
-        job_completed_with_error(job.id)
+        job_completed(job.id)
 
     job.refresh_from_db()
     assert job.state == models.JobState.COMPLETED
@@ -252,13 +232,13 @@ def test_job_completed_with_error(job):
 
 
 @pytest.mark.django_db
-def test_process_post_success(job):
+def test_process_report_success(job):
 
     with mock.patch("siemrules.worker.tasks.run_file2txt", return_value=None) as mock_run_file2txt, \
         mock.patch("siemrules.worker.tasks.run_txt2detection", return_value="detection_bundle") as mock_run_txt2detection, \
         mock.patch("siemrules.worker.tasks.upload_to_arango", return_value=None) as mock_upload_to_arango:
 
-        process_post(job.file.name, job.id)
+        process_report(job.file.name, job.id)
 
         job.refresh_from_db()
         mock_run_file2txt.assert_called_once_with(job.file)
@@ -269,15 +249,13 @@ def test_process_post_success(job):
 
 
 @pytest.mark.django_db
-def test_process_post_fail(job):
+def test_process_report_fail(job):
 
     with mock.patch("siemrules.worker.tasks.run_file2txt", return_value=None, side_effect=ValueError("unexpected")) as mock_run_file2txt:
-
-        process_post(job.file.name, job.id)
+        with pytest.raises(ValueError):
+            process_report(job.file.name, job.id)
 
         # Assertions
         job.refresh_from_db()
         mock_run_file2txt.assert_called_once_with(job.file)
-        assert job.error is not None
-        assert job.state == models.JobState.PENDING
 
