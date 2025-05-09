@@ -11,6 +11,7 @@ from django.http import HttpRequest, HttpResponse
 from siemrules import settings
 import typing
 from stix2.serialization import serialize as stix2_serialize
+from dogesec_commons.objects.helpers import OBJECT_TYPES
 
 from siemrules.siemrules.utils import TLP_LEVEL_STIX_ID_MAPPING, TLP_Levels
 from siemrules.worker.tasks import upload_to_arango
@@ -180,22 +181,27 @@ def get_single_rule_versions(indicator_id):
         raise NotFound(f"no rule with id `{indicator_id}`")
     return Response(sorted([rule['modified'] for rule in rules], reverse=True))
 
-def get_objects_for_rule(indicator_id, version=None):
+def get_objects_for_rule(indicator_id, version=None, types: str=None):
+    types = types or ''
     r = request_from_queries(indicator_id=indicator_id, version=version)
     helper = ArangoDBHelper(settings.VIEW_NAME, r)
     rules = get_rules(r, paginate=False, nokeep=False)
     if not rules:
         raise NotFound(f"no rule with id `{indicator_id}`")
     rule = rules[0]
+
+
     query = '''
     LET rel_ids = (FOR rel IN siemrules_edge_collection FILTER rel._from == @rule_key OR rel._to == @rule_key RETURN [rel._from, rel._to, rel._id])
     LET obj_ids = FLATTEN([@rule_key, rel_ids], 3)
     FOR doc IN @@view
     FILTER doc._id IN obj_ids
+    FILTER NOT @types OR doc.type IN @types
     LIMIT @offset, @count
     RETURN KEEP(doc, KEYS(doc, TRUE))
     '''
-    return helper.execute_query(query, bind_vars={'rule_key': rule['_id'], '@view': settings.VIEW_NAME})
+    binds = {'rule_key': rule['_id'], '@view': settings.VIEW_NAME, "types": list(OBJECT_TYPES.intersection(types.split(","))) if types else None,}
+    return helper.execute_query(query, bind_vars=binds)
 
 
 def get_objects_by_id(indicator_id):

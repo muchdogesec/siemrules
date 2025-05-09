@@ -29,6 +29,7 @@ from siemrules.siemrules.serializers import (
     JobSerializer,
 )
 from rest_framework.exceptions import NotFound, ParseError
+from dogesec_commons.objects.helpers import OBJECT_TYPES
 
 from rest_framework import request
 from django.http import HttpRequest, HttpResponse
@@ -481,7 +482,14 @@ class JobView(
         ),
         responses=arangodb_helpers.ArangoDBHelper.get_paginated_response_schema(),
         parameters=arangodb_helpers.ArangoDBHelper.get_schema_operation_parameters() + [
-            OpenApiParameter('version', description="The version of the rule you want to retrieve (e.g. `2025-04-04T06:12:59.482478Z`). The `version` value is the same as the STIX objects `modified` time. You can see all of the versions of a rule using the version endpoint.",)
+            OpenApiParameter('version', description="The version of the rule you want to retrieve (e.g. `2025-04-04T06:12:59.482478Z`). The `version` value is the same as the STIX objects `modified` time. You can see all of the versions of a rule using the version endpoint.",),
+            OpenApiParameter(
+                "types",
+                many=True,
+                explode=False,
+                description="Filter the results by one or more STIX Object types",
+                enum=OBJECT_TYPES,
+            ),
         ],
     ),
 )
@@ -648,6 +656,7 @@ class RuleView(viewsets.GenericViewSet):
     def objects(self, request, *args, indicator_id=None, **kwargs):
         return arangodb_helpers.get_objects_for_rule(
             indicator_id, version=request.query_params.get("version"),
+            types=request.query_params.get("types"),
         )
     
 @extend_schema_view(
