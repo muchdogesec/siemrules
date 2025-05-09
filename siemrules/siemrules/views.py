@@ -410,6 +410,18 @@ class JobView(
             """
         ),
     ),
+    clone=extend_schema(
+        summary="Duplicate a Rule",
+        description=textwrap.dedent(
+            """
+            This endpoint allows you to duplicate the content of a Rule.
+
+            This body requires the following values:
+
+            Note, this will not delete the existing rule. It will create a new rule with a different id and response contains the newly created rule.
+            """
+        ),
+    ),
     versions=extend_schema(
         summary="Get all Versions of a Base Sigma Rule by ID",
         description=textwrap.dedent(
@@ -643,6 +655,15 @@ class RuleView(viewsets.GenericViewSet):
         s.is_valid(raise_exception=True)
         rev = arangodb_helpers.delete_rule(indicator_id, rule_date=s.initial_data['version'], delete=False)
         return self.retrieve(request, indicator_id=indicator_id)
+    
+
+    @extend_schema(request=serializers.RuleCloneSerializer)
+    @decorators.action(methods=['POST'], detail=True)
+    def clone(self, request, *args, indicator_id=None, **kwargs):
+        s = serializers.RuleCloneSerializer(data=request.data)
+        s.is_valid(raise_exception=True)
+        new_rule_indicator_id = arangodb_helpers.make_clone(indicator_id, s.validated_data)
+        return self.retrieve(request, indicator_id=new_rule_indicator_id)
 
     def destroy(self, request, *args, indicator_id=None, **kwargs):
         arangodb_helpers.delete_rule(indicator_id, 
@@ -753,7 +774,7 @@ class RuleViewWithCorrelationModifier(RuleView):
     @decorators.action(methods=['POST'], detail=True, url_path="modify/correlation-rule/manual", parser_classes=[SigmaRuleParser])
     def modify_correlation_manual(self, request, *args, indicator_id=None, **kwargs):
         report, indicator, all_objs = arangodb_helpers.get_objects_by_id(indicator_id)
-        old_rule = correlations.correlations.yaml_to_rule(
+        old_rule, _ = correlations.correlations.yaml_to_rule(
             indicator["pattern"]
         )
         new_rule = correlations.serializers.DRFCorrelationRuleModify.serialize_rule_from(old_rule, request.data)
@@ -787,7 +808,7 @@ class RuleViewWithCorrelationModifier(RuleView):
         report, indicator, all_objs = arangodb_helpers.get_objects_by_id(indicator_id)
         s = serializers.AIModifySerializer(data=request.data)
         s.is_valid(raise_exception=True)
-        old_detection = correlations.correlations.yaml_to_rule(
+        old_detection, _ = correlations.correlations.yaml_to_rule(
             indicator["pattern"]
         )
         new_rule = correlations.correlations.get_modification(

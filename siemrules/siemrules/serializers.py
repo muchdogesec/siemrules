@@ -163,3 +163,10 @@ class AIModifySerializer(serializers.Serializer):
 
 class RuleRevertSerializer(serializers.Serializer):
     version = serializers.DateTimeField()
+
+
+class RuleCloneSerializer(serializers.Serializer):
+    identity = STIXIdentityField(write_only=True, required=False, help_text='This will be used as the `created_by_ref` for all created SDOs and SROs. This is a full STIX Identity JSON. e.g. `{"type":"identity","spec_version":"2.1","id":"identity--b1ae1a15-6f4b-431e-b990-1b9678f35e15","name":"Dummy Identity"}`. If no value is passed, [the Stixify identity object will be used](https://raw.githubusercontent.com/muchdogesec/stix4doge/refs/heads/main/objects/identity/stixify.json). This is a txt2detection setting.')
+    tlp_level = serializers.ChoiceField(choices=TLP_Levels.choices, default=None, help_text='This will be assigned to all SDOs and SROs created. Stixify uses TLPv2. This is a txt2detection setting.')
+    title = serializers.CharField(default='Sigma Rule')
+    description = serializers.CharField(default='Description for Sigma Rule')
