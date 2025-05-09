@@ -73,7 +73,7 @@ class SchemaViewCached(SpectacularAPIView):
 
 @extend_schema_view(
     upload=extend_schema(
-        summary="Upload an intelligence report to convert into Sigma Rules",
+        summary="Upload an intelligence report to convert into Rules",
         description=textwrap.dedent(
             """
             Upload a file to be processed by SIEM Rules During processing a file is turned into markdown by [file2txt](https://github.com/muchdogesec/file2txt/), which is then passed to [txt2detection](https://github.com/muchdogesec/txt2detection/) to turn into rules.
@@ -85,10 +85,10 @@ class SchemaViewCached(SpectacularAPIView):
         ),
     ),
     sigma=extend_schema(
-        summary="Upload an existing Sigma Rule",
+        summary="Upload an existing Rule",
         description=textwrap.dedent(
             """
-            Upload a Sigma Rule yaml file to be processed by SIEM Rules, this file is passed as is to [txt2detection](https://github.com/muchdogesec/txt2detection/) to turn into rules.
+            Upload a Rule yaml file to be processed by SIEM Rules, this file is passed as is to [txt2detection](https://github.com/muchdogesec/txt2detection/) to turn into rules.
 
             Files cannot be modified once uploaded. If you need to reprocess a file, you must upload it again.
 
@@ -97,7 +97,7 @@ class SchemaViewCached(SpectacularAPIView):
         ),
     ),
     text=extend_schema(
-        summary="Enter a text input to convert into Sigma Rules",
+        summary="Enter a text input to convert into Rules",
         description=textwrap.dedent(
             """
             Create a file from a text input. During processing the created file is passed to [txt2detection](https://github.com/muchdogesec/txt2detection/) to turn into rules.
@@ -111,12 +111,12 @@ class SchemaViewCached(SpectacularAPIView):
             * `report_id` (optional): If you want to define the UUID of the STIX Report object you can use this property. Pass the entire report id, e.g. `report--26dd4dcb-0ebc-4a71-8d37-ffd88faed163`. The UUID part will also be used for the file ID. If not passed, this UUID will be randomly generated. Must be unique.
             * `ai_provider` (required): An AI provider and model to be used for rule generation in format `provider:model` e.g. `openai:gpt-4o`. This is a txt2detection setting.
             * `report_id` (optional): Only pass a UUIDv4. It will be use to generate the STIX Report ID, e.g. `report--<UUID>`. If not passed, this value will be randomly generated for this file. This is a txt2detection setting.
-            * `identity` (optional): This will be used as the `created_by_ref` for all created SDOs and SROs. This is a full STIX Identity JSON. e.g. `{"type":"identity","spec_version":"2.1","id":"identity--b1ae1a15-6f4b-431e-b990-1b9678f35e15","name":"Dummy Identity"}`. If no value is passed, the Stixify identity object will be used. This is a txt2detection setting.
+            * `identity` (optional): This will be used as the `created_by_ref` for all created SDOs and SROs. This is a full STIX Identity JSON. e.g. `{"type":"identity","spec_version":"2.1","id":"identity--b1ae1a15-6f4b-431e-b990-1b9678f35e15","name":"Dummy Identity"}`. If no value is passed, the SIEM Rules identity object will be used. This is a txt2detection setting.
             * `created` (optional) by default all object created times will take the time the script was run. If you want to explicitly set these times you can do so using this flag. Pass the value in the format `YYYY-MM-DDTHH:MM:SS` e.g. `2020-01-01T00:00:00`. This is a txt2detection setting.
-            * `tlp_level` (optional): This will be assigned to all SDOs and SROs created. Stixify uses TLPv2. This is a txt2detection setting.
-            * `labels` (optional): Will be added to the `labels` of the Report and Indicator SDOs created, and `tags` in the Sigma rule itself. This is a txt2detection setting.
-            * `references` (optional) A list of URLs to be added as `references` in the Sigma Rule property and in the `external_references` property of the Indicator and Report STIX object created (e.g. `https://www.dogesec.com`). This is a txt2detection setting. This is a txt2detection setting.
-             * `license` (optional): [License of the rule according the SPDX ID specification](https://spdx.org/licenses/) (e.g. `MIT`). Will be added to the Sigma rule. This is a txt2detection setting.
+            * `tlp_level` (optional): This will be assigned to all SDOs and SROs created. SIEM Rules uses TLPv2. This is a txt2detection setting.
+            * `labels` (optional): Will be added to the `labels` of the Report and Indicator SDOs created, and `tags` in the Rule itself. Must pass in format `namespace.value`. Cannot use the namespace `tlp`. This is a txt2detection setting.
+            * `references` (optional) A list of URLs to be added as `references` in the Rule property and in the `external_references` property of the Indicator and Report STIX object created (e.g. `https://www.dogesec.com`). This is a txt2detection setting. This is a txt2detection setting.
+             * `license` (optional): [License of the rule according the SPDX ID specification](https://spdx.org/licenses/) (e.g. `MIT`). Will be added to the Rule. This is a txt2detection setting.
             * `defang` (optional): Whether to defang the observables in the text. e.g. turns `1.1.1[.]1` to `1.1.1.1` for extraction. This is a file2txt setting.
             * `ignore_embedded_relationships` (optional, default: `false`): boolean, if `true` passed, this will stop ANY embedded relationships from being generated. This applies for all object types (SDO, SCO, SRO, SMO). If you want to target certain object types see `ignore_embedded_relationships_sro` and `ignore_embedded_relationships_sro` flags. This is a stix2arango setting.
             * `ignore_embedded_relationships_sro` (optional, default: false): boolean, if true passed, will stop any embedded relationships from being generated from SRO objects (type = `relationship`). This is a stix2arango setting.
@@ -351,7 +351,7 @@ class JobView(
             """
             Can be used to return Sigma Base and Correlation Rules.
 
-            Base Rules are created from the Files endpoints. During processing, txt2detection turns a File into one or more Base Sigma Rules.
+            Base Rules are created from the Files endpoints. During processing, txt2detection turns a File into one or more Base Rules.
 
             Correlation Rules can be created using the Rule endpoints. Correlation Rules reference one or more Base Rules
 
@@ -383,22 +383,28 @@ class JobView(
         ],
     ),
     destroy=extend_schema(
-        summary="Delete a Base Sigma Rule by ID",
+        summary="Delete a Rule by ID",
         description=textwrap.dedent(
             """
+            Can be used to delete Sigma Base and Correlation Rules.
+
             Use this endpoint to delete a Rule. All versions of the Rule that exist will be removed.
 
-            This endpoint will remove the Rule from the databases, and any references to it (e.g. in its corresponding `report` object). However, the original `report` object the rule was created from will still remain.
+            This endpoint will remove the `indicator` representing the rule, and any relationships linking to the Indicator.
+
+            If you are deleting a Base Rule, this endpoint will not delete the STIX report object representing the file this rule was generated from, nor any STIX objects representing observables extracted from the rule, MITRE ATT&CK enrichments, or CVE enrichments.
 
             If you wish to delete the `report` object and all `indicators` (rules) connected to it, use the Delete Reports endpoint.
             """
         ),
     ),
     revert=extend_schema(
-        summary="Revert a Base Rule to older version",
+        summary="Revert a Rule to older version",
         description=textwrap.dedent(
             """
-            This endpoint allows you to roll back (revert) the content of a Base Rule to an old version more easily.
+            Can be used to revert Sigma Base and Correlation Rules.
+
+            This endpoint allows you to roll back (revert) the content of a Rule to an old version.
 
             This body requires the following values:
 
@@ -409,16 +415,18 @@ class JobView(
         ),
     ),
     versions=extend_schema(
-        summary="Get all Versions of a Base Sigma Rule by ID",
+        summary="Get all Versions of a Rule by ID",
         description=textwrap.dedent(
             """
-            Base Rules can be modified over time. Each modification versions the Base Rule.
+            Can be used to return Sigma Base and Correlation Rules.
 
-            Use this endpoint to retrieve all versions of a Base Rule using its STIX Indicator ID.
+            Rules can be modified over time. Each modification versions the Rule.
 
-            If you do not know the ID of the Base Rule you can use the Search and retrieve created Base Rules endpoint.
+            Use this endpoint to retrieve all versions of a Rule using its STIX Indicator ID.
 
-            You can use the list of versions on the Get Base Rule endpoint to see each version of the Base Rule.
+            If you do not know the ID of the Rule you can use the GET Rules endpoint.
+
+            You can use the list of versions returned on this endpoint to get a specific version of a rule using the  GET Rule endpoint.
             """
         ),
     ),
@@ -426,7 +434,7 @@ class JobView(
         summary="Use AI to modify a Base Rule by ID",
         description=textwrap.dedent(
             """
-            Use this endpoint to get AI to modify a Sigma Rule via a prompt.
+            Use this endpoint to get AI to modify a Base Rule via a prompt.
 
             The following key / values are accepted in the body of the request:
 
@@ -436,12 +444,12 @@ class JobView(
         ),
     ),
     modify_base_rule_manual=extend_schema(
-        summary="Manually edit a Base Sigma Rule by ID",
+        summary="Manually edit a Base Rule by ID",
         description=textwrap.dedent(
             """
-            Use this endpoint to modify a Sigma Rule.
+            Use this endpoint to modify a Rule.
 
-            You can enter the following properties. You should only enter the parts of the Sigma Rule you wish to change. Any properties/values not passed will remain unchanged in the rule.
+            You can enter the following properties. You should only enter the parts of the Rule you wish to change. Any properties/values not passed will remain unchanged in the rule.
 
             To delete a property entirely from a rule (if not required property), pass the property without a value (you cannot do this on required field)
 
@@ -471,12 +479,12 @@ class JobView(
         ),
     ),
     objects=extend_schema(
-        summary="Get objects linked to Base Sigma Rule",
+        summary="Get objects linked to Base Rule",
         description=textwrap.dedent(
             """
-            A Base Sigma Rule can be directly linked to a range of other STIX objects representing MITRE ATT&CK references, CVE references, or detected observables inside the detection part of the rule.
+            A Base Rule can be directly linked to a range of other STIX objects representing MITRE ATT&CK references, CVE references, or detected observables inside the detection part of the rule.
 
-            Use the endpoint to return all objects linked a Base Sigma Rule, including the Base Sigma Rule.
+            Use the endpoint to return all objects linked a Base Rule, including the Base Rule.
             """
         ),
         responses=arangodb_helpers.ArangoDBHelper.get_paginated_response_schema(),
@@ -498,7 +506,7 @@ class RuleView(viewsets.GenericViewSet):
         OpenApiParameter(
             lookup_url_kwarg,
             location=OpenApiParameter.PATH,
-            description="The `id` of the Indicator. e.g. `indicator--3fa85f64-5717-4562-b3fc-2c963f66afa6`. Note the UUID part of the STIX `id` used here will match the `id` in the Sigma rule.",
+            description="The `id` of the Indicator. e.g. `indicator--3fa85f64-5717-4562-b3fc-2c963f66afa6`. Note the UUID part of the STIX `id` used here will match the `id` in the Rule.",
         )
     ]
 
@@ -553,7 +561,7 @@ class RuleView(viewsets.GenericViewSet):
         parameters=[
             OpenApiParameter(
                 "format",
-                description="The format of the report, either `sigma` (returns only the Sigma YAML) or `json` (returns the STIX 2.1 Indicator object containing the Sigma rule). Make sure to set the `Accept` header correctly.",
+                description="The format of the report, either `sigma` (returns only the Sigma YAML) or `json` (returns the STIX 2.1 Indicator object containing the Rule). Make sure to set the `Accept` header correctly.",
                 enum=["sigma", "json"],
             )
         ]
@@ -688,7 +696,7 @@ class RuleView(viewsets.GenericViewSet):
         summary="Use AI to modify a rule by ID",
         description=textwrap.dedent(
             """
-            Use this endpoint to get AI to modify a Sigma Rule via a prompt.
+            Use this endpoint to get AI to modify a Rule via a prompt.
 
             The following key / values are accepted in the body of the request:
 
@@ -699,7 +707,7 @@ class RuleView(viewsets.GenericViewSet):
     ),
 
     create_from_sigma=extend_schema(
-        summary="Create a Correlation Sigma Rule using YML",
+        summary="Create a Correlation Rule using YML",
         description=textwrap.dedent(
             """
             This endpoint is useful if you're comfortable writing a Sigma Correlation Rule.
@@ -724,7 +732,7 @@ class RuleView(viewsets.GenericViewSet):
         summary="Create A Correlation Rule from an AI prompt",
         description=textwrap.dedent(
             """
-            Use this endpoint to create a Correlation Sigma Rule via a prompt.
+            Use this endpoint to create a Correlation Rule via a prompt.
 
             The body of the request accepts:
 
