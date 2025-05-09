@@ -88,9 +88,13 @@ class SchemaViewCached(SpectacularAPIView):
         summary="Upload an existing Rule",
         description=textwrap.dedent(
             """
-            Upload a Rule yaml file to be processed by SIEM Rules, this file is passed as is to [txt2detection](https://github.com/muchdogesec/txt2detection/) to turn into rules.
+            If you have an existing Sigma Rule, you can upload it via this endpoint to create it as a Rule in SIEM Rules.
+
+            [The file uploaded will be first validated against the Sigma rule specification](https://github.com/SigmaHQ/sigma-specification/blob/main/specification/sigma-rules-specification.md). If it passed this check, the file is then passed to [txt2detection](https://github.com/muchdogesec/txt2detection/) to turn it into STIX objects.
 
             Files cannot be modified once uploaded. If you need to reprocess a file, you must upload it again.
+
+            Important, if the rule uploaded contains an existing `id` value, it will be changed by SIEM Rules to ensure collisions between IDs don't occur. The original `id` will be referenced inside the new rule under the `related` property.
 
             The response will contain the Job information, including the Job `id`. This can be used with the GET Jobs by ID endpoint to monitor the status of the Job.
             """
@@ -525,10 +529,10 @@ class RuleView(viewsets.GenericViewSet):
             choices=models.TLP_Levels.choices,
         )
         attack_id = BaseInFilter(
-            help_text="Filter the results return rules linked to a particular ATT&CK Technique. Pass the full ATT&CK ID, e.g. `T1047`."
+            help_text="Filter the results return rules linked to a particular ATT&CK Technique. Pass the full ATT&CK ID, e.g. `T1047`. Note, only Base Rules have ATT&CK tags."
         )
         cve_id = BaseInFilter(
-            help_text="Filter the results return rules linked to a particular CVE. Pass the full CVE ID, e.g. `CVE-2024-28374`."
+            help_text="Filter the results return rules linked to a particular CVE. Pass the full CVE ID, e.g. `CVE-2024-28374`. Note, only Base Rules have CVE tags."
         )
         created_by_ref = BaseInFilter(
             help_text="Filter the results by only the reports created by this identity. Pass the full STIX ID of the Identity object, e.g. `identity--b1ae1a15-6f4b-431e-b990-1b9678f35e15`."
@@ -546,7 +550,7 @@ class RuleView(viewsets.GenericViewSet):
         )
         rule_type = ChoiceFilter(
             choices=[("base-rule", "Base Rule"), ("correlation-rule", "Correlation Rule")],
-            help_text="Filter the results by rule_type. default: shows all type"
+            help_text="Filter the results by the rule type, either `base-rule` or `correlation-rule`. If none passed will return all types."
         )
 
     def get_renderers(self):
