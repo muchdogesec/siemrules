@@ -4,7 +4,8 @@ import itertools
 from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator, model_validator, NameEmail
 from typing import ClassVar, List, Dict, Optional
 from uuid import UUID
-from txt2detection.models import SigmaTag, BaseDetection, TLP_LEVEL
+from pydantic_core import Url
+from txt2detection.models import SigmaTag, BaseDetection, TLP_LEVEL, Statuses, Level, tlp_from_tags, set_tlp_level_in_tags
 
 
 class CorrelationType(str, Enum):
@@ -91,8 +92,15 @@ class BaseRuleModel(BaseModel):
     title: str = Field(min_length=3, description="Title of the Sigma rule")
     description: str = Field(min_length=10, description="Description of the Sigma rule")
     correlation: 'Correlation' = Field(..., description="Correlation configuration for the rule")
+    falsepositives: Optional[list[str]] = Field(description="False positives", default=None)
 
-class RuleModel(BaseRuleModel):
+class RuleModelExtraProperties(BaseModel):
+    references : Optional[list[str]] = None
+    status : Optional[Statuses] = None
+    level : Optional[Level] = None
+    
+
+class RuleModel(BaseRuleModel, RuleModelExtraProperties):
     author: Optional[str] = None
     date: Optional["dt_date"] = Field(default_factory=lambda: datetime.now(UTC).date())
     modified: Optional["dt_date"] = None
@@ -129,24 +137,6 @@ class RuleModel(BaseRuleModel):
     @rule_id.setter
     def rule_id(self, rule_id):
         self._rule_id = rule_id
-
-
-def tlp_from_tags(tags):
-    for tag in tags:
-        ns, _, level = tag.partition(".")
-        if ns != "tlp":
-            continue
-        if tlp_level := TLP_LEVEL.get(level.replace("-", "_")):
-            return tlp_level
-    return None
-
-def set_tlp_level_in_tags(tags, level):
-    level = str(level)
-    for i, tag in enumerate(tags):
-        if tag.startswith('tlp.'):
-            tags.remove(tag)
-    tags.append('tlp.'+level.replace("_", "-"))
-    return tags
 
 
 class AIRuleModel(BaseRuleModel):
