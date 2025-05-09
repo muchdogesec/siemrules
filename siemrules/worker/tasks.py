@@ -8,7 +8,7 @@ from siemrules.siemrules.correlations import correlations
 from siemrules.siemrules.correlations.models import RuleModel
 from siemrules.siemrules.models import Job, File, JobType
 from siemrules.siemrules import models
-from celery import shared_task
+from celery import Task, shared_task
 from txt2detection.utils import validate_token_count, parse_model as parse_ai_model
 from txt2detection.bundler import Bundler as txt2detectionBundler
 import txt2detection
@@ -36,13 +36,17 @@ POLL_INTERVAL = 1
 
 
 def new_task(job: Job):
-    task = process_post.s(job.file.file.name, job.id)
-    ( task| job_completed_with_error.si(job.id)).apply_async(
-        countdown=POLL_INTERVAL, root_id=str(job.id), task_id=str(job.id)
+    task: Task = process_report.s(job.file.file.name, job.id)
+    
+    task.apply_async(
+        countdown=POLL_INTERVAL, root_id=str(job.id), task_id=str(job.id),
+        link=job_completed.si(job.id),
+        link_error=job_failed.s(job_id=job.id),
     )
 
 def new_correlation_task(job: Job, correlation: RuleModel, related_indicators, data):
     assert job.type in [JobType.CORRELATION_PROMPT, JobType.CORRELATION_SIGMA], f"unsupported {job.type=}"
+    task : Task
     match job.type:
         case JobType.CORRELATION_SIGMA:
             task = process_correlation.s(job.id, correlation.model_dump(by_alias=True), related_indicators)
@@ -51,17 +55,11 @@ def new_correlation_task(job: Job, correlation: RuleModel, related_indicators, d
         case _:
             raise validators.ValidationError('Unknown job type')
     # process_correlation(job.id, correlation.model_dump(by_alias=True), related_indicators)
-    ( 
-        task | job_completed_with_error.si(job.id)).apply_async(
-        countdown=POLL_INTERVAL, root_id=str(job.id), task_id=str(job.id)
+    task.apply_async(
+        countdown=POLL_INTERVAL, root_id=str(job.id), task_id=str(job.id),
+        link=job_completed.si(job.id),
+        link_error=job_failed.s(job_id=job.id),
     )
-
-def save_file(file: InMemoryUploadedFile):
-    filename = Path(file.name).name
-    print("name=", file.name, filename)
-    fd, filename = tempfile.mkstemp(suffix='--'+filename, prefix='file--')
-    os.write(fd, file.read())
-    return filename
 
 def run_txt2detection(file: models.File):
     input_str = None
@@ -163,7 +161,7 @@ def make_bundle(objects):
 
 
 @shared_task
-def process_post(filename, job_id, *args):
+def process_report(filename, job_id, *args):
     job = Job.objects.get(id=job_id)
     try:
         if job.file.mode == 'sigma':
@@ -174,9 +172,9 @@ def process_post(filename, job_id, *args):
         upload_to_arango(job, bundle)
         job.file.save()
     except Exception as e:
-        job.error = f"report failed to process with: {e}"
-        logging.error(job.error)
-        logging.exception(e)
+        error = f"report failed to process with: {e}"
+        logging.exception(error)
+        raise 
     job.save()
     return job_id
 
@@ -210,7 +208,16 @@ def process_correlation_ai(job_id, data, related_indicators):
 
 
 @shared_task
-def job_completed_with_error(job_id):
+def job_completed(job_id):
     job = Job.objects.get(pk=job_id)
     job.state = models.JobState.COMPLETED
+    job.save()
+
+@shared_task
+def job_failed(request, exc, traceback, job_id=None):
+    logging.error('Task {0} with job_id {3} raised exception: {1!r}\n{2!r}'.format(
+          request.id, exc, traceback, job_id))
+    job = Job.objects.get(pk=job_id)
+    job.state = models.JobState.FAILED
+    job.error = f"{type(exc)}: {exc}"
     job.save()
