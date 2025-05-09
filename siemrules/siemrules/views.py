@@ -828,6 +828,7 @@ class RuleViewWithCorrelationModifier(RuleView):
         rule_s = DRFCorrelationRule.drf_serializer(data=request.data)
         rule_s.is_valid(raise_exception=True)
         rule = DRFCorrelationRule.model_validate(rule_s.data)
+
         related_indicators = []
         if rule.correlation.rules:
             related_indicators = self.get_rules(rule.correlation.rules)

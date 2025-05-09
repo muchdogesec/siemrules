@@ -2,7 +2,7 @@ import copy
 from datetime import datetime, UTC
 from siemrules.siemrules.serializers import validate_model
 from siemrules.siemrules.utils import TLP_Levels
-from .models import RuleModel as CorrelationRule, Correlation, BaseRuleModel, set_tlp_level_in_tags, tlp_from_tags
+from .models import RuleModel as CorrelationRule, Correlation, BaseRuleModel, RuleModelExtraProperties, set_tlp_level_in_tags, tlp_from_tags
 from drf_pydantic import BaseModel as DRFBaseModel, DrfPydanticSerializer
 from drf_pydantic.parse import create_serializer_from_model, SERIALIZER_REGISTRY
 from rest_framework import serializers
@@ -31,7 +31,7 @@ class DRFCorrelationRule(DRFBaseModel, CorrelationRule):
 def default_tags_factory():
     return ['tlp.clear']
 
-class DRFCorrelationRuleModify(DRFBaseModel, BaseRuleModel):
+class DRFCorrelationRuleModify(DRFBaseModel, BaseRuleModel, RuleModelExtraProperties):
     tags: Optional[list[SigmaTag]] = Field(default_factory=default_tags_factory)
     drf_config = {"validate_pydantic": True}
 
