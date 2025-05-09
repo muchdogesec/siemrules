@@ -346,23 +346,29 @@ class JobView(
 
 @extend_schema_view(
     list=extend_schema(
-        summary="Search and retrieve created Base Sigma Rules",
+        summary="Search and retrieve created Rules",
         description=textwrap.dedent(
             """
-            During processing, txt2detection turns a File into one or more Base Sigma Rules.
+            Can be used to return Sigma Base and Correlation Rules.
 
-            You can use this endpoint to retrieve them.
+            Base Rules are created from the Files endpoints. During processing, txt2detection turns a File into one or more Base Sigma Rules.
+
+            Correlation Rules can be created using the Rule endpoints. Correlation Rules reference one or more Base Rules
+
+            You can use this endpoint to retrieve either type of rule. Filter by `rule_type` if you want a specific type.
             """
         ),
         responses={200: serializers.RuleSerializer, 400: DEFAULT_400_ERROR},
     ),
     retrieve=extend_schema(
-        summary="Get a Base Sigma Rule by ID",
+        summary="Get a Rule by ID",
         description=textwrap.dedent(
             """
-            Use this endpoint to retrieve a Base Rule using its STIX Indicator ID.
+            Can be used to return Sigma Base and Correlation Rules.
 
-            If you do not know the ID of the Base Rule you can use the Search and retrieve created Base Rules endpoint.
+            Use this endpoint to retrieve a Rule using its STIX Indicator ID.
+
+            If you do not know the ID of the Rule you can use the GET Rules endpoint.
             """
         ),
         responses={
@@ -480,7 +486,7 @@ class JobView(
     ),
 )
 class RuleView(viewsets.GenericViewSet):
-    openapi_tags = ["Base Rules"]
+    openapi_tags = ["Rules"]
     pagination_class = Pagination("rules")
     serializer_class = serializers.RuleSerializer
     lookup_url_kwarg = "indicator_id"
