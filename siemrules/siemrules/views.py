@@ -29,6 +29,7 @@ from siemrules.siemrules.serializers import (
     JobSerializer,
 )
 from rest_framework.exceptions import NotFound, ParseError
+from dogesec_commons.objects.helpers import OBJECT_TYPES
 
 from rest_framework import request
 from django.http import HttpRequest, HttpResponse
@@ -495,7 +496,14 @@ class JobView(
         ),
         responses=arangodb_helpers.ArangoDBHelper.get_paginated_response_schema(),
         parameters=arangodb_helpers.ArangoDBHelper.get_schema_operation_parameters() + [
-            OpenApiParameter('version', description="The version of the rule you want to retrieve (e.g. `2025-04-04T06:12:59.482478Z`). The `version` value is the same as the STIX objects `modified` time. You can see all of the versions of a rule using the version endpoint.",)
+            OpenApiParameter('version', description="The version of the rule you want to retrieve (e.g. `2025-04-04T06:12:59.482478Z`). The `version` value is the same as the STIX objects `modified` time. You can see all of the versions of a rule using the version endpoint.",),
+            OpenApiParameter(
+                "types",
+                many=True,
+                explode=False,
+                description="Filter the results by one or more STIX Object types",
+                enum=OBJECT_TYPES,
+            ),
         ],
     ),
 )
@@ -544,9 +552,6 @@ class RuleView(viewsets.GenericViewSet):
             choices=[(f, f) for f in arangodb_helpers.RULES_SORT_FIELDS],
         )
         visible_to = CharFilter(help_text="Only show rules that are visible to the Identity id passed. e.g. passing `identity--b1ae1a15-6f4b-431e-b990-1b9678f35e15` would only show rules created by that identity (with any TLP level) or reports created by another identity ID but only if they are marked with `TLP:CLEAR` or `TLP:GREEN`.")
-        correlation_rule = BaseInFilter(
-            help_text="Filter the results by the id of correlation rules that contain rule. Pass the full STIX ID of the Indicator object, e.g. `indicator--3fa85f64-5717-4562-b3fc-2c963f66afa6`."
-        )
         report_id = BaseInFilter(
             help_text="Filter the results by the report_id of the rule. Pass the full STIX ID of the Indicator object, e.g. `report--3fa85f64-5717-4562-b3fc-2c963f66afa6`."
         )
@@ -674,6 +679,7 @@ class RuleView(viewsets.GenericViewSet):
     def objects(self, request, *args, indicator_id=None, **kwargs):
         return arangodb_helpers.get_objects_for_rule(
             indicator_id, version=request.query_params.get("version"),
+            types=request.query_params.get("types"),
         )
     
 @extend_schema_view(

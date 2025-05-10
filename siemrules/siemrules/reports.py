@@ -3,6 +3,7 @@ import uuid
 from rest_framework import viewsets, decorators, status, exceptions, request, validators
 from django.http import HttpRequest
 from rest_framework.response import Response
+from dogesec_commons.objects.helpers import OBJECT_TYPES
 
 from drf_spectacular.utils import OpenApiParameter
 from drf_spectacular.types import OpenApiTypes
@@ -148,7 +149,15 @@ class ReportView(viewsets.ViewSet):
     
     @extend_schema(
         responses=ArangoDBHelper.get_paginated_response_schema(),
-        parameters=ArangoDBHelper.get_schema_operation_parameters(),
+        parameters=ArangoDBHelper.get_schema_operation_parameters() + [
+            OpenApiParameter(
+                "types",
+                many=True,
+                explode=False,
+                description="Filter the results by one or more STIX Object types",
+                enum=OBJECT_TYPES,
+            ),
+        ],
     )
     @decorators.action(methods=["GET"], detail=True)
     def objects(self, request, *args, report_id=..., **kwargs):
@@ -234,13 +243,16 @@ class ReportView(viewsets.ViewSet):
 
     def get_report_objects(self, report_id):
         helper = ArangoDBHelper(settings.VIEW_NAME, self.request)
+        types = helper.query.get('types', "")
         bind_vars = {
-                "@collection": settings.VIEW_NAME,
-                'report_id': report_id,                
+            "@collection": settings.VIEW_NAME,
+            'report_id': report_id,
+            "types": list(OBJECT_TYPES.intersection(types.split(","))) if types else None,
         }
         query = """
             FOR doc in @@collection
             FILTER doc._stixify_report_id == @report_id
+            FILTER NOT @types OR doc.type IN @types
             
             LIMIT @offset, @count
             RETURN KEEP(doc, KEYS(doc, TRUE))
