@@ -427,9 +427,18 @@ class JobView(
             """
             This endpoint allows you to duplicate the content of a Rule.
 
+            It will also clone any external enrichments (MITRE ATT&CK and Vulnerabilities) as well as an extracted Observables.
+
+            Note, this rule will be linked original Indicator object using an SRO created by the `identity` used to clone it. It will not be directly linked to a Report or File object.
+
             This body requires the following values:
 
-            Note, this will not delete the existing rule. It will create a new rule with a different id and response contains the newly created rule.
+            * `identity` (optional): This will be used as the `created_by_ref` for all created SDOs and SROs. This is a full STIX Identity JSON. e.g. `{"type":"identity","spec_version":"2.1","id":"identity--b1ae1a15-6f4b-431e-b990-1b9678f35e15","name":"Dummy Identity"}`. If no value is passed, the SIEM Rules identity object will be used.
+            * `title` (optional): The `title` of the rule. If none passed, the current `title` of the rule will be used.
+            * `description` (optional): The `description` of the rule. If none passed, the current `description` of the rule will be used.
+            * `tlp_level` (optional, dictionary): either `clear`, `green`, `amber`, `amber+strict`, `red`. If none passed, the current TLP level of the rule will be used.
+
+            You cannot modify any other values when cloning a rule. Edit the rule after cloning it to do this.
             """
         ),
     ),
@@ -707,7 +716,7 @@ class RuleView(viewsets.GenericViewSet):
 
             * `title` (optional): if passed, cannot be blank. Used as the rule `title`. Will overwrite existing value.
             * `description` (optional): if passed, used as the rule `description`.  Will overwrite existing value.
-            * `tags` (optional): in format `NAMESPACE.TAG` (e.g. `threat-actor.someone`). Cannot use the reserved namespaces `attack.`, `cve.` or `tlp. If you wish to use reserved tags `attack.` or `cve,`, update one of the Base Rules used in this Correlation Rule with the desired tag. Will be appended to existing values. If you want to delete all tags list, pass this property as empty.
+            * `tags` (optional): in format `NAMESPACE.TAG` (e.g. `threat-actor.someone`). Cannot use the reserved namespaces `attack.`, `cve.` or `tlp`. If you wish to use reserved tags `attack.` or `cve,`, update one of the Base Rules used in this Correlation Rule with the desired tag. Will be appended to existing values. If you want to change the `tlp` level of the rule, you must delete and recreate or just clone it. If you want to delete all tags list, pass this property as empty (will not delete `tlp.` tags)
             * `status` (optional, dictionary): the status of the rule, either `stable`, `test`, `experimental`, `deprecated`, `unsupported`. Will overwrite any existing value.
             * `level` (optional, dictionary): the level of the rule, either `informational`, `low`, `medium`, `high`, `critical`. Will overwrite any existing value.
             * `falsepositives` (list of strings): the `falsepositives` displayed in the rule. Will append to any existing values. To delete all `falsepositives`, pass this property as empty.
@@ -763,11 +772,11 @@ class RuleView(viewsets.GenericViewSet):
 
             * `title` (required): used as the rule `title`
             * `description` (optional) used as the rule `description`
-            * `author` (optional): A full STIX 2.1 identity object (make sure to properly escape). Will be validated by the STIX2 library. The ID is used to create the Indicator STIX object, and is used as the `author` property in the Sigma Correlation Rule. If not passed, the SIEM Rules Identity object will be used.
+            * `author` (optional): A full STIX 2.1 identity object (make sure to properly escape). Will be validated by the STIX2 library. The ID is used to create the Indicator STIX object, and is used as the `author` property in the Sigma Correlation Rule. If not passed, the SIEM Rules Identity object will be used. e.g. `{"type":"identity","spec_version":"2.1","id":"identity--b1ae1a15-6f4b-431e-b990-1b9678f35e15","name":"Dummy Identity"}`
             * `date` (optional, date): will be used at the `created` time in the Indicator object generated and `date` value in the Sigma Correlation Rule. Default is now. Must be lower than `date`. In format `YYYY-MM-DD` (e.g. `2000-01-31`).
             * `modified` (optional, date): will be used at the `modified` time in the Indicator object generated and `modified` value in the Sigma Correlation Rule. Default is now. Must be higher than `date`. In format `YYYY-MM-DD` (e.g. `2000-01-31`).
-            * `tlp_level` (optional, dictionary): TLP level assigned to the Indicator object and in the `tags` of the Sigma Correlation Rule. Either `clear`, `green`, `amber`, `amber+strict`, or `red`.
-            * `tags` (optional): in format `NAMESPACE.TAG` (e.g. `threat-actor.someone`). Cannot use the reserved namespaces `attack.`, `cve.` or `tlp. If you wish to use reserved tags `attack.` or `cve,`, update one of the Base Rules used in this Correlation Rule with the desired tag.
+            * `tags` (`tlp.` required): in format `NAMESPACE.TAG` (e.g. `threat-actor.someone`). Cannot use the reserved namespaces `attack.`, `cve.` If you wish to use reserved tags `attack.` or `cve,`, update one of the Base Rules used in this Correlation Rule with the desired tag.
+                * `tlp.XXX`: you must assign a TLP level to the rule replacing XXX with either `clear`, `green`, `amber`, `amber+strict`, `red`. Not TLP cannot be changed once the rule is created.
             * `status` (optional, dictionary): the status of the rule, either `stable`, `test`, `experimental`, `deprecated`, `unsupported`.
             * `level` (optional, dictionary): the level of the rule, either `informational`, `low`, `medium`, `high`, `critical`.
             * `falsepositives` (optional, list of strings): the `falsepositives` displayed in the rule.
@@ -801,7 +810,7 @@ class RuleView(viewsets.GenericViewSet):
                 * creating Correlation from a single rule; `create a Sigma correlation when this Sigma rule with ID <ID> is triggered 5 times over a 10 minute period`
                 * creating a Correlation from multiple rules; `create a Sigma correlation when the Sigma rule with ID <ID> is triggered followed by the Sigma rule with ID <ID> being triggered within a 2 minute period.
             * `ai_provider` (required): An AI provider and model to be used for rule generation in format `provider:model` e.g. `openai:gpt-4o`. This is a txt2detection setting.
-            * `author` (optional): A full STIX 2.1 identity object (make sure to properly escape). Will be validated by the STIX2 library. The ID is used to create the Indicator STIX object, and is used as the `author` property in the Sigma Correlation Rule. If not passed, the SIEM Rules Identity object will be used.
+            * `author` (optional): A full STIX 2.1 identity object (make sure to properly escape). Will be validated by the STIX2 library. The ID is used to create the Indicator STIX object, and is used as the `author` property in the Sigma Correlation Rule. If not passed, the SIEM Rules Identity object will be used. e.g. `{"type":"identity","spec_version":"2.1","id":"identity--b1ae1a15-6f4b-431e-b990-1b9678f35e15","name":"Dummy Identity"}`
             * `date` (optional): will be used at the `created` time in the Indicator object generated and `date` value in the Sigma Correlation Rule. Default is now. Must be lower than `date`. In format `YYYY-MM-DD` (e.g. `2000-01-31`).
             * `modified`: will be used at the `modified` time in the Indicator object generated and `modified` value in the Sigma Correlation Rule. Default is now. Must be higher than `date`. In format `YYYY-MM-DD` (e.g. `2000-01-31`).
             * `tlp_level` (optional): TLP level assigned to the Indicator object and in the `tags` of the Sigma Correlation Rule. Either `clear`, `green`, `amber`, `amber+strict`, or `red`. Default if not passed is `clear`.
@@ -815,7 +824,9 @@ class RuleView(viewsets.GenericViewSet):
             * `id`: this is auto-generated by SIEM Rules
             * `title`: generated by the AI, can be modified later
             * `description`: generated by the AI, can be modified later
-            * `related`: this is not considered during the creation of a new rule. Can be modified later
+            * `related`: this is not considered during the creation of a new rule.
+
+            If the request is successful, the response will contain a job `id` you can use with the Jobs endpoints.
             """
         ),
     ),

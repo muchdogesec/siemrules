@@ -209,15 +209,13 @@ SPECTACULAR_SETTINGS = {
     "TITLE": "SIEM Rules API",
     "DESCRIPTION": dedent(
         """
-        SIEM Rules takes reports containing threat intelligence and turns them into detection rules.\n\n
-        [DOGESEC](https://www.dogesec.com/) offer a fully hosted web version of SIEM Rules which includes many additional features over those in this codebase. [You can find out more about the web version here](https://www.siemrules.com/)
+        SIEM Rules is a detection rules database.\n\n
+        Upload reports containing threat intelligence and SIEM Rules will write detection rules for the information they hold.\n\n
+        You are using the open-source version of SIEM Rules available at [github.com/muchdogesec/siemrules](https://github.com/muchdogesec/siemrules)\n\n
+        A fully hosted version of SIEM Rules, with many more advanced features can be found at [siemrules.com](https://www.siemrules.com)
         """
     ),
     "VERSION": "1.0.0",
-    "CONTACT": {
-        "email": "noreply@dogesec.com",
-        "url": "https://github.com/muchdogesec/siemrules",
-    },
     "TAGS": [
         {"name": "Files", "description": "Upload files and retrieve uploaded files that create Base Rules"},
         {"name": "Reports", "description": "Search and retrieve Reports created from uploaded files"},
