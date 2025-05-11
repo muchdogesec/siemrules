@@ -75,7 +75,7 @@ class SchemaViewCached(SpectacularAPIView):
 
 @extend_schema_view(
     upload=extend_schema(
-        summary="Upload an intelligence report to convert into Sigma Rules",
+        summary="Upload an intelligence report to convert into Rules",
         description=textwrap.dedent(
             """
             Upload a file to be processed by SIEM Rules During processing a file is turned into markdown by [file2txt](https://github.com/muchdogesec/file2txt/), which is then passed to [txt2detection](https://github.com/muchdogesec/txt2detection/) to turn into rules.
@@ -87,19 +87,23 @@ class SchemaViewCached(SpectacularAPIView):
         ),
     ),
     sigma=extend_schema(
-        summary="Upload an existing Sigma Rule",
+        summary="Upload an existing Rule",
         description=textwrap.dedent(
             """
-            Upload a Sigma Rule yaml file to be processed by SIEM Rules, this file is passed as is to [txt2detection](https://github.com/muchdogesec/txt2detection/) to turn into rules.
+            If you have an existing Sigma Rule, you can upload it via this endpoint to create it as a Rule in SIEM Rules.
+
+            [The file uploaded will be first validated against the Sigma rule specification](https://github.com/SigmaHQ/sigma-specification/blob/main/specification/sigma-rules-specification.md). If it passed this check, the file is then passed to [txt2detection](https://github.com/muchdogesec/txt2detection/) to turn it into STIX objects.
 
             Files cannot be modified once uploaded. If you need to reprocess a file, you must upload it again.
+
+            Important, if the rule uploaded contains an existing `id` value, it will be changed by SIEM Rules to ensure collisions between IDs don't occur. The original `id` will be referenced inside the new rule under the `related` property.
 
             The response will contain the Job information, including the Job `id`. This can be used with the GET Jobs by ID endpoint to monitor the status of the Job.
             """
         ),
     ),
     text=extend_schema(
-        summary="Enter a text input to convert into Sigma Rules",
+        summary="Enter a text input to convert into Rules",
         description=textwrap.dedent(
             """
             Create a file from a text input. During processing the created file is passed to [txt2detection](https://github.com/muchdogesec/txt2detection/) to turn into rules.
@@ -113,12 +117,12 @@ class SchemaViewCached(SpectacularAPIView):
             * `report_id` (optional): If you want to define the UUID of the STIX Report object you can use this property. Pass the entire report id, e.g. `report--26dd4dcb-0ebc-4a71-8d37-ffd88faed163`. The UUID part will also be used for the file ID. If not passed, this UUID will be randomly generated. Must be unique.
             * `ai_provider` (required): An AI provider and model to be used for rule generation in format `provider:model` e.g. `openai:gpt-4o`. This is a txt2detection setting.
             * `report_id` (optional): Only pass a UUIDv4. It will be use to generate the STIX Report ID, e.g. `report--<UUID>`. If not passed, this value will be randomly generated for this file. This is a txt2detection setting.
-            * `identity` (optional): This will be used as the `created_by_ref` for all created SDOs and SROs. This is a full STIX Identity JSON. e.g. `{"type":"identity","spec_version":"2.1","id":"identity--b1ae1a15-6f4b-431e-b990-1b9678f35e15","name":"Dummy Identity"}`. If no value is passed, the Stixify identity object will be used. This is a txt2detection setting.
+            * `identity` (optional): This will be used as the `created_by_ref` for all created SDOs and SROs. This is a full STIX Identity JSON. e.g. `{"type":"identity","spec_version":"2.1","id":"identity--b1ae1a15-6f4b-431e-b990-1b9678f35e15","name":"Dummy Identity"}`. If no value is passed, the SIEM Rules identity object will be used. This is a txt2detection setting.
             * `created` (optional) by default all object created times will take the time the script was run. If you want to explicitly set these times you can do so using this flag. Pass the value in the format `YYYY-MM-DDTHH:MM:SS` e.g. `2020-01-01T00:00:00`. This is a txt2detection setting.
-            * `tlp_level` (optional): This will be assigned to all SDOs and SROs created. Stixify uses TLPv2. This is a txt2detection setting.
-            * `labels` (optional): Will be added to the `labels` of the Report and Indicator SDOs created, and `tags` in the Sigma rule itself. This is a txt2detection setting.
-            * `references` (optional) A list of URLs to be added as `references` in the Sigma Rule property and in the `external_references` property of the Indicator and Report STIX object created (e.g. `https://www.dogesec.com`). This is a txt2detection setting. This is a txt2detection setting.
-             * `license` (optional): [License of the rule according the SPDX ID specification](https://spdx.org/licenses/) (e.g. `MIT`). Will be added to the Sigma rule. This is a txt2detection setting.
+            * `tlp_level` (optional): This will be assigned to all SDOs and SROs created. SIEM Rules uses TLPv2. This is a txt2detection setting.
+            * `labels` (optional): Will be added to the `labels` of the Report and Indicator SDOs created, and `tags` in the Rule itself. Must pass in format `namespace.value`. Cannot use the namespace `tlp`. This is a txt2detection setting.
+            * `references` (optional) A list of URLs to be added as `references` in the Rule property and in the `external_references` property of the Indicator and Report STIX object created (e.g. `https://www.dogesec.com`). This is a txt2detection setting. This is a txt2detection setting.
+             * `license` (optional): [License of the rule according the SPDX ID specification](https://spdx.org/licenses/) (e.g. `MIT`). Will be added to the Rule. This is a txt2detection setting.
             * `defang` (optional): Whether to defang the observables in the text. e.g. turns `1.1.1[.]1` to `1.1.1.1` for extraction. This is a file2txt setting.
             * `ignore_embedded_relationships` (optional, default: `false`): boolean, if `true` passed, this will stop ANY embedded relationships from being generated. This applies for all object types (SDO, SCO, SRO, SMO). If you want to target certain object types see `ignore_embedded_relationships_sro` and `ignore_embedded_relationships_sro` flags. This is a stix2arango setting.
             * `ignore_embedded_relationships_sro` (optional, default: false): boolean, if true passed, will stop any embedded relationships from being generated from SRO objects (type = `relationship`). This is a stix2arango setting.
@@ -354,7 +358,7 @@ class JobView(
             """
             Can be used to return Sigma Base and Correlation Rules.
 
-            Base Rules are created from the Files endpoints. During processing, txt2detection turns a File into one or more Base Sigma Rules.
+            Base Rules are created from the Files endpoints. During processing, txt2detection turns a File into one or more Base Rules.
 
             Correlation Rules can be created using the Rule endpoints. Correlation Rules reference one or more Base Rules
 
@@ -386,22 +390,28 @@ class JobView(
         ],
     ),
     destroy=extend_schema(
-        summary="Delete a Base Sigma Rule by ID",
+        summary="Delete a Rule by ID",
         description=textwrap.dedent(
             """
+            Can be used to delete Sigma Base and Correlation Rules.
+
             Use this endpoint to delete a Rule. All versions of the Rule that exist will be removed.
 
-            This endpoint will remove the Rule from the databases, and any references to it (e.g. in its corresponding `report` object). However, the original `report` object the rule was created from will still remain.
+            This endpoint will remove the `indicator` representing the rule, and any relationships linking to the Indicator.
+
+            If you are deleting a Base Rule, this endpoint will not delete the STIX report object representing the file this rule was generated from, nor any STIX objects representing observables extracted from the rule, MITRE ATT&CK enrichments, or CVE enrichments.
 
             If you wish to delete the `report` object and all `indicators` (rules) connected to it, use the Delete Reports endpoint.
             """
         ),
     ),
     revert=extend_schema(
-        summary="Revert a Base Rule to older version",
+        summary="Revert a Rule to older version",
         description=textwrap.dedent(
             """
-            This endpoint allows you to roll back (revert) the content of a Base Rule to an old version more easily.
+            Can be used to revert Sigma Base and Correlation Rules.
+
+            This endpoint allows you to roll back (revert) the content of a Rule to an old version.
 
             This body requires the following values:
 
@@ -424,16 +434,18 @@ class JobView(
         ),
     ),
     versions=extend_schema(
-        summary="Get all Versions of a Base Sigma Rule by ID",
+        summary="Get all Versions of a Rule by ID",
         description=textwrap.dedent(
             """
-            Base Rules can be modified over time. Each modification versions the Base Rule.
+            Can be used to return Sigma Base and Correlation Rules.
 
-            Use this endpoint to retrieve all versions of a Base Rule using its STIX Indicator ID.
+            Rules can be modified over time. Each modification versions the Rule.
 
-            If you do not know the ID of the Base Rule you can use the Search and retrieve created Base Rules endpoint.
+            Use this endpoint to retrieve all versions of a Rule using its STIX Indicator ID.
 
-            You can use the list of versions on the Get Base Rule endpoint to see each version of the Base Rule.
+            If you do not know the ID of the Rule you can use the GET Rules endpoint.
+
+            You can use the list of versions returned on this endpoint to get a specific version of a rule using the  GET Rule endpoint.
             """
         ),
     ),
@@ -441,7 +453,7 @@ class JobView(
         summary="Use AI to modify a Base Rule by ID",
         description=textwrap.dedent(
             """
-            Use this endpoint to get AI to modify a Sigma Rule via a prompt.
+            Use this endpoint to get AI to modify a Base Rule via a prompt.
 
             The following key / values are accepted in the body of the request:
 
@@ -451,12 +463,12 @@ class JobView(
         ),
     ),
     modify_base_rule_manual=extend_schema(
-        summary="Manually edit a Base Sigma Rule by ID",
+        summary="Manually edit a Base Rule by ID",
         description=textwrap.dedent(
             """
-            Use this endpoint to modify a Sigma Rule.
+            Use this endpoint to modify a Rule.
 
-            You can enter the following properties. You should only enter the parts of the Sigma Rule you wish to change. Any properties/values not passed will remain unchanged in the rule.
+            You can enter the following properties. You should only enter the parts of the Rule you wish to change. Any properties/values not passed will remain unchanged in the rule.
 
             To delete a property entirely from a rule (if not required property), pass the property without a value (you cannot do this on required field)
 
@@ -486,12 +498,12 @@ class JobView(
         ),
     ),
     objects=extend_schema(
-        summary="Get objects linked to Base Sigma Rule",
+        summary="Get objects linked to Base Rule",
         description=textwrap.dedent(
             """
-            A Base Sigma Rule can be directly linked to a range of other STIX objects representing MITRE ATT&CK references, CVE references, or detected observables inside the detection part of the rule.
+            A Base Rule can be directly linked to a range of other STIX objects representing MITRE ATT&CK references, CVE references, or detected observables inside the detection part of the rule.
 
-            Use the endpoint to return all objects linked a Base Sigma Rule, including the Base Sigma Rule.
+            Use the endpoint to return all objects linked a Base Rule, including the Base Rule.
             """
         ),
         responses=arangodb_helpers.ArangoDBHelper.get_paginated_response_schema(),
@@ -520,7 +532,7 @@ class RuleView(viewsets.GenericViewSet):
         OpenApiParameter(
             lookup_url_kwarg,
             location=OpenApiParameter.PATH,
-            description="The `id` of the Indicator. e.g. `indicator--3fa85f64-5717-4562-b3fc-2c963f66afa6`. Note the UUID part of the STIX `id` used here will match the `id` in the Sigma rule.",
+            description="The `id` of the Indicator. e.g. `indicator--3fa85f64-5717-4562-b3fc-2c963f66afa6`. Note the UUID part of the STIX `id` used here will match the `id` in the Rule.",
         )
     ]
 
@@ -539,10 +551,10 @@ class RuleView(viewsets.GenericViewSet):
             choices=models.TLP_Levels.choices,
         )
         attack_id = BaseInFilter(
-            help_text="Filter the results return rules linked to a particular ATT&CK Technique. Pass the full ATT&CK ID, e.g. `T1047`."
+            help_text="Filter the results return rules linked to a particular ATT&CK Technique. Pass the full ATT&CK ID, e.g. `T1047`. Note, only Base Rules have ATT&CK tags."
         )
         cve_id = BaseInFilter(
-            help_text="Filter the results return rules linked to a particular CVE. Pass the full CVE ID, e.g. `CVE-2024-28374`."
+            help_text="Filter the results return rules linked to a particular CVE. Pass the full CVE ID, e.g. `CVE-2024-28374`. Note, only Base Rules have CVE tags."
         )
         created_by_ref = BaseInFilter(
             help_text="Filter the results by only the reports created by this identity. Pass the full STIX ID of the Identity object, e.g. `identity--b1ae1a15-6f4b-431e-b990-1b9678f35e15`."
@@ -557,7 +569,7 @@ class RuleView(viewsets.GenericViewSet):
         )
         rule_type = ChoiceFilter(
             choices=[("base-rule", "Base Rule"), ("correlation-rule", "Correlation Rule")],
-            help_text="Filter the results by rule_type. default: shows all type"
+            help_text="Filter the results by the rule type, either `base-rule` or `correlation-rule`. If none passed will return all types."
         )
 
     def get_renderers(self):
@@ -572,7 +584,7 @@ class RuleView(viewsets.GenericViewSet):
         parameters=[
             OpenApiParameter(
                 "format",
-                description="The format of the report, either `sigma` (returns only the Sigma YAML) or `json` (returns the STIX 2.1 Indicator object containing the Sigma rule). Make sure to set the `Accept` header correctly.",
+                description="The format of the report, either `sigma` (returns only the Sigma YAML) or `json` (returns the STIX 2.1 Indicator object containing the Rule). Make sure to set the `Accept` header correctly.",
                 enum=["sigma", "json"],
             )
         ]
@@ -689,22 +701,36 @@ class RuleView(viewsets.GenericViewSet):
             """
             Use this endpoint to modify a Correlation Rule.
 
-            You should only enter the parts of the Correlation Rule you wish to change. Any properties/values not passed will remain unchanged in the rule. To delete a value from a property, pass the property without the value.
+            You should only enter the parts of the Correlation Rule you wish to change. Any properties not passed will remain unchanged in the existing rule. To delete a value from a property (if optional), pass the property without the value.
 
-            Enter the properties you want to change in YML format. You can change the following properties
+            Enter the properties you want to change in YML format. You can change the following properties of a Correlation rule;
 
-            * `title` (optional): cannot be blank.Used as the rule `title`
-            * `description` (optional) used as the rule `description`
-            * `tlp_level` (optional): TLP level assigned to the Indicator object and in the `tags` of the Sigma Correlation Rule. Either `clear`, `green`, `amber`, `amber+strict`, or `red`.
-            * `tags` (optional): in format `NAMESPACE.TAG` (e.g. `threat-actor.someone`). Cannot use the reserved namespaces `attack.`, `cve.` or `tlp.).
-            * `rule_ids` (required): one or more Sigma Base Rule ID's (e.g. `680c2e5b-3704-47e1-9a0c-4f6746211faf`). Do not include the `indicator--` part. Must be valid, else creation will fail.
+            * `title` (optional): if passed, cannot be blank. Used as the rule `title`. Will overwrite existing value.
+            * `description` (optional): if passed, used as the rule `description`.  Will overwrite existing value.
+            * `tags` (optional): in format `NAMESPACE.TAG` (e.g. `threat-actor.someone`). Cannot use the reserved namespaces `attack.`, `cve.` or `tlp. If you wish to use reserved tags `attack.` or `cve,`, update one of the Base Rules used in this Correlation Rule with the desired tag. Will be appended to existing values. If you want to delete all tags list, pass this property as empty.
+            * `status` (optional, dictionary): the status of the rule, either `stable`, `test`, `experimental`, `deprecated`, `unsupported`. Will overwrite any existing value.
+            * `level` (optional, dictionary): the level of the rule, either `informational`, `low`, `medium`, `high`, `critical`. Will overwrite any existing value.
+            * `falsepositives` (list of strings): the `falsepositives` displayed in the rule. Will append to any existing values. To delete all `falsepositives`, pass this property as empty.
+            * `references` (list of urls): the `references` displayed in the rule. Must be URLs. Will append to any existing values. To delete all `references`, pass this property as empty.
+            * `correlation` (optional): if passed, [should contain the full correlation part of the rule as defined by the Sigma specification](https://github.com/SigmaHQ/sigma-specification/blob/main/specification/sigma-correlation-rules-specification.md). The properties available are;
+                * `rules` (required, rule ids): This property must contain one or more Sigma Base Rule ID's (e.g. `680c2e5b-3704-47e1-9a0c-4f6746211faf`). Do not include the `indicator--` part. Must be valid, else creation will fail.
+                * `type` (required, dictionary): either `event_count`, `value_count`, `temporal`, `temporal_ordered`
+                * `timespan` (required): defines a time period in which the correlation should be applied. The following format must be used: `number + letter (in lowercase)`. e.g. `90s` (90 seconds), `90m` (90 minutes), `90h` (90 hours), `90d` (90 days)
+                * `condition` (required, dictionary): The condition defines when a correlation matches. Either `gt` (greater than), `gte` (greater than or equal to), `lt` (less than), `lte` (less than or equal to), `eq` (equal to).
+                    * for an `event_count` correlation it defines the event count that must appear within the given time frame to match.
+                    * for a `value_count` correlation it defines the count of distinct values contained in the field specified in the mandatory field attribute.
+                    * for a `temporal` or `temporal_ordered` correlation it specified the count of different event types (Sigma rules matching) in the given time frame.
+                * `aliases` (optional, list of aliases): defines field name aliases that are applied to correlated Sigma rules
+                * `group-by` (optional, list of field names): optionally defines one or multiple fields which should be treated as separate event occurrence scope
 
             You cannot change the following properties (doing so will result in an error):
 
             * `id`: is fixed across all versions of the Correlation Rule
+            * `related`: this is controlled by SIEM Rules
             * `date`: the `date` value will remain the same, showing the date the Correlation Rule was first created
             * `modified`: the `modified` time will be auto-updated based on the time of this modification
             * `author`: the `author` value will remain the same. If you wish to use a new `author` value, you must create a new Correlation Rule
+            * `tlp_level`: modifying TLP is considered a major change to the Rule, thus you need to clone the Rule if you wish to change the TLP level
 
             The rule will be validated against the Sigma specification. [You can read the specification here to see available properties and values allowed](https://github.com/SigmaHQ/sigma-specification/blob/main/specification/sigma-correlation-rules-specification.md).
 
@@ -717,7 +743,7 @@ class RuleView(viewsets.GenericViewSet):
         summary="Use AI to modify a rule by ID",
         description=textwrap.dedent(
             """
-            Use this endpoint to get AI to modify a Sigma Rule via a prompt.
+            Use this endpoint to get AI to modify a Rule via a prompt.
 
             The following key / values are accepted in the body of the request:
 
@@ -728,24 +754,37 @@ class RuleView(viewsets.GenericViewSet):
     ),
 
     create_from_sigma=extend_schema(
-        summary="Create a Correlation Sigma Rule using YML",
+        summary="Create a Correlation Rule using YML",
         description=textwrap.dedent(
             """
-            This endpoint is useful if you're comfortable writing a Sigma Correlation Rule.
+            This endpoint is useful if you're comfortable writing a Sigma Correlation Rule manually.
 
-            The body of the request accepts:
+            The body of the request accepts a valid Sigma YAML rule with the following properties;
 
             * `title` (required): used as the rule `title`
             * `description` (optional) used as the rule `description`
             * `author` (optional): A full STIX 2.1 identity object (make sure to properly escape). Will be validated by the STIX2 library. The ID is used to create the Indicator STIX object, and is used as the `author` property in the Sigma Correlation Rule. If not passed, the SIEM Rules Identity object will be used.
-            * `date` (optional): will be used at the `created` time in the Indicator object generated and `date` value in the Sigma Correlation Rule. Default is now. Must be lower than `date`. In format `YYYY-MM-DD` (e.g. `2000-01-31`).
-            * `modified`: will be used at the `modified` time in the Indicator object generated and `modified` value in the Sigma Correlation Rule. Default is now. Must be higher than `date`. In format `YYYY-MM-DD` (e.g. `2000-01-31`).
-            * `tlp_level` (optional): TLP level assigned to the Indicator object and in the `tags` of the Sigma Correlation Rule. Either `clear`, `green`, `amber`, `amber+strict`, or `red`.
-            * `tags` (optional): in format `NAMESPACE.TAG` (e.g. `threat-actor.someone`). Cannot use the reserved namespaces `attack.`, `cve.` or `tlp.).
-            * `rule_ids` (required): one or more Sigma Base Rule ID's (e.g. `680c2e5b-3704-47e1-9a0c-4f6746211faf`). Do not include the `indicator--` part. Must be valid, else creation will fail.
-            * `correlation`: a valid Sigma Correlation Rule in the body of the request, [as per the Sigma specification](https://github.com/SigmaHQ/sigma-specification/blob/main/specification/sigma-correlation-rules-specification.md). The Correlation Rule should conform to the yml syntax (properly indented and escaped).
+            * `date` (optional, date): will be used at the `created` time in the Indicator object generated and `date` value in the Sigma Correlation Rule. Default is now. Must be lower than `date`. In format `YYYY-MM-DD` (e.g. `2000-01-31`).
+            * `modified` (optional, date): will be used at the `modified` time in the Indicator object generated and `modified` value in the Sigma Correlation Rule. Default is now. Must be higher than `date`. In format `YYYY-MM-DD` (e.g. `2000-01-31`).
+            * `tlp_level` (optional, dictionary): TLP level assigned to the Indicator object and in the `tags` of the Sigma Correlation Rule. Either `clear`, `green`, `amber`, `amber+strict`, or `red`.
+            * `tags` (optional): in format `NAMESPACE.TAG` (e.g. `threat-actor.someone`). Cannot use the reserved namespaces `attack.`, `cve.` or `tlp. If you wish to use reserved tags `attack.` or `cve,`, update one of the Base Rules used in this Correlation Rule with the desired tag.
+            * `status` (optional, dictionary): the status of the rule, either `stable`, `test`, `experimental`, `deprecated`, `unsupported`.
+            * `level` (optional, dictionary): the level of the rule, either `informational`, `low`, `medium`, `high`, `critical`.
+            * `falsepositives` (optional, list of strings): the `falsepositives` displayed in the rule.
+            * `correlation` (required): [should contain the full correlation part of the rule as defined by the Sigma specification](https://github.com/SigmaHQ/sigma-specification/blob/main/specification/sigma-correlation-rules-specification.md). The properties available are;
+                * `rules` (required, rule ids): This property must contain one or more Sigma Base Rule ID's (e.g. `680c2e5b-3704-47e1-9a0c-4f6746211faf`). Do not include the `indicator--` part. Must be valid, else creation will fail.
+                * `type` (required, dictionary): either `event_count`, `value_count`, `temporal`, `temporal_ordered`
+                * `timespan` (required): defines a time period in which the correlation should be applied. The following format must be used: `number + letter (in lowercase)`. e.g. `90s` (90 seconds), `90m` (90 minutes), `90h` (90 hours), `90d` (90 days)
+                * `condition` (required, dictionary): The condition defines when a correlation matches. Either `gt` (greater than), `gte` (greater than or equal to), `lt` (less than), `lte` (less than or equal to), `eq` (equal to).
+                    * for an `event_count` correlation it defines the event count that must appear within the given time frame to match.
+                    * for a `value_count` correlation it defines the count of distinct values contained in the field specified in the mandatory field attribute.
+                    * for a `temporal` or `temporal_ordered` correlation it specified the count of different event types (Sigma rules matching) in the given time frame.
+                * `aliases` (optional, list of aliases): defines field name aliases that are applied to correlated Sigma rules
+                * `group-by` (optional, list of field names): optionally defines one or multiple fields which should be treated as separate event occurrence scope
 
-            The `id` of the Sigma Correlation Rule will be auto-generated and cannot be passed in the request.
+            You cannot change the following properties (doing so will result in an error):
+
+            * `id`: this is auto-generated by SIEM Rules
             """
         ),
     ),
@@ -753,20 +792,30 @@ class RuleView(viewsets.GenericViewSet):
         summary="Create A Correlation Rule from an AI prompt",
         description=textwrap.dedent(
             """
-            Use this endpoint to create a Correlation Sigma Rule via a prompt.
+            Use this endpoint to create a Correlation Rule via an AI prompt.
 
             The body of the request accepts:
 
+            * `rules` (required, rule ids): one or more Sigma Base Rule ID's (e.g. `680c2e5b-3704-47e1-9a0c-4f6746211faf`). Do not include the `indicator--` part. Must be valid, else creation will fail. The rules will be passed to the AI for consideration when generating the correlation.
+            * `prompt` (required): The prompt you wish to send to the AI with instructions on how to create the correlation part of the rule. An example of;
+                * creating Correlation from a single rule; `create a Sigma correlation when this Sigma rule with ID <ID> is triggered 5 times over a 10 minute period`
+                * creating a Correlation from multiple rules; `create a Sigma correlation when the Sigma rule with ID <ID> is triggered followed by the Sigma rule with ID <ID> being triggered within a 2 minute period.
+            * `ai_provider` (required): An AI provider and model to be used for rule generation in format `provider:model` e.g. `openai:gpt-4o`. This is a txt2detection setting.
             * `author` (optional): A full STIX 2.1 identity object (make sure to properly escape). Will be validated by the STIX2 library. The ID is used to create the Indicator STIX object, and is used as the `author` property in the Sigma Correlation Rule. If not passed, the SIEM Rules Identity object will be used.
             * `date` (optional): will be used at the `created` time in the Indicator object generated and `date` value in the Sigma Correlation Rule. Default is now. Must be lower than `date`. In format `YYYY-MM-DD` (e.g. `2000-01-31`).
             * `modified`: will be used at the `modified` time in the Indicator object generated and `modified` value in the Sigma Correlation Rule. Default is now. Must be higher than `date`. In format `YYYY-MM-DD` (e.g. `2000-01-31`).
-            * `tlp_level` (optional): TLP level assigned to the Indicator object and in the `tags` of the Sigma Correlation Rule. Either `clear`, `green`, `amber`, `amber+strict`, or `red`.
-            * `tags` (optional): in format `NAMESPACE.TAG` (e.g. `threat-actor.someone`). Cannot use the reserved namespaces `attack.`, `cve.` or `tlp.).
-            * `rule_ids` (required): one or more Sigma Base Rule ID's (e.g. `680c2e5b-3704-47e1-9a0c-4f6746211faf`). Do not include the `indicator--` part. Must be valid, else creation will fail.
-            * `prompt` (required): The prompt you wish to send to the AI with instructions on how to modify or improve the rule. For example; Add MITRE ATT&CK Technique T1134 to this rule.
-            * `ai_provider` (required): An AI provider and model to be used for rule generation in format `provider:model` e.g. `openai:gpt-4o`. This is a txt2detection setting.
+            * `tlp_level` (optional): TLP level assigned to the Indicator object and in the `tags` of the Sigma Correlation Rule. Either `clear`, `green`, `amber`, `amber+strict`, or `red`. Default if not passed is `clear`.
+            * `tags` (optional): in format `NAMESPACE.TAG` (e.g. `threat-actor.someone`). Cannot use the reserved namespaces `attack.`, `cve.` or `tlp. If you wish to use reserved tags `attack.` or `cve,`, update one of the Base Rules used in this Correlation Rule with the desired tag.
+            * `status` (optional, dictionary): the status of the rule, either `stable`, `test`, `experimental`, `deprecated`, `unsupported`.
+            * `level` (optional, dictionary): the level of the rule, either `informational`, `low`, `medium`, `high`, `critical`.
+            * `falsepositives` (optional, list of strings): the `falsepositives` displayed in the rule.
 
-            The `id` of the Sigma Correlation Rule will be auto-generated and cannot be passed in the request.
+            You pass the following properties (doing so will result in an error):
+
+            * `id`: this is auto-generated by SIEM Rules
+            * `title`: generated by the AI, can be modified later
+            * `description`: generated by the AI, can be modified later
+            * `related`: this is not considered during the creation of a new rule. Can be modified later
             """
         ),
     ),
