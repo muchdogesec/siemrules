@@ -26,7 +26,7 @@ All generated correlation rules must include the following fields:
 Optionally, the rule can include:
 - falsepositives: An array of strings describing known false positive scenarios.
 - level: A string indicating severity (examples: "low", "medium", "high", "critical").
-- generate: A boolean value that defines whether to also generate standalone Sigma rules (default: false).
+- status: A string indicating sigma status (one of: "stable", "test", "experimental", "deprecated", "unsupported").
 
 ---
 
