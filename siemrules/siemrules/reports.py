@@ -109,10 +109,10 @@ class ReportView(viewsets.ViewSet):
         )
     ]
     SORT_PROPERTIES = [
-        "modified_descending",
-        "modified_ascending",
         "created_descending",
         "created_ascending",
+        "modified_descending",
+        "modified_ascending",
         "name_descending",
         "name_ascending",
     ]
