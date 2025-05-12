@@ -526,6 +526,7 @@ class JobView(
                 description="Filter the results by one or more STIX Object types",
                 enum=OBJECT_TYPES,
             ),
+            OpenApiParameter('ignore_embedded_sro', type=bool, description="If set to `true` all embedded SROs are removed from the response."),
         ],
     ),
 )
@@ -700,8 +701,7 @@ class RuleView(viewsets.GenericViewSet):
     @decorators.action(methods=["GET"], detail=True)
     def objects(self, request, *args, indicator_id=None, **kwargs):
         return arangodb_helpers.get_objects_for_rule(
-            indicator_id, version=request.query_params.get("version"),
-            types=request.query_params.get("types"),
+            indicator_id, request, version=request.query_params.get("version"),
         )
     
 @extend_schema_view(
