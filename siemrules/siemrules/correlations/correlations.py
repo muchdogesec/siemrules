@@ -46,7 +46,8 @@ def add_rule_indicator(rule: RuleModel, related_indicators = None, correlation_r
     identity = default_identity()
     if rule.author:
         identity = make_identity(rule.author)
-    indicator_id = rule.rule_id or str(uuid.uuid4())
+    job_correlation_id = job_data and job_data.get('correlation_id')
+    indicator_id = rule.rule_id or job_correlation_id or str(uuid.uuid4())
     rule_str = make_rule(rule, rules_from_indicators(related_indicators), indicator_id)
 
     correlation_indicator = {

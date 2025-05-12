@@ -53,6 +53,7 @@ tags:
         job: models.Job = mock_task.mock_calls[0].args[0]
         assert job.type == models.JobType.CORRELATION_SIGMA
         assert job.data['input_form'] == 'sigma'
+        assert "correlation_id" in job.data
 
 
 @pytest.mark.django_db
@@ -78,6 +79,7 @@ def test_correlation_create__prompt(client: django.test.Client):
         assert job.data['input_form'] == 'ai_prompt'
         assert job.data["ai_provider"] == rule_payload['ai_provider']
         assert job.data["prompt"] == rule_payload['prompt']
+        assert "correlation_id" in job.data
 
 
 @pytest.mark.parametrize(

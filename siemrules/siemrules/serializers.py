@@ -22,20 +22,31 @@ def validate_model(model):
         raise validators.ValidationError(f"invalid model: {model}")
     return model
 
-@extend_schema_field({
-    'example': 'report--3fa85f64-5717-4562-b3fc-2c963f66afa6'
-})
-class ReportIDField(serializers.CharField):
+
+class StixIdField(serializers.CharField):
+    stix_type = None
     def to_internal_value(self, data: str):
         if not isinstance(data, str):
             raise validators.ValidationError("string expected")
-        if not data.startswith('report--'):
+        if not data.startswith(self.stix_type + '--'):
             raise validators.ValidationError("invalid STIX Report ID, must be in format `report--{UUID}`")
-        data = data.replace("report--", "")
+        _, _, data = data.rpartition('--')
         return serializers.UUIDField().to_internal_value(data)
     
     def to_representation(self, value):
-        return "report--"+serializers.UUIDField().to_representation(value)
+        return self.stix_type+"--"+serializers.UUIDField().to_representation(value)
+    
+@extend_schema_field({
+    'example': 'report--3fa85f64-5717-4562-b3fc-2c963f66afa6'
+})
+class ReportIDField(StixIdField):
+    stix_type = 'report'
+
+@extend_schema_field({
+    'example': 'indicator--3fa85f64-5717-4562-b3fc-2c963f66afa6'
+})
+class IndicatorIDField(StixIdField):
+    stix_type = 'indicator'
 
 @extend_schema_field(dict)
 class STIXIdentityField(serializers.JSONField):
@@ -143,6 +154,7 @@ class JobSerializer(serializers.ModelSerializer):
 
 
 class CorrelationJobSerializer(serializers.ModelSerializer):
+    correlation_id = IndicatorIDField(source='data.correlation_id')
     class Meta:
         model = Job
         exclude = ['file']
