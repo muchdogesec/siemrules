@@ -245,7 +245,7 @@ class TestReportsView:
             reports.ReportView.SORT_PROPERTIES+[None]
     )
     def test_list_reports_sort(self, client, sort_filter: str):
-        DEFAULT = 'modified_descending'
+        DEFAULT = 'created_descending'
         expected_sort = sort_filter or DEFAULT
         filters = dict(sort=sort_filter) if sort_filter else None
         response = client.get(self.url, query_params=filters)
