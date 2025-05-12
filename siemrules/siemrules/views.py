@@ -680,7 +680,13 @@ class RuleView(viewsets.GenericViewSet):
     def revert(self, request, *args, indicator_id=None, **kwargs):
         s = serializers.RuleRevertSerializer(data=request.data)
         s.is_valid(raise_exception=True)
-        rev = arangodb_helpers.delete_rule(indicator_id, rule_date=s.initial_data['version'], delete=False)
+        versions = arangodb_helpers.get_single_rule_versions(indicator_id).data
+        selected_version = s.initial_data['version']
+        if selected_version not in versions:
+            raise validators.ValidationError("selected version does not exist")
+        if selected_version == versions[0]:
+            raise validators.ValidationError("You cannot revert to the latest version of the rule")
+        rev = arangodb_helpers.delete_rule(indicator_id, rule_date=selected_version, delete=False)
         return self.retrieve(request, indicator_id=indicator_id)
     
 
@@ -914,9 +920,9 @@ class RuleViewWithCorrelationModifier(RuleView):
 
     @extend_schema(
         request=DRFCorrelationRule.drf_serializer,
-        responses={200: serializers.JobSerializer, 400: DEFAULT_400_ERROR},
+        responses={200: serializers.CorrelationJobSerializer, 400: DEFAULT_400_ERROR},
     )
-    @decorators.action(methods=['POST'], detail=False, serializer_class=JobSerializer, url_path="create/correlation-rule/manual", parser_classes=[SigmaRuleParser])
+    @decorators.action(methods=['POST'], detail=False, serializer_class=serializers.CorrelationJobSerializer, url_path="create/correlation-rule/manual", parser_classes=[SigmaRuleParser])
     def create_from_sigma(self, request, *args, **kwargs):
         rule_s = DRFCorrelationRule.drf_serializer(data=request.data)
         rule_s.is_valid(raise_exception=True)
@@ -935,9 +941,9 @@ class RuleViewWithCorrelationModifier(RuleView):
 
     @extend_schema(
         request=CorrelationRuleSerializer,
-        responses={200: serializers.JobSerializer, 400: DEFAULT_400_ERROR},
+        responses={200: serializers.CorrelationJobSerializer, 400: DEFAULT_400_ERROR},
     )
-    @decorators.action(methods=['POST'], detail=False, serializer_class=JobSerializer, url_path="create/correlation-rule/ai")
+    @decorators.action(methods=['POST'], detail=False, serializer_class=CorrelationJobSerializer, url_path="create/correlation-rule/ai")
     def create_from_prompt(self, request, *args, **kwargs):
         s = CorrelationRuleSerializer(data=request.data)
         s.is_valid(raise_exception=True)

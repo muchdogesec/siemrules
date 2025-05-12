@@ -43,7 +43,7 @@ def can_remove_report(report_id):
     rules = arangodb_helpers.get_rules(arangodb_helpers.request_from_queries(report_id=report_id), paginate=False)
     related_correlations = arangodb_helpers.related_correlation_rules([rule['id'] for rule in rules])
     if related_correlations:
-        raise validators.ValidationError(f'sorry, you cannot delete this file because it is linked to {len(related_correlations)} correlation(s)')
+        raise validators.ValidationError(dict(message=f'sorry, you cannot delete this file/report because it is linked to {len(related_correlations)} correlation(s)', correlations=related_correlations))
 
 def remove_report(report_id: str):
     helper = ArangoDBHelper(settings.VIEW_NAME, request.Request(HttpRequest()))

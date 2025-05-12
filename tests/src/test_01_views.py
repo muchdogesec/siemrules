@@ -186,7 +186,7 @@ class TestRuleView:
         versions_resp = client.get(rule_url + "versions/")
         assert versions_resp.status_code == 200, versions_resp.json()
         versions_before_revert = list(versions_resp.data)
-        revert_version = random.choice(versions_before_revert)
+        revert_version = random.choice(versions_before_revert[1:])
         object_before_revert = client.get(rule_url, query_params=dict(version=revert_version)).json()
 
         response = client.patch(rule_url + "modify/revert/", data=dict(version=revert_version), content_type="application/json")
@@ -205,3 +205,24 @@ class TestRuleView:
             if k in ['external_references', 'modified']:
                 continue
             assert object_before_revert[k] == object_after_revert[k]
+
+    def test_revert_to_latest(self, client: django.test.Client):
+        rule_id = "indicator--8af82832-2abd-5765-903c-01d414dae1e9"
+        rule_url = f"{self.url}{rule_id}/"
+
+        versions_resp = client.get(rule_url + "versions/")
+        assert versions_resp.status_code == 200, versions_resp.json()
+        versions_before_revert = list(versions_resp.data)
+        revert_version = versions_before_revert[0] #latest version
+
+        response = client.patch(rule_url + "modify/revert/", data=dict(version=revert_version), content_type="application/json")
+        assert response.status_code == 400, response.json()
+
+    def test_revert_bad_version(self, client: django.test.Client):
+        rule_id = "indicator--8af82832-2abd-5765-903c-01d414dae1e9"
+        rule_url = f"{self.url}{rule_id}/"
+
+        revert_version = "2001-01-01T01:01:01.001Z" #bad version
+
+        response = client.patch(rule_url + "modify/revert/", data=dict(version=revert_version), content_type="application/json")
+        assert response.status_code == 400, response.json()
