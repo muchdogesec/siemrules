@@ -1,5 +1,6 @@
 from datetime import UTC, datetime
 import io
+import uuid
 from rest_framework import (
     viewsets,
     parsers,
@@ -922,7 +923,7 @@ class RuleViewWithCorrelationModifier(RuleView):
         if rule.correlation.rules:
             related_indicators = self.get_rules(rule.correlation.rules)
 
-        job_instance = models.Job.objects.create(type=models.JobType.CORRELATION_SIGMA, data=dict(input_form='sigma'))
+        job_instance = models.Job.objects.create(type=models.JobType.CORRELATION_SIGMA, data=dict(input_form='sigma', correlation_id=str(uuid.uuid4())))
         job_s = CorrelationJobSerializer(job_instance)
 
         tasks.new_correlation_task(job_instance, rule, related_indicators, {})
@@ -941,7 +942,7 @@ class RuleViewWithCorrelationModifier(RuleView):
         if s.validated_data['rules']:
             related_indicators = self.get_rules(s.validated_data['rules'])
 
-        job_instance = models.Job.objects.create(type=models.JobType.CORRELATION_PROMPT, data=dict(input_form='ai_prompt', **s.data))
+        job_instance = models.Job.objects.create(type=models.JobType.CORRELATION_PROMPT, data=dict(input_form='ai_prompt', **s.data, correlation_id=str(uuid.uuid4())))
         job_s = CorrelationJobSerializer(job_instance)
         tasks.new_correlation_task(job_instance, s.validated_data, related_indicators, s.validated_data)
         return Response(job_s.data)
