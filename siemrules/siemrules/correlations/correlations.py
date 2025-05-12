@@ -49,6 +49,13 @@ def add_rule_indicator(rule: RuleModel, related_indicators = None, correlation_r
     indicator_id = rule.rule_id or str(uuid.uuid4())
     rule_str = make_rule(rule, rules_from_indicators(related_indicators), indicator_id)
 
+
+    ext_refs = [
+        dict(source_name="siemrules-type", external_id=correlation_rule_type)
+    ]
+    for ref in getattr(rule, 'references', None) or []:
+        ext_refs.append(dict(source_name='siemrules', description='siemrules-references', url=ref))
+
     correlation_indicator = {
         "type": "indicator",
         "id": "indicator--"+indicator_id,
@@ -66,9 +73,7 @@ def add_rule_indicator(rule: RuleModel, related_indicators = None, correlation_r
             rule.tlp_level.value['id'],
             "marking-definition--97ba4e8b-04f6-57e8-8f6e-3a0f0a7dc0fb"
         ],
-        "external_references": [
-            dict(source_name="siemrules-type", external_id=correlation_rule_type)
-        ]
+        "external_references": ext_refs
     }
     
     logging.debug(f"===== rule {indicator_id} =====")
