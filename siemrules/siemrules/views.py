@@ -46,6 +46,7 @@ from django_filters.rest_framework import (
     ChoiceFilter,
     CharFilter,
     BaseInFilter,
+    Filter,
 )
 
 from siemrules.siemrules.autoschema import DEFAULT_400_ERROR, DEFAULT_404_ERROR
@@ -335,6 +336,7 @@ class JobView(
         file_id = BaseInFilter(
             help_text="Filter the results by the ID of the File the Job was created from, e.g. `2632fd7a-ae33-4d35-9652-425e488c97af`."
         )
+        state = Filter(help_text="Filter results by state")
 
     filter_backends = [DjangoFilterBackend, Ordering]
     ordering_fields = ["run_datetime", "state"]
