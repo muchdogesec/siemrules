@@ -11,9 +11,15 @@ from django.http import HttpRequest, HttpResponse
 from siemrules import settings
 import typing
 from stix2.serialization import serialize as stix2_serialize
+from dogesec_commons.objects.helpers import OBJECT_TYPES
 
+from siemrules.siemrules.correlations import correlations
+from siemrules.siemrules.correlations.correlations import yaml_to_rule
+from siemrules.siemrules.modifier import yaml_to_detection
 from siemrules.siemrules.utils import TLP_LEVEL_STIX_ID_MAPPING, TLP_Levels
 from siemrules.worker.tasks import upload_to_arango
+from txt2detection.models import TLP_LEVEL as T2D_TLP_LEVEL, SigmaRuleDetection
+from siemrules.siemrules.correlations.models import RuleModel, set_tlp_level_in_tags
 
 if typing.TYPE_CHECKING:
     from siemrules import settings
@@ -180,22 +186,27 @@ def get_single_rule_versions(indicator_id):
         raise NotFound(f"no rule with id `{indicator_id}`")
     return Response(sorted([rule['modified'] for rule in rules], reverse=True))
 
-def get_objects_for_rule(indicator_id, version=None):
+def get_objects_for_rule(indicator_id, version=None, types: str=None):
+    types = types or ''
     r = request_from_queries(indicator_id=indicator_id, version=version)
     helper = ArangoDBHelper(settings.VIEW_NAME, r)
     rules = get_rules(r, paginate=False, nokeep=False)
     if not rules:
         raise NotFound(f"no rule with id `{indicator_id}`")
     rule = rules[0]
+
+
     query = '''
     LET rel_ids = (FOR rel IN siemrules_edge_collection FILTER rel._from == @rule_key OR rel._to == @rule_key RETURN [rel._from, rel._to, rel._id])
     LET obj_ids = FLATTEN([@rule_key, rel_ids], 3)
     FOR doc IN @@view
     FILTER doc._id IN obj_ids
+    FILTER NOT @types OR doc.type IN @types
     LIMIT @offset, @count
     RETURN KEEP(doc, KEYS(doc, TRUE))
     '''
-    return helper.execute_query(query, bind_vars={'rule_key': rule['_id'], '@view': settings.VIEW_NAME})
+    binds = {'rule_key': rule['_id'], '@view': settings.VIEW_NAME, "types": list(OBJECT_TYPES.intersection(types.split(","))) if types else None,}
+    return helper.execute_query(query, bind_vars=binds)
 
 
 def get_objects_by_id(indicator_id):
@@ -414,6 +425,119 @@ def do_reversion(helper, revision_id):
     indicator['external_references'] = ext_refs
 
     make_upload(indicator.get('_stixify_report_id', ''), make_bundle(objects), s2a_kwargs=dict(always_latest=True))
+
+
+def indicator_to_rule(indicator: dict) -> SigmaRuleDetection|tuple[RuleModel, list[dict]]:
+    rule_type = 'base'
+    for ref in indicator.get('external_references', []):
+        if ref['source_name'] == 'siemrules-type':
+            if ref.get('external_id', '').startswith('file'):
+                return yaml_to_detection(indicator['pattern'])
+            else:
+                return yaml_to_rule(indicator['pattern'])
+    else:
+        raise ParseError("unable to determine rule type")
+
+def make_clone(indicator_id, data):
+    r = request_from_queries(indicator_id=indicator_id)
+    helper = ArangoDBHelper(settings.VIEW_NAME, r)
+    now = datetime.now(UTC).isoformat().replace('+00:00', 'Z')
+
+    rules = get_rules(r, paginate=False, nokeep=False)
+    if not rules:
+        raise NotFound(f"no rule with id `{indicator_id}`")
+    rule = rules[0]
+    new_uuid = str(uuid.uuid4())
+    old_stix_id = rule['id']
+    _, _, old_uuid = old_stix_id.rpartition('--')
+    old_arango_id = rule['_id']
+    rule['id'] = 'indicator--'+new_uuid
+    old_pattern = indicator_to_rule(rule)
+    other_documents = []
+    if isinstance(old_pattern, tuple):
+        old_pattern, other_documents = old_pattern
+    author_ref = old_pattern.author
+    identity = data.get('identity', settings.STIX_IDENTITY.copy())
+    author_ref = identity['id']
+
+    tlp_level = old_pattern.tlp_level
+    if l := data.get('tlp_level'):
+        tlp_level = T2D_TLP_LEVEL.get(l)
+
+
+    new_pattern = old_pattern.model_copy()
+    ### update title/description/tlp_level
+    new_pattern.title = rule['name'] = data.get('title', old_pattern.title)
+    new_pattern.description = rule['description'] = data.get('description', old_pattern.description)
+    new_pattern.author = author_ref
+    set_tlp_level_in_tags(new_pattern.tags, tlp_level.name)
+    ##############
+    if isinstance(new_pattern, RuleModel):
+        rule['pattern'] = correlations.make_rule(new_pattern, other_documents, new_uuid)
+    else:
+        new_pattern.id = new_pattern.detection_id = new_uuid
+        new_pattern.related = new_pattern.related or []
+        new_pattern.related.append(dict(id=old_uuid, type='derived'))
+        rule['pattern'] = new_pattern.make_rule(None)
+
+    rels : list[dict] = helper.execute_query('''
+            FOR d in siemrules_edge_collection
+            FILTER d._from == @revision_id AND d._is_ref != TRUE
+            RETURN d
+        ''', bind_vars=dict(revision_id=rule['_id']), paginate=False)
+    
+    objects = [rule] + rels
+
+    new_marking_refs = [
+        tlp_level.value['id'],
+        "marking-definition--8ef05850-cb0d-51f7-80be-50e4376dbe63"
+    ]
+
+    objects.append(
+        {
+            "type": "relationship",
+            "spec_version": "2.1",
+            "id": "relationship--"+str(uuid.uuid5(settings.STIX_NAMESPACE, f"{rule['id']}+{old_stix_id}")),
+            "created_by_ref": author_ref,
+            "created": now,
+            "modified": now,
+            "_to": old_arango_id,
+            "relationship_type": "derived",
+            "description": f"{new_pattern.title} was derived from {old_pattern.title}",
+            "source_ref": f"indicator--{new_uuid}",
+            "target_ref": f"indicator--{old_uuid}",
+            "object_marking_refs": new_marking_refs
+        }
+    )
+    
+    for obj in objects:
+        if hasattr(obj, 'source_ref'):
+            obj['source_ref'] = rule['id']
+
+        obj['object_marking_refs'] = new_marking_refs
+        obj['created_by_ref'] = author_ref
+        
+        for k in [
+            '_record_modified',
+            '_record_created',
+            '_record_md5_hash',
+            '_from',
+            '_id',
+            '_key',
+        ]:
+            obj.pop(k, None)
+        obj['_is_latest'] = True
+        obj['modified'] = now
+        obj['created'] = now
+    
+    ext_refs: list[dict] = [ref for ref in rule.get('external_references', []) if ref['source_name'] != 'siemrules-cloned-from']
+    ext_refs.append(dict(source_name='siemrules-cloned-from', external_id=old_uuid))
+    rule['external_references'] = ext_refs
+
+    objects += [identity]
+
+    make_upload(rule.get('_stixify_report_id', ''), make_bundle(objects), s2a_kwargs=dict(always_latest=True))
+    return rule['id']
             
 
 def make_bundle(objects):

@@ -30,6 +30,16 @@ def create_indicator(correlation: RuleModel):
 def make_identity(name):
     return Identity(id='identity--'+str(uuid.uuid5(settings.STIX_NAMESPACE, f"txt2detection+{name}")), name=name, created_by_ref=default_identity()['id'], created=datetime(2020, 1, 1), modified=datetime(2020, 1, 1))
 
+def make_rule(rule: RuleModel, other_documents: list[dict], id):
+    rule_dict = rule.model_dump(mode='json', exclude_none=True)
+    rule_dict.update(id=id)
+    rule_str = yaml.safe_dump_all(
+        [rule_dict, *other_documents],
+        indent=4,
+        sort_keys=False,
+    )
+    return rule_str
+
 def add_rule_indicator(rule: RuleModel, related_indicators = None, correlation_rule_type='manual', job_data=None):
     job_data = job_data or dict()
     related_indicators = related_indicators or []
@@ -37,11 +47,8 @@ def add_rule_indicator(rule: RuleModel, related_indicators = None, correlation_r
     if rule.author:
         identity = make_identity(rule.author)
     indicator_id = rule.rule_id or str(uuid.uuid4())
-    rule_str = yaml.safe_dump_all(
-        [rule.model_dump(mode='json', exclude_none=True), *rules_from_indicators(related_indicators)],
-        indent=4,
-        sort_keys=False,
-    )
+    rule_str = make_rule(rule, rules_from_indicators(related_indicators), indicator_id)
+
 
     ext_refs = [
         dict(source_name="siemrules-type", external_id=correlation_rule_type)
@@ -132,5 +139,5 @@ def get_modification(model, input_text, old_detection: RuleModel, prompt) -> Rul
 
 
 def yaml_to_rule(modification: str):
-    modification = list(yaml.safe_load_all(io.StringIO(modification)))[0]
-    return RuleModel.model_validate(modification)
+    modification, *others = list(yaml.safe_load_all(io.StringIO(modification)))
+    return RuleModel.model_validate(modification), others

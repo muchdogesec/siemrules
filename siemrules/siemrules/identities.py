@@ -24,6 +24,8 @@ from drf_spectacular.utils import extend_schema, extend_schema_view
         description=textwrap.dedent(
             """
             This endpoint will delete all Files, Reports, Rules and any other STIX objects created using this identity. It will also delete the Identity object selected.
+
+            It will not delete any Profiles using the Identity selected. This ensures a Profile being used by other Identities is not removed. Use the Delete Profile endpoint to delete a Profile..
             """
         ),
     ),
