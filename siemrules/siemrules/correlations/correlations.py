@@ -100,7 +100,6 @@ def add_rule_indicator(rule: RuleModel, related_indicators = None, correlation_r
                 source_ref=correlation_indicator.id,
                 target_ref=related_indicator['id'],
                 object_marking_refs=correlation_indicator.object_marking_refs,
-                allow_custom=True,
                 _to=related_indicator['_id'],
             )
         )
