@@ -44,7 +44,7 @@ class DRFCorrelationRuleModify(DRFBaseModel, BaseRuleModel, RuleModelExtraProper
             
     @classmethod
     def serialize_rule_from(cls, old_rule: CorrelationRule, data: dict):
-        data = {**old_rule.model_dump(exclude=['created', 'modified', 'date', "author"], by_alias=True), **data}
+        data = cls.merge_detection(old_rule, data)
         tlp_level = tlp_from_tags(old_rule.tags)
         set_tlp_level_in_tags(data['tags'], tlp_level.name)
         s = cls.drf_serializer(data=data)
@@ -52,6 +52,14 @@ class DRFCorrelationRuleModify(DRFBaseModel, BaseRuleModel, RuleModelExtraProper
         cls.is_valid(s)
         new_rule = CorrelationRule.model_validate({**s.data, **dict(date=old_rule.date, modified=datetime.now(UTC))})
         return new_rule
+
+    @classmethod
+    def merge_detection(cls, old_detection: CorrelationRule, request_data: dict):
+        for k in ['tags', 'falsepositives', 'references']:
+            v = request_data.pop(k, [])
+            if v != None:
+                request_data.update({k: [*getattr(old_detection, k, []), *v]})
+        return {**old_detection.model_dump(exclude=['created', 'modified', 'date', 'author'], exclude_unset=True, exclude_none=True), **request_data}
 
     
 # class _CorrelationPatch(create_serializer_from_model(Correlation, {"validate_pydantic": True})):

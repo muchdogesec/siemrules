@@ -93,11 +93,12 @@ class BaseRuleModel(BaseModel):
     description: str = Field(min_length=10, description="Description of the Sigma rule")
     correlation: 'Correlation' = Field(..., description="Correlation configuration for the rule")
     falsepositives: Optional[list[str]] = Field(description="False positives", default=None)
+    status: Optional[Statuses] = None
+    level: Optional[Level] = None
 
 class RuleModelExtraProperties(BaseModel):
     references : Optional[list[str]] = None
-    status : Optional[Statuses] = None
-    level : Optional[Level] = None
+    related: Optional[list[dict]] = None
     
 
 class RuleModel(BaseRuleModel, RuleModelExtraProperties):

@@ -471,13 +471,14 @@ def make_clone(indicator_id, data):
     new_pattern.description = rule['description'] = data.get('description', old_pattern.description)
     new_pattern.author = author_ref
     set_tlp_level_in_tags(new_pattern.tags, tlp_level.name)
+    new_pattern.related = new_pattern.related or []
+    new_pattern.related.append(dict(id=old_uuid, type='derived'))
     ##############
     if isinstance(new_pattern, RuleModel):
         rule['pattern'] = correlations.make_rule(new_pattern, other_documents, new_uuid)
     else:
         new_pattern.id = new_pattern.detection_id = new_uuid
         new_pattern.related = new_pattern.related or []
-        new_pattern.related.append(dict(id=old_uuid, type='derived'))
         rule['pattern'] = new_pattern.make_rule(None)
 
     rels : list[dict] = helper.execute_query('''
