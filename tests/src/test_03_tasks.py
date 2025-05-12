@@ -88,7 +88,6 @@ def test_process_correlation_ai(job):
         mock_model_validate.assert_called_once_with(
             dict(
                 **mdump.return_value,
-                author="some author",
                 date="rule.date",
                 modified="rule.modified",
                 tags=["tlp.green"],

@@ -65,7 +65,7 @@ def test_correlation_create__prompt(client: django.test.Client):
         "prompt": "create a tempral correlation",
         "ai_provider": "openai",
         "created": "2025-03-02T14:36:52.663Z",
-        "author": "myauthor",
+        "identity":  {"type":"identity","spec_version":"2.1","id":"identity--b1ae1a15-abcd-431e-b990-1b9678f35e15","name":"Test Identity"},
         "modified": "2025-04-17T14:36:52.663Z"
     }
     with patch("siemrules.worker.tasks.new_correlation_task") as mock_task:
@@ -80,7 +80,6 @@ def test_correlation_create__prompt(client: django.test.Client):
         assert job.data["ai_provider"] == rule_payload['ai_provider']
         assert job.data["prompt"] == rule_payload['prompt']
         assert "correlation_id" in job.data
-
 
 @pytest.mark.parametrize(
         ["rule_ids", "should_fail"],

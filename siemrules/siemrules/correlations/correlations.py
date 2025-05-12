@@ -44,12 +44,15 @@ def add_rule_indicator(rule: RuleModel, related_indicators = None, correlation_r
     job_data = job_data or dict()
     related_indicators = related_indicators or []
     identity = default_identity()
-    if rule.author:
+    if rule.author and not rule.author.startswith('identity--'):
         identity = make_identity(rule.author)
+    elif job_data and job_data.get('identity'):
+        identity = job_data['identity']
+
+    rule.author = identity['id']
     job_correlation_id = job_data and job_data.get('correlation_id')
     indicator_id = rule.rule_id or job_correlation_id or str(uuid.uuid4())
     rule_str = make_rule(rule, rules_from_indicators(related_indicators), indicator_id)
-
 
     ext_refs = [
         dict(source_name="siemrules-type", external_id=correlation_rule_type)
@@ -97,7 +100,6 @@ def add_rule_indicator(rule: RuleModel, related_indicators = None, correlation_r
                 source_ref=correlation_indicator.id,
                 target_ref=related_indicator['id'],
                 object_marking_refs=correlation_indicator.object_marking_refs,
-                allow_custom=True,
                 _to=related_indicator['_id'],
             )
         )
