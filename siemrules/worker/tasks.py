@@ -197,7 +197,6 @@ def process_correlation_ai(job_id, data, related_indicators):
     correlation_with_date = RuleModel.model_validate(
         dict(
             **correlation.model_dump(),
-            author=data.get('author'),
             date=data.get('created'),
             modified=data.get('modified'),
             tags=["tlp."+data['tlp_level'].replace('_', '-')],
