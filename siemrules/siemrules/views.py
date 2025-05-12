@@ -680,7 +680,13 @@ class RuleView(viewsets.GenericViewSet):
     def revert(self, request, *args, indicator_id=None, **kwargs):
         s = serializers.RuleRevertSerializer(data=request.data)
         s.is_valid(raise_exception=True)
-        rev = arangodb_helpers.delete_rule(indicator_id, rule_date=s.initial_data['version'], delete=False)
+        versions = arangodb_helpers.get_single_rule_versions(indicator_id).data
+        selected_version = s.initial_data['version']
+        if selected_version not in versions:
+            raise validators.ValidationError("selected version does not exist")
+        if selected_version == versions[0]:
+            raise validators.ValidationError("You cannot revert to the latest version of the rule")
+        rev = arangodb_helpers.delete_rule(indicator_id, rule_date=selected_version, delete=False)
         return self.retrieve(request, indicator_id=indicator_id)
     
 
