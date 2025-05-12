@@ -51,7 +51,7 @@ class IndicatorIDField(StixIdField):
 @extend_schema_field(dict(
     example={"type":"identity","spec_version":"2.1","id":"identity--b1ae1a15-6f4b-431e-b990-1b9678f35e15","name":"Dummy Identity"}, type='object'
 ))
-class STIXIdentityField(serializers.JSONField):
+class STIXIdentityField(serializers.DictField):
     pass
 
 class FileSerializer(serializers.ModelSerializer):
