@@ -528,7 +528,6 @@ def make_clone(indicator_id, data):
             obj.pop(k, None)
         obj['_is_latest'] = True
         obj['modified'] = now
-        obj['created'] = now
     
     ext_refs: list[dict] = [ref for ref in rule.get('external_references', []) if ref['source_name'] != 'siemrules-cloned-from']
     ext_refs.append(dict(source_name='siemrules-cloned-from', external_id=old_uuid))
