@@ -332,7 +332,7 @@ def delete_rule(indicator_id, rule_date='', delete=True):
         # check that there is no correlation using the rule
         correlation_rels = related_correlation_rules([indicator_id])
         if correlation_rels:
-            raise ValidationError(f'sorry, you cannot delete this rule because it is linked to {len({correlation_rels})} correlation(s)')
+            raise ValidationError(dict(message=f'sorry, you cannot delete this rule because it is linked to {len(correlation_rels)} correlation(s)', correlations=correlation_rels))
 
         # perform deletion
         helper.execute_query('''
@@ -549,4 +549,4 @@ def related_correlation_rules(indicator_ids):
             FILTER doc.target_ref IN @indicator_ids AND doc.relationship_type == "contains-rule"
             RETURN KEEP(doc, "source_ref", "modified", "relationship_type")
     ''', bind_vars=dict(indicator_ids=indicator_ids), paginate=False)
-    return ["{source_ref}@{modified}".format(**r) for r in correlation_rels]
+    return [dict(id=r['source_ref'], version=r['modified']) for r in correlation_rels]
