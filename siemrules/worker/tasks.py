@@ -75,7 +75,8 @@ def run_txt2detection(file: models.File):
     kwargs.update(
         external_refs=[
             dict(source_name="siemrules-type", external_id=job.type)
-        ]
+        ],
+        created=file.created,
     )
 
     bundler: txt2detectionBundler = txt2detection.run_txt2detection(
