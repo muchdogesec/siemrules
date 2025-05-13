@@ -1,4 +1,5 @@
 from functools import lru_cache
+import json
 import os
 import time
 import django
@@ -70,7 +71,7 @@ def test_correlation_create__prompt(client: django.test.Client):
     }
     with patch("siemrules.worker.tasks.new_correlation_task") as mock_task:
         response = client.post(
-            correlation_url + "create/correlation-rule/ai/", format="sigma", data=rule_payload
+            correlation_url + "create/correlation-rule/ai/", format="sigma", data=json.dumps(rule_payload), content_type='application/json'
         )
         assert response.status_code == status.HTTP_200_OK, response.content
         mock_task.assert_called_once()
