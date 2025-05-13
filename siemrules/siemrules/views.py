@@ -135,7 +135,7 @@ class SchemaViewCached(SpectacularAPIView):
             * `labels` (optional): Will be added to the `labels` of the Report and Indicator SDOs created, and `tags` in the Rule itself. Must pass in format `namespace.value`. This is a txt2detection setting.
                 * note: you cannot use the reserved `tlp`. Use the `tlp_level` setting to set this
                 * note: you cannot use reserved namespaces `cve.` and `attack.`. The AI will add these based on the rule content.
-            * `tlp_level` (optional): This will be assigned to all SDOs and SROs created and added to the Base Rule as a tag (e.g. `tlp.red`). SIEM Rules uses TLPv2. This is a txt2detection setting.
+            * `tlp_level` (optional): This will be assigned to all SDOs and SROs created and added to the Base Rule as a tag (e.g. `tlp.red`). SIEM Rules uses TLPv2. This is a txt2detection setting. If not passed default is `tlp.clear`
              * `license` (optional): [License of the rule according the SPDX ID specification](https://spdx.org/licenses/) (e.g. `MIT`). Will be added to the Rule. This is a txt2detection setting.
             * `defang` (optional): Whether to defang the observables in the text. e.g. turns `1.1.1[.]1` to `1.1.1.1` for extraction. This is a file2txt setting.
             * `ai_provider` (required): An AI provider and model to be used for rule generation in format `provider:model` e.g. `openai:gpt-4o`. This is a txt2detection setting.
@@ -806,7 +806,7 @@ class RuleView(viewsets.GenericViewSet):
             * `date` (optional, date): will be used at the `created` time in the Indicator object generated and `date` value in the Sigma Correlation Rule. Default is now. Must be lower than `date`. In format `YYYY-MM-DD` (e.g. `2000-01-31`).
             * `modified` (optional, date): will be used at the `modified` time in the Indicator object generated and `modified` value in the Sigma Correlation Rule. Default is now. Must be higher than `date`. In format `YYYY-MM-DD` (e.g. `2000-01-31`).
             * `tags` (`tlp.` required): in format `NAMESPACE.TAG` (e.g. `threat-actor.someone`). Cannot use the reserved namespaces `attack.`, `cve.` If you wish to use reserved tags `attack.` or `cve,`, update one of the Base Rules used in this Correlation Rule with the desired tag.
-                * `tlp.XXX`: you must assign a TLP level to the rule replacing XXX with either `clear`, `green`, `amber`, `amber+strict`, `red`. Not TLP cannot be changed once the rule is created.
+                * `tlp.XXX`: you must assign a TLP level to the rule replacing XXX with either `clear`, `green`, `amber`, `amber+strict`, `red`. Not TLP cannot be changed once the rule is created. If none passed, default is `clear`
             * `references` (list of urls): the `references` displayed in the rule. Must be URLs. Will append to any existing values. To delete all `references`, pass this property as empty.
             * `status` (optional, dictionary): the status of the rule, either `stable`, `test`, `experimental`, `deprecated`, `unsupported`.
             * `level` (optional, dictionary): the level of the rule, either `informational`, `low`, `medium`, `high`, `critical`.
