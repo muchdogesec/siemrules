@@ -7,8 +7,7 @@
 {
   "ai_provider": "openai:gpt-4o",
   "text_input": "Create a detection rule for 1[.]1[.]1[.]1",
-  "name": "Basic IP input",
-  "report_id": "report--59aded11-d696-4150-854f-2a5677d0d0a2",
+  "name": "testing minimum values",
   "defang": true,
   "ignore_embedded_relationships": false,
   "ignore_embedded_relationships_sro": true,
@@ -16,6 +15,9 @@
 }
 ```
 
+* Default TLP level should be `clear`
+* `created` and `modified` should be time run
+* check SIEM rules identity used to create objects
 
 ### Created time
 
@@ -23,9 +25,78 @@
 {
   "ai_provider": "openai:gpt-4o",
   "text_input": "Create a detection rule for 1[.]1[.]1[.]1",
-  "name": "Basic IP input",
+  "name": "testing created",
   "report_id": "report--005c5f5e-3ef4-4853-a14c-274af0fbd391",
   "created": "2020-01-01T00:00:00",
+  "defang": true,
+  "ignore_embedded_relationships": false,
+  "ignore_embedded_relationships_sro": true,
+  "ignore_embedded_relationships_smo": true
+}
+```
+
+* `created` and `modified` should match `created` value
+
+### tlp level
+
+```json
+{
+  "ai_provider": "openai:gpt-4o",
+  "text_input": "Create a detection rule for 1[.]1[.]1[.]1",
+  "name": "testing tlp green",
+  "report_id": "report--f913ff8a-a024-4d97-ac94-ab8721fc10a8",
+  "tlp_level": "green",
+  "defang": true,
+  "ignore_embedded_relationships": false,
+  "ignore_embedded_relationships_sro": true,
+  "ignore_embedded_relationships_smo": true
+}
+```
+
+```json
+{
+  "ai_provider": "openai:gpt-4o",
+  "text_input": "Create a detection rule for 1[.]1[.]1[.]1",
+  "name": "testing tlp amber+strict",
+  "report_id": "report--f913ff8a-a024-4d97-ac94-ab8721fc10a8",
+  "tlp_level": "amber+strict",
+  "defang": true,
+  "ignore_embedded_relationships": false,
+  "ignore_embedded_relationships_sro": true,
+  "ignore_embedded_relationships_smo": true
+}
+```
+
+* all SDOs and SROs should have this marking
+* check no SROs have this marking
+
+### Identity
+
+```json
+{
+  "ai_provider": "openai:gpt-4o",
+  "text_input": "Create a detection rule for 1[.]1[.]1[.]1",
+  "name": "using custom identity",
+  "report_id": "report--129017ea-5700-4814-a310-c57d2f1fd23a",
+  "identity": {"type":"identity","spec_version":"2.1","id":"identity--068335dc-7ad6-4ed6-a053-cb3f76a1ad1a","name":"Using a custom Identity"},
+  "defang": true,
+  "ignore_embedded_relationships": false,
+  "ignore_embedded_relationships_sro": true,
+  "ignore_embedded_relationships_smo": true
+}
+```
+
+* check assigned to all SDOs, non embedded SROs
+
+### Labels
+
+```json
+{
+  "ai_provider": "openai:gpt-4o",
+  "text_input": "Create a detection rule for 1[.]1[.]1[.]1",
+  "name": "testing labels",
+  "report_id": "report--129017ea-5700-4814-a310-c57d2f1fd23a",
+  "identity": {"type":"identity","spec_version":"2.1","id":"identity--068335dc-7ad6-4ed6-a053-cb3f76a1ad1a","name":"Using a custom Identity"},
   "defang": true,
   "ignore_embedded_relationships": false,
   "ignore_embedded_relationships_sro": true,

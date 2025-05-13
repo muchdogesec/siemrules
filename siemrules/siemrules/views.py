@@ -135,7 +135,7 @@ class SchemaViewCached(SpectacularAPIView):
             * `labels` (optional): Will be added to the `labels` of the Report and Indicator SDOs created, and `tags` in the Rule itself. Must pass in format `namespace.value`. This is a txt2detection setting.
                 * note: you cannot use the reserved `tlp`. Use the `tlp_level` setting to set this
                 * note: you cannot use reserved namespaces `cve.` and `attack.`. The AI will add these based on the rule content.
-            * `tlp_level` (optional): This will be assigned to all SDOs and SROs created and added to the Base Rule as a tag (e.g. `tlp.red`). SIEM Rules uses TLPv2. This is a txt2detection setting. If not passed default is `tlp.clear`
+            * `tlp_level` (optional): This will be assigned to all SDOs and SROs created and added to the Base Rule as a tag (e.g. `tlp.red`). SIEM Rules uses TLPv2. This is a txt2detection setting. Either `clear`, `green`, `amber`, `amber+strict`, `red`. If not passed default is `clear`. 
              * `license` (optional): [License of the rule according the SPDX ID specification](https://spdx.org/licenses/) (e.g. `MIT`). Will be added to the Rule. This is a txt2detection setting.
             * `defang` (optional): Whether to defang the observables in the text. e.g. turns `1.1.1[.]1` to `1.1.1.1` for extraction. This is a file2txt setting.
             * `ai_provider` (required): An AI provider and model to be used for rule generation in format `provider:model` e.g. `openai:gpt-4o`. This is a txt2detection setting.
