@@ -438,7 +438,6 @@ def do_reversion(helper, revision_id):
 
 
 def indicator_to_rule(indicator: dict) -> SigmaRuleDetection|tuple[RuleModel, list[dict]]:
-    rule_type = 'base'
     for ref in indicator.get('external_references', []):
         if ref['source_name'] == 'siemrules-type':
             if ref.get('external_id', '').startswith('file'):
