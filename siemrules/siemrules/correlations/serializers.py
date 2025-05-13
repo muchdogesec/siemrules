@@ -23,10 +23,10 @@ class DRFCorrelationRule(DRFBaseModel, CorrelationRule):
     @field_validator("tags", mode="before")
     @classmethod
     def add_default_tlp(cls, tags):
-        tags = tags or []
-        if tlp_from_tags(tags):
-            return tags
-        return ["tlp.clear"] + tags
+        tlp_level = tlp_from_tags(tags)
+        if not tlp_level:
+            set_tlp_level_in_tags(tags, TLP_Levels.CLEAR.value)
+        return tags
 
 def default_tags_factory():
     return ['tlp.clear']
