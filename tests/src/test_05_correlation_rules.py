@@ -70,7 +70,7 @@ def test_correlation_create__prompt(client: django.test.Client):
     }
     with patch("siemrules.worker.tasks.new_correlation_task") as mock_task:
         response = client.post(
-            correlation_url + "create/correlation-rule/ai/", format="sigma", data=rule_payload
+            correlation_url + "create/correlation-rule/prompt/", format="sigma", data=rule_payload
         )
         assert response.status_code == status.HTTP_200_OK, response.content
         mock_task.assert_called_once()
