@@ -56,7 +56,6 @@ def modify_indicator(report, indicator: dict, detection: Detection):
     retval = []
     for obj in bundler.bundle_dict['objects']:
         retval.append(obj)
-        obj['object_marking_refs'] = indicator['object_marking_refs']
     return retval
 
 
