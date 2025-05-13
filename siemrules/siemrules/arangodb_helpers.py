@@ -451,7 +451,8 @@ def indicator_to_rule(indicator: dict) -> SigmaRuleDetection|tuple[RuleModel, li
 def make_clone(indicator_id, data):
     r = request_from_queries(indicator_id=indicator_id)
     helper = ArangoDBHelper(settings.VIEW_NAME, r)
-    now = datetime.now(UTC).isoformat().replace('+00:00', 'Z')
+    now = datetime.now(UTC)
+    now_str = now.isoformat().replace('+00:00', 'Z')
 
     rules = get_rules(r, paginate=False, nokeep=False)
     if not rules:
@@ -474,15 +475,16 @@ def make_clone(indicator_id, data):
     if l := data.get('tlp_level'):
         tlp_level = T2D_TLP_LEVEL.get(l)
 
-
     new_pattern = old_pattern.model_copy()
-    ### update title/description/tlp_level
+    ### update title/description/tlp_level/modified
     new_pattern.title = rule['name'] = data.get('title', old_pattern.title)
     new_pattern.description = rule['description'] = data.get('description', old_pattern.description)
     new_pattern.author = author_ref
     set_tlp_level_in_tags(new_pattern.tags, tlp_level.name)
     new_pattern.related = new_pattern.related or []
     new_pattern.related.append(dict(id=old_uuid, type='derived'))
+    new_pattern.modified = now.date()
+
     ##############
     if isinstance(new_pattern, RuleModel):
         rule['pattern'] = correlations.make_rule(new_pattern, other_documents, new_uuid)
@@ -510,8 +512,8 @@ def make_clone(indicator_id, data):
             "spec_version": "2.1",
             "id": "relationship--"+str(uuid.uuid5(settings.STIX_NAMESPACE, f"{rule['id']}+{old_stix_id}")),
             "created_by_ref": author_ref,
-            "created": now,
-            "modified": now,
+            "created": now_str,
+            "modified": now_str,
             "_to": old_arango_id,
             "relationship_type": "derived",
             "description": f"{new_pattern.title} was derived from {old_pattern.title}",
@@ -538,7 +540,7 @@ def make_clone(indicator_id, data):
         ]:
             obj.pop(k, None)
         obj['_is_latest'] = True
-        obj['modified'] = now
+        obj['modified'] = now_str
     
     ext_refs: list[dict] = [ref for ref in rule.get('external_references', []) if ref['source_name'] != 'siemrules-cloned-from']
     ext_refs.append(dict(source_name='siemrules-cloned-from', external_id=old_uuid))
