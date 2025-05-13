@@ -157,6 +157,7 @@ class ReportView(viewsets.ViewSet):
                 description="Filter the results by one or more STIX Object types",
                 enum=OBJECT_TYPES,
             ),
+            OpenApiParameter('ignore_embedded_sro', type=bool, description="If set to `true` all embedded SROs are removed from the response."),
         ],
     )
     @decorators.action(methods=["GET"], detail=True)
@@ -244,19 +245,26 @@ class ReportView(viewsets.ViewSet):
     def get_report_objects(self, report_id):
         helper = ArangoDBHelper(settings.VIEW_NAME, self.request)
         types = helper.query.get('types', "")
+        filters = []
         bind_vars = {
             "@collection": settings.VIEW_NAME,
             'report_id': report_id,
             "types": list(OBJECT_TYPES.intersection(types.split(","))) if types else None,
         }
+
+        if q := helper.query_as_bool('ignore_embedded_sro', default=False):
+            filters.append('FILTER doc._is_ref != TRUE')
+
         query = """
             FOR doc in @@collection
             FILTER doc._stixify_report_id == @report_id
             FILTER NOT @types OR doc.type IN @types
+            #filters
             
             LIMIT @offset, @count
             RETURN KEEP(doc, KEYS(doc, TRUE))
         """
+        query = query.replace("#filters", '\n'.join(filters))
         resp = helper.execute_query(query, bind_vars=bind_vars)
         resp.data['objects'] = list(resp.data['objects'])
         return resp
