@@ -48,7 +48,7 @@ def validate_file(file: InMemoryUploadedFile, mode: str):
 
 class File(models.Model):
     id = models.UUIDField(unique=True, max_length=64, primary_key=True, default=uuid.uuid4)
-    name = models.CharField(max_length=256, help_text="This will be assigned to the File and Report object created. Note, the names of each detection rule generated will be automatic. Max 256 characters. This is a txt2detection setting.")
+    name = models.CharField(max_length=256, help_text="This will be assigned to the File and Report object created. Note, the names of each detection rule generated will be automatically. Max 256 characters. This is a txt2detection setting.")
     identity = models.JSONField(default=default_identity, validators=[validate_identity])
     labels = ArrayField(base_field=models.CharField(max_length=256), default=list)
     tlp_level = models.CharField(choices=TLP_Levels.choices, default=TLP_Levels.RED, max_length=128)
