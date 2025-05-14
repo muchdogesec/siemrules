@@ -44,7 +44,7 @@ class TestFileView:
         )
         with patch("siemrules.worker.tasks.new_task") as mock_task:
             response = client.post(
-                self.url + "upload/", data=file_data, format="multipart"
+                self.url + "intel/", data=file_data, format="multipart"
             )
             assert response.status_code == status.HTTP_200_OK, response.content
             mock_task.assert_called_once()
@@ -62,7 +62,7 @@ class TestFileView:
         )
         with patch("siemrules.worker.tasks.new_task") as mock_task:
             response = client.post(
-                self.url + "text/", data=file_data, content_type="application/json"
+                self.url + "prompt/", data=file_data, content_type="application/json"
             )
             assert response.status_code == status.HTTP_200_OK, response.content
             mock_task.assert_called_once()
