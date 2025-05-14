@@ -1,6 +1,6 @@
 import os
 from django.conf import settings
-from django.db.models.signals import post_delete
+from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
 from django.db import models
 from django.contrib.postgres.fields import ArrayField
@@ -131,3 +131,11 @@ class Job(models.Model):
         if not self.completion_time and self.state == JobState.COMPLETED:
             self.completion_time = datetime.now(UTC)
         return super().save(*args, **kwargs)
+
+
+@receiver(post_save, sender=Job)
+def remove_file_on_job_failure(sender, instance: Job, **kwargs):
+    if instance.file == None:
+        return
+    if instance.state == JobState.FAILED:
+        instance.file.delete()

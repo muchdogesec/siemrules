@@ -107,7 +107,7 @@ class TestReportsView:
                     "report--bc14a07a-5189-5f64-85c3-33161b923627",
                     "report--cc297329-2c8d-55f3-bef9-3137bb9d87a7",
                 ],
-                id='no filter'
+                id="no filter",
             ),
             pytest.param(dict(created_min="2027-01-01"), []),
             pytest.param(
@@ -117,19 +117,19 @@ class TestReportsView:
                     "report--bc14a07a-5189-5f64-85c3-33161b923627",
                     "report--cc297329-2c8d-55f3-bef9-3137bb9d87a7",
                 ],
-                id='created_min 1',
+                id="created_min 1",
             ),
             pytest.param(
                 dict(created_min="2025-03-01"),
                 [
                     "report--cc297329-2c8d-55f3-bef9-3137bb9d87a7",
                 ],
-                id='created_min 2',
+                id="created_min 2",
             ),
             pytest.param(
                 dict(created_max="2020-01-01"),
                 [],
-                id='created_max 0',
+                id="created_max 0",
             ),
             pytest.param(
                 dict(created_max="2025-04-01"),
@@ -138,64 +138,63 @@ class TestReportsView:
                     "report--bc14a07a-5189-5f64-85c3-33161b923627",
                     "report--cc297329-2c8d-55f3-bef9-3137bb9d87a7",
                 ],
-                id='created_max 1',
+                id="created_max 1",
             ),
             pytest.param(
                 dict(created_max="2025-01-01T13:45:58.354498Z"),
                 [
                     "report--bc14a07a-5189-5f64-85c3-33161b923627",
                 ],
-                id='created_max 2',
+                id="created_max 2",
             ),
-
             pytest.param(
                 dict(description="contains pypotr"),
                 [
                     "report--bc14a07a-5189-5f64-85c3-33161b923627",
                 ],
-                id='description match case',
+                id="description match case",
             ),
             pytest.param(
                 dict(description="ConTAiNs pYpOtr"),
                 [
                     "report--bc14a07a-5189-5f64-85c3-33161b923627",
                 ],
-                id='description bad case',
+                id="description bad case",
             ),
             pytest.param(
                 dict(description="contains pypotr".upper()),
                 [
                     "report--bc14a07a-5189-5f64-85c3-33161b923627",
                 ],
-                id='description upper case',
+                id="description upper case",
             ),
             pytest.param(
                 dict(name="python vulnerability"),
                 [
                     "report--bc14a07a-5189-5f64-85c3-33161b923627",
                 ],
-                id='name match case',
+                id="name match case",
             ),
             pytest.param(
                 dict(name="pYThoN vuLNER"),
                 [
                     "report--bc14a07a-5189-5f64-85c3-33161b923627",
                 ],
-                id='name bad case',
+                id="name bad case",
             ),
             pytest.param(
                 dict(name="python vulnerability".upper()),
                 [
                     "report--bc14a07a-5189-5f64-85c3-33161b923627",
                 ],
-                id='name upper case',
+                id="name upper case",
             ),
             pytest.param(
                 dict(tlp_level="amber"),
                 [
                     "report--cc297329-2c8d-55f3-bef9-3137bb9d87a7",
                 ],
-                id='test tlp_level 0',
+                id="test tlp_level 0",
             ),
             pytest.param(
                 dict(tlp_level="green"),
@@ -203,15 +202,24 @@ class TestReportsView:
                     "report--60915f4c-fa2d-5bf1-b7d1-d7ecab167560",
                     "report--bc14a07a-5189-5f64-85c3-33161b923627",
                 ],
-                id='test tlp_level 1',
+                id="test tlp_level 1",
             ),
-
             pytest.param(
-                dict(tlp_level="green", name='python'),
+                dict(tlp_level="green", name="python"),
                 [
                     "report--bc14a07a-5189-5f64-85c3-33161b923627",
                 ],
-                id='test tlp_level+name',
+                id="test tlp_level+name",
+            ),
+            pytest.param(
+                dict(indicator_id="indicator--8af82832-2abd-5765-903c-01d414dae1e9"),
+                ["report--bc14a07a-5189-5f64-85c3-33161b923627"],
+                id="indicator_id good",
+            ),
+            pytest.param(
+                dict(indicator_id="indicator--abcdef12-2abd-5765-903c-01d414dae1e9"),
+                [],
+                id="indicator_id bad",
             ),
         ],
     )
@@ -221,41 +229,61 @@ class TestReportsView:
         assert response.status_code == status.HTTP_200_OK
         assert {obj["id"] for obj in response.data["objects"]} == expected_ids_set
 
-
     @pytest.mark.parametrize(
-            ['report_id', 'expected_ids'],
-            [
-                *[(bundle['id'].replace('bundle', 'report'), [obj['id'] for obj in bundle['objects']]) for bundle in [test_data.BUNDLE_1, test_data.BUNDLE_2, test_data.BUNDLE_3]]
+        ["report_id", "expected_ids"],
+        [
+            *[
+                (
+                    bundle["id"].replace("bundle", "report"),
+                    [obj["id"] for obj in bundle["objects"]],
+                )
+                for bundle in [
+                    test_data.BUNDLE_1,
+                    test_data.BUNDLE_2,
+                    test_data.BUNDLE_3,
+                ]
             ]
+        ],
     )
     def test_get_report_objects(self, client, report_id, expected_ids, subtests):
         expected_ids_set = set(expected_ids)
         response = client.get(f"{self.url}{report_id}/objects/")
         assert response.status_code == status.HTTP_200_OK
         objects = response.data["objects"]
-        assert {obj["id"] for obj in objects}.issuperset(expected_ids_set), response.data
+        assert {obj["id"] for obj in objects}.issuperset(
+            expected_ids_set
+        ), response.data
         for obj in objects:
-            if obj['id'] in expected_ids_set:
+            if obj["id"] in expected_ids_set:
                 continue
-            with subtests.test('unexpected id', stix_id=obj['id']):
-                assert obj['type'] == 'relationship', 'all unexpected ids must be of type relationship'
-                assert obj['source_ref'] in expected_ids_set or obj['target_ref'] in expected_ids_set, 'all unexpected ids must be related to one of expected ids'
-    @pytest.mark.parametrize(
-            'sort_filter',
-            reports.ReportView.SORT_PROPERTIES+[None]
-    )
+            with subtests.test("unexpected id", stix_id=obj["id"]):
+                assert (
+                    obj["type"] == "relationship"
+                ), "all unexpected ids must be of type relationship"
+                assert (
+                    obj["source_ref"] in expected_ids_set
+                    or obj["target_ref"] in expected_ids_set
+                ), "all unexpected ids must be related to one of expected ids"
+
+    @pytest.mark.parametrize("sort_filter", reports.ReportView.SORT_PROPERTIES + [None])
     def test_list_reports_sort(self, client, sort_filter: str):
-        DEFAULT = 'created_descending'
+        DEFAULT = "created_descending"
         expected_sort = sort_filter or DEFAULT
         filters = dict(sort=sort_filter) if sort_filter else None
         response = client.get(self.url, query_params=filters)
         assert response.status_code == status.HTTP_200_OK
         report_objects = response.data["objects"]
-        assert {obj["type"] for obj in report_objects} == set(["report"]), "expected all returned objects to have type = 'report'"
-        property, _, direction = expected_sort.rpartition('_')
+        assert {obj["type"] for obj in report_objects} == set(
+            ["report"]
+        ), "expected all returned objects to have type = 'report'"
+        property, _, direction = expected_sort.rpartition("_")
+
         def sort_fn(obj):
             retval = obj[property]
-            if property == 'name':
+            if property == "name":
                 retval = retval.lower()
             return retval
-        assert is_sorted(report_objects, key=sort_fn, reverse=direction == 'descending'), f"expected reports to be sorted by {property} in {direction} order"
+
+        assert is_sorted(
+            report_objects, key=sort_fn, reverse=direction == "descending"
+        ), f"expected reports to be sorted by {property} in {direction} order"
