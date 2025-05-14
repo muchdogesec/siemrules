@@ -108,6 +108,7 @@ def test_run_txt2detection():
     mock_file.references = mock_file.license = 'random'
     mock_file.level = "level"
     mock_file.status = "status"
+    mock_file.created = "2022-11-13T12:43:41.613Z"
     mock_file.job = mock.Mock(spec=models.Job)
     mock_file_copy = copy.copy(mock_file)
 
@@ -143,7 +144,8 @@ def test_run_txt2detection():
             license=mock_file.license,
             level=mock_file.level,
             status=mock_file.status,
-            external_refs=[{'source_name': 'siemrules-type', 'external_id': mock_file.job.type}]
+            external_refs=[{'source_name': 'siemrules-type', 'external_id': mock_file.job.type}],
+            created=mock_file.created,
         )
 
         assert result == {"mocked": "detection_output"}
