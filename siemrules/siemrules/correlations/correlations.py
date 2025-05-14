@@ -67,6 +67,7 @@ def add_rule_indicator(rule: RuleModel, related_indicators = None, correlation_r
         "created_by_ref": identity["id"],
         "created": job_data.get('created', rule.date),
         "modified": job_data.get('modified', rule.modified or rule.date),
+        "description": rule.description,
         "indicator_types": [],
         "name": rule.title,
         "labels": [],
