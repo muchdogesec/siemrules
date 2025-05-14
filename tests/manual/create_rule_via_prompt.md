@@ -1,4 +1,3 @@
-
 ## Base Rule Create (good): Prompt
 
 ### Minimum allowed info
@@ -95,8 +94,11 @@
   "ai_provider": "openai:gpt-4o",
   "text_input": "Create a detection rule for 1[.]1[.]1[.]1",
   "name": "testing labels",
-  "report_id": "report--129017ea-5700-4814-a310-c57d2f1fd23a",
-  "identity": {"type":"identity","spec_version":"2.1","id":"identity--068335dc-7ad6-4ed6-a053-cb3f76a1ad1a","name":"Using a custom Identity"},
+  "report_id": "report--441fd854-fe0b-4b4b-ae0f-26655b8e5c01",
+  "labels": [
+    "label.one",
+    "namespace.tag"
+  ],
   "defang": true,
   "ignore_embedded_relationships": false,
   "ignore_embedded_relationships_sro": true,
@@ -104,32 +106,43 @@
 }
 ```
 
-
+### License
 
 ```json
 {
-  "report_id": "report--7cd0e894-919b-4a3b-b70e-3a9291e7de55",
-  "tlp_level": "green",
-  "labels": [
-    "cve.2025-36546",
-    "attack.t1176.002",
-    "attack.t1674"
-  ],
-  "defang": true,
   "ai_provider": "openai:gpt-4o",
+  "text_input": "Create a detection rule for 1[.]1[.]1[.]1",
+  "name": "testing license",
+  "report_id": "report--e185ca7e-0e32-4505-a97f-57143942af47",
+  "license": "MIT",
+  "defang": true,
+  "ignore_embedded_relationships": false,
+  "ignore_embedded_relationships_sro": true,
+  "ignore_embedded_relationships_smo": true
+}
+```
+
+### References
+
+```json
+{
+  "ai_provider": "openai:gpt-4o",
+  "text_input": "Create a detection rule for 1[.]1[.]1[.]1",
+  "name": "testing references",
+  "report_id": "report--a2efe5a8-4586-4c5f-b87c-702ea822eb27",
   "references": [
     "https://google.com",
     "https://facebook.com"
   ],
-  "license": "0BSD",
+  "defang": true,
   "ignore_embedded_relationships": false,
   "ignore_embedded_relationships_sro": true,
-  "ignore_embedded_relationships_smo": true,
-  "created": "2025-05-08T15:18:14.359Z",
-  "text_input": "Create a detection rule for 1[.]1[.]1[.]1",
-  "name": "Basic IP input"
+  "ignore_embedded_relationships_smo": true
 }
 ```
+
+Check references in external ref and Sigma rule
+
 
 ## Base Rule Create (bad): Prompt
 
@@ -137,53 +150,109 @@
 
 ```json
 {
-  "report_id": "report--3d422c9f-c5e9-43d7-b802-090996e2214e",
-  "identity": {"type":"identity","spec_version":"2.1","id":"identity--b1ae1a15-6f4b-431e-b990-1b9678f35e15","name":"Dummy Identity"},
-  "tlp_level": "red",
+  "ai_provider": "openai:gpt-4o",
+  "text_input": "Create a detection rule for 1[.]1[.]1[.]1",
+  "name": "bad has attack tags",
+  "report_id": "report--0e428fd7-d65d-4bf6-8764-8a973914f5a5",
   "labels": [
     "attack.t1176.002",
     "attack.t1674"
   ],
   "defang": true,
-  "ai_provider": "openai:gpt-4o",
-  "references": [
-    "https://google.com",
-    "https://facebook.com"
-  ],
-  "license": "0BSD",
   "ignore_embedded_relationships": false,
   "ignore_embedded_relationships_sro": true,
-  "ignore_embedded_relationships_smo": true,
-  "created": "2025-05-08T15:18:14.359Z",
-  "text_input": "Create a detection rule for 1[.]1[.]1[.]1",
-  "name": "Basic IP input"
+  "ignore_embedded_relationships_smo": true
 }
 ```
+
+attack tags not allowed
 
 ### Has CVE labels 
 
 ```json
 {
-  "report_id": "report--3d422c9f-c5e9-43d7-b802-090996e2214e",
-  "identity": {"type":"identity","spec_version":"2.1","id":"identity--b1ae1a15-6f4b-431e-b990-1b9678f35e15","name":"Dummy Identity"},
-  "tlp_level": "red",
+  "ai_provider": "openai:gpt-4o",
+  "text_input": "Create a detection rule for 1[.]1[.]1[.]1",
+  "name": "bad has cve tags",
+  "report_id": "report--c6046104-e2ca-4227-bbc0-0f29d8801901",
   "labels": [
-    "attack.t1176.002",
-    "attack.t1674"
+    "cve.2021-1675"
   ],
   "defang": true,
-  "ai_provider": "openai:gpt-4o",
-  "references": [
-    "https://google.com",
-    "https://facebook.com"
-  ],
-  "license": "0BSD",
   "ignore_embedded_relationships": false,
   "ignore_embedded_relationships_sro": true,
-  "ignore_embedded_relationships_smo": true,
-  "created": "2025-05-08T15:18:14.359Z",
-  "text_input": "Create a detection rule for 1[.]1[.]1[.]1",
-  "name": "Basic IP input"
+  "ignore_embedded_relationships_smo": true
 }
 ```
 
+cve tags not allowed
+
+### Bad tag type
+
+```json
+{
+  "ai_provider": "openai:gpt-4o",
+  "text_input": "Create a detection rule for 1[.]1[.]1[.]1",
+  "name": "bad has cve tags",
+  "report_id": "report--c6046104-e2ca-4227-bbc0-0f29d8801901",
+  "labels": [
+    "bad_tag"
+  ],
+  "defang": true,
+  "ignore_embedded_relationships": false,
+  "ignore_embedded_relationships_sro": true,
+  "ignore_embedded_relationships_smo": true
+}
+```
+
+does not use namespace
+
+### Bad reference
+
+```json
+{
+  "ai_provider": "openai:gpt-4o",
+  "text_input": "Create a detection rule for 1[.]1[.]1[.]1",
+  "name": "bad reference",
+  "report_id": "report--bbd9efdc-33e5-4b2c-85f7-c190684bed3b",
+  "references": [
+    "not a url"
+  ],
+  "defang": true,
+  "ignore_embedded_relationships": false,
+  "ignore_embedded_relationships_sro": true,
+  "ignore_embedded_relationships_smo": true
+}
+```
+
+### Bad identity
+
+```json
+{
+  "ai_provider": "openai:gpt-4o",
+  "text_input": "Create a detection rule for 1[.]1[.]1[.]1",
+  "name": "bad identity",
+  "report_id": "report--2aad562d-4e26-448a-b5a9-016fb44e9769",
+  "identity": "identity--068335dc-7ad6-4ed6-a053-cb3f76a1ad1a",
+  "defang": true,
+  "ignore_embedded_relationships": false,
+  "ignore_embedded_relationships_sro": true,
+  "ignore_embedded_relationships_smo": true
+}
+```
+
+### Bad tlp
+
+```json
+{
+  "ai_provider": "openai:gpt-4o",
+  "text_input": "Create a detection rule for 1[.]1[.]1[.]1",
+  "name": "bad tlp",
+  "report_id": "report--dfc76a31-3406-47ad-a9a3-8ab4d840dda2",
+  "tlp_level": "black",
+  "defang": true,
+  "ignore_embedded_relationships": false,
+  "ignore_embedded_relationships_sro": true,
+  "ignore_embedded_relationships_smo": true
+}
+```
