@@ -142,6 +142,7 @@ class ReportView(viewsets.ViewSet):
             OpenApiParameter('created_min', description="Minimum value of `created` value to filter by in format `YYYY-MM-DD`."),
             OpenApiParameter('visible_to', description="Only show reports that are visible to the Identity id passed. e.g. passing `identity--b1ae1a15-6f4b-431e-b990-1b9678f35e15` would only show reports created by that identity (with any TLP level) or reports created by another identity ID but only if they are marked with `TLP:CLEAR` or `TLP:GREEN`."),
             OpenApiParameter('sort', description="Sort results by property", enum=SORT_PROPERTIES),
+            OpenApiParameter('indicator_id', description="Only show report that contain rule id", many=True, explode=False,),
         ],
     )
     def list(self, request, *args, **kwargs):
@@ -216,6 +217,11 @@ class ReportView(viewsets.ViewSet):
         if term := helper.query.get('created_min'):
             bind_vars['created_min'] = term
             filters.append("FILTER doc.created >= @created_min")
+
+
+        if indicator_ids := helper.query_as_array('indicator_id'):
+            bind_vars['indicator_ids'] = indicator_ids
+            filters.append('FILTER doc.object_refs ANY IN @indicator_ids')
 
         
         visible_to_filter = ''
