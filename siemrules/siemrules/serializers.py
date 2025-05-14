@@ -11,6 +11,7 @@ from drf_spectacular.utils import extend_schema_field, extend_schema_serializer
 import file2txt.parsers.core as f2t_core
 from txt2detection.utils import parse_model as parse_ai_model, valid_licenses
 from django.template.defaultfilters import slugify
+import stix2, json
 
 
 def validate_model(model):
@@ -51,8 +52,14 @@ class IndicatorIDField(StixIdField):
 @extend_schema_field(dict(
     example={"type":"identity","spec_version":"2.1","id":"identity--b1ae1a15-6f4b-431e-b990-1b9678f35e15","name":"Dummy Identity"}, type='object'
 ))
-class STIXIdentityField(serializers.DictField):
-    pass
+class STIXIdentityField(serializers.JSONField):
+    def run_validators(self, value):
+        try:
+            identity = stix2.Identity(**value)
+            return json.loads(identity.serialize())
+        except Exception as e:
+            raise validators.ValidationError(e)
+
 
 class FileSerializer(serializers.ModelSerializer):
     type_label = 'siemrules.file'
@@ -177,5 +184,5 @@ class RuleRevertSerializer(serializers.Serializer):
 class RuleCloneSerializer(serializers.Serializer):
     identity = STIXIdentityField(write_only=True, required=False, help_text='This will be used as the `created_by_ref` for all created SDOs and SROs. This is a full STIX Identity JSON. e.g. `{"type":"identity","spec_version":"2.1","id":"identity--b1ae1a15-6f4b-431e-b990-1b9678f35e15","name":"Dummy Identity"}`. If no value is passed, [the Stixify identity object will be used](https://raw.githubusercontent.com/muchdogesec/stix4doge/refs/heads/main/objects/identity/stixify.json). This is a txt2detection setting.')
     tlp_level = serializers.ChoiceField(choices=TLP_Levels.choices, default=None, help_text='This will be assigned to all SDOs and SROs created. Stixify uses TLPv2. This is a txt2detection setting. Default is `tlp.clear`')
-    title = serializers.CharField(default='Sigma Rule')
-    description = serializers.CharField(default='Description for Sigma Rule')
+    title = serializers.CharField(required=False,default='Sigma Rule')
+    description = serializers.CharField(required=False,default='Description for Sigma Rule')

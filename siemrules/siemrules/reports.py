@@ -142,6 +142,7 @@ class ReportView(viewsets.ViewSet):
             OpenApiParameter('created_min', description="Minimum value of `created` value to filter by in format `YYYY-MM-DD`."),
             OpenApiParameter('visible_to', description="Only show reports that are visible to the Identity id passed. e.g. passing `identity--b1ae1a15-6f4b-431e-b990-1b9678f35e15` would only show reports created by that identity (with any TLP level) or reports created by another identity ID but only if they are marked with `TLP:CLEAR` or `TLP:GREEN`."),
             OpenApiParameter('sort', description="Sort results by property", enum=SORT_PROPERTIES),
+            OpenApiParameter('indicator_id', description="Only show report that contain rule id", many=True, explode=False,),
         ],
     )
     def list(self, request, *args, **kwargs):
@@ -157,6 +158,7 @@ class ReportView(viewsets.ViewSet):
                 description="Filter the results by one or more STIX Object types",
                 enum=OBJECT_TYPES,
             ),
+            OpenApiParameter('ignore_embedded_sro', type=bool, description="If set to `true` all embedded SROs are removed from the response."),
         ],
     )
     @decorators.action(methods=["GET"], detail=True)
@@ -216,6 +218,11 @@ class ReportView(viewsets.ViewSet):
             bind_vars['created_min'] = term
             filters.append("FILTER doc.created >= @created_min")
 
+
+        if indicator_ids := helper.query_as_array('indicator_id'):
+            bind_vars['indicator_ids'] = indicator_ids
+            filters.append('FILTER doc.object_refs ANY IN @indicator_ids')
+
         
         visible_to_filter = ''
         if q := helper.query.get('visible_to'):
@@ -244,19 +251,26 @@ class ReportView(viewsets.ViewSet):
     def get_report_objects(self, report_id):
         helper = ArangoDBHelper(settings.VIEW_NAME, self.request)
         types = helper.query.get('types', "")
+        filters = []
         bind_vars = {
             "@collection": settings.VIEW_NAME,
             'report_id': report_id,
             "types": list(OBJECT_TYPES.intersection(types.split(","))) if types else None,
         }
+
+        if q := helper.query_as_bool('ignore_embedded_sro', default=False):
+            filters.append('FILTER doc._is_ref != TRUE')
+
         query = """
             FOR doc in @@collection
             FILTER doc._stixify_report_id == @report_id
             FILTER NOT @types OR doc.type IN @types
+            #filters
             
             LIMIT @offset, @count
             RETURN KEEP(doc, KEYS(doc, TRUE))
         """
+        query = query.replace("#filters", '\n'.join(filters))
         resp = helper.execute_query(query, bind_vars=bind_vars)
         resp.data['objects'] = list(resp.data['objects'])
         return resp

@@ -75,7 +75,7 @@ class SchemaViewCached(SpectacularAPIView):
         )
 
 @extend_schema_view(
-    upload=extend_schema(
+    create_from_intel=extend_schema(
         summary="Upload an intelligence report to convert into Sigma Base Rules",
         description=textwrap.dedent(
             """
@@ -97,7 +97,7 @@ class SchemaViewCached(SpectacularAPIView):
             """
         ),
     ),
-    sigma=extend_schema(
+    create_from_sigma=extend_schema(
         summary="Upload an existing Sigma Base Rule",
         description=textwrap.dedent(
             """
@@ -113,7 +113,7 @@ class SchemaViewCached(SpectacularAPIView):
             """
         ),
     ),
-    text=extend_schema(
+    create_from_prompt=extend_schema(
         summary="Enter a text prompt to convert into Sigma Base Rule",
         description=textwrap.dedent(
             """
@@ -254,8 +254,8 @@ class FileView(
         responses={200: serializers.JobSerializer, 400: DEFAULT_400_ERROR},
         request=serializers.FileSerializer,
     )
-    @decorators.action(methods=["POST"], detail=False)
-    def upload(self, request, *args, **kwargs):
+    @decorators.action(methods=["POST"], detail=False, url_path="intel")
+    def create_from_intel(self, request, *args, **kwargs):
         serializer = FileSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         temp_file = request.FILES["file"]
@@ -269,8 +269,8 @@ class FileView(
         responses={200: serializers.JobSerializer, 400: DEFAULT_400_ERROR},
         request=serializers.FileSigmaSerializer,
     )
-    @decorators.action(methods=["POST"], detail=False)
-    def sigma(self, request, *args, **kwargs):
+    @decorators.action(methods=["POST"], detail=False, url_path="sigma")
+    def create_from_sigma(self, request, *args, **kwargs):
         serializer = serializers.FileSigmaSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         temp_file = request.FILES["sigma_file"]
@@ -287,9 +287,9 @@ class FileView(
         request=serializers.FilePromptSerializer,
     )
     @decorators.action(
-        methods=["POST"], detail=False, parser_classes=[parsers.JSONParser]
+        methods=["POST"], detail=False, parser_classes=[parsers.JSONParser], url_path="prompt"
     )
-    def text(self, request, *args, **kwargs):
+    def create_from_prompt(self, request, *args, **kwargs):
         serializer = serializers.FilePromptSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         file_instance = serializer.save(mimetype="text/plain")
@@ -549,6 +549,7 @@ class JobView(
                 description="Filter the results by one or more STIX Object types",
                 enum=OBJECT_TYPES,
             ),
+            OpenApiParameter('ignore_embedded_sro', type=bool, description="If set to `true` all embedded SROs are removed from the response."),
         ],
     ),
 )
@@ -675,7 +676,7 @@ class RuleView(viewsets.GenericViewSet):
         request=serializers.AIModifySerializer,
         responses={200: serializers.RuleSerializer, 400: DEFAULT_400_ERROR},
     )
-    @decorators.action(methods=['POST'], detail=True, url_path="modify/base-rule/ai")
+    @decorators.action(methods=['POST'], detail=True, url_path="modify/base-rule/prompt")
     def modify_base_rule_from_prompt(self, request, *args, indicator_id=None, **kwargs):
         report, indicator, all_objs = arangodb_helpers.get_objects_by_id(indicator_id)
         s = serializers.AIModifySerializer(data=request.data)
@@ -729,8 +730,7 @@ class RuleView(viewsets.GenericViewSet):
     @decorators.action(methods=["GET"], detail=True)
     def objects(self, request, *args, indicator_id=None, **kwargs):
         return arangodb_helpers.get_objects_for_rule(
-            indicator_id, version=request.query_params.get("version"),
-            types=request.query_params.get("types"),
+            indicator_id, request, version=request.query_params.get("version"),
         )
     
 @extend_schema_view(
@@ -905,7 +905,7 @@ class RuleViewWithCorrelationModifier(RuleView):
         request=serializers.AIModifySerializer,
         responses={200: serializers.RuleSerializer, 400: DEFAULT_400_ERROR},
     )
-    @decorators.action(methods=['POST'], detail=True, url_path="modify/correlation-rule/ai")
+    @decorators.action(methods=['POST'], detail=True, url_path="modify/correlation-rule/prompt")
     def modify_correlation_from_prompt(self, request, *args, indicator_id=None, **kwargs):
         report, indicator, all_objs = arangodb_helpers.get_objects_by_id(indicator_id)
         s = serializers.AIModifySerializer(data=request.data)
@@ -969,7 +969,7 @@ class RuleViewWithCorrelationModifier(RuleView):
         request=CorrelationRuleSerializer,
         responses={200: serializers.CorrelationJobSerializer, 400: DEFAULT_400_ERROR},
     )
-    @decorators.action(methods=['POST'], detail=False, serializer_class=CorrelationJobSerializer, url_path="create/correlation-rule/ai")
+    @decorators.action(methods=['POST'], detail=False, serializer_class=CorrelationJobSerializer, url_path="create/correlation-rule/prompt")
     def create_from_prompt(self, request, *args, **kwargs):
         s = CorrelationRuleSerializer(data=request.data)
         s.is_valid(raise_exception=True)

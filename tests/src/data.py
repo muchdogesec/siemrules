@@ -290,6 +290,7 @@ BUNDLE_2 = {
             "pattern_type": "sigma",
             "pattern": "id: 9e2536b0-988b-598d-8cc3-407f9f13fc61\ntitle: Detection of Malicious Code in xz Tarballs\ndescription: Detects the presence of malicious code in the xz tarballs starting from\n    version 5.6.0, which modifies the liblzma library through obfuscation techniques.\nlevel: high\ndetection:\n    condition: selection\n    selection:\n        file_name: test_file\n        file_version: 5.6.0\n        library: liblzma\nlogsource:\n    product: application\n    service: xz\nfalsepositives:\n- Legitimate updates or patches to the xz library that include test files.\n- Custom builds of xz that include additional test files for development purposes.\ntags:\n- tlp.green\n- cve.2024-3094\n- attack.execution\n- attack.defense-evasion\n- txt2detection.downloaded\n- txt2detection.nvd\n- txt2detection.cve-2024-3094\n- txt2detection.xz\n- txt2detection.liblzma\n- txt2detection.linux\nconfidence: 85\nauthor: identity--a4d70b75-6f4a-5d19-9137-da863edd33d7\nstatus: experimental\nlicense: 0BSD\n",
             "valid_from": "2025-01-23T17:31:01.000Z",
+            "description": "Detects the presence of malicious code in the xz tarballs starting from version 5.6.0, which modifies the liblzma library through obfuscation techniques.",
             "object_marking_refs": [
                 "marking-definition--bab4a63c-aed9-4cf5-a766-dfca5abac2bb",
                 "marking-definition--a4d70b75-6f4a-5d19-9137-da863edd33d7"
