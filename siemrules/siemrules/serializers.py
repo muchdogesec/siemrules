@@ -69,6 +69,21 @@ class STIXIdentityField(serializers.JSONField):
             return json.loads(identity.serialize())
         except Exception as e:
             raise validators.ValidationError(e)
+        
+
+class CharacterSeparatedField(serializers.ListField):
+    def __init__(self, *args, **kwargs):
+        self.separator = kwargs.pop("separator", ",")
+        super().__init__(*args, **kwargs)
+
+    def to_internal_value(self, data):
+        retval = []
+        if hasattr(self.parent, "skip_csv"):
+            retval = data
+        else:
+            for s in data:
+                retval.extend(s.split(self.separator))
+        return super().to_internal_value(retval)
 
 
 class FileSerializer(serializers.ModelSerializer):
@@ -85,8 +100,8 @@ class FileSerializer(serializers.ModelSerializer):
     created = serializers.DateTimeField(default=None, help_text="By default the `data` and `modified` values in the rule will be used. If no values exist for these, the default behaviour is to use script run time. You can pass  `created` time here which will overwrite `date` and `modified` date in the rule")
     identity = STIXIdentityField(write_only=True, required=False, help_text='This will be used as the `created_by_ref` for all created SDOs and SROs. This is a full STIX Identity JSON. e.g. `{"type":"identity","spec_version":"2.1","id":"identity--b1ae1a15-6f4b-431e-b990-1b9678f35e15","name":"Dummy Identity"}`. If no value is passed, [the Stixify identity object will be used](https://raw.githubusercontent.com/muchdogesec/stix4doge/refs/heads/main/objects/identity/stixify.json). This is a txt2detection setting.')
     tlp_level = serializers.ChoiceField(choices=TLP_Levels.choices, default=TLP_Levels.CLEAR.value, help_text='This will be assigned to all SDOs and SROs created. Stixify uses TLPv2. This is a txt2detection setting.')
-    labels = serializers.ListField(child=serializers.CharField(validators=[validate_label]), required=False, help_text="Will be added to the `labels` of the Report and Indicator SDOs created, and `tags` in the Sigma rule itself. Must pass in format `namespace.value`. This is a txt2detection setting. Note: you cannot use the reserved `tlp.` namespace. Use the `tlp_level` setting to set this. Note: you cannot use reserved namespaces `cve.` and `attack.`. The AI will add these based on the rule content.")
-    references = serializers.ListField(child=serializers.URLField(), default=list, help_text="A list of URLs to be added as `references` in the Sigma Rule property and in the `external_references` property of the Indicator and Report STIX object created (e.g. `https://www.dogesec.com`). This is a txt2detection setting.")
+    labels = CharacterSeparatedField(child=serializers.CharField(validators=[validate_label]), required=False, help_text="Will be added to the `labels` of the Report and Indicator SDOs created, and `tags` in the Sigma rule itself. Must pass in format `namespace.value`. This is a txt2detection setting. Note: you cannot use the reserved `tlp.` namespace. Use the `tlp_level` setting to set this. Note: you cannot use reserved namespaces `cve.` and `attack.`. The AI will add these based on the rule content.")
+    references = CharacterSeparatedField(child=serializers.URLField(), default=list, help_text="A list of URLs to be added as `references` in the Sigma Rule property and in the `external_references` property of the Indicator and Report STIX object created (e.g. `https://www.dogesec.com`). This is a txt2detection setting.")
     license = serializers.ChoiceField(default=None, choices=list(valid_licenses().items()), allow_null=True, help_text='[License of the rule according the SPDX ID specification](https://spdx.org/licenses/) (e.g. `MIT`). Will be added to the Sigma rule. This is a txt2detection setting.')
     defang = serializers.BooleanField(default=True, help_text="Whether to defang the observables in the text. e.g. turns `1.1.1[.]1` to `1.1.1.1` for extraction. This is a file2txt setting.")
     ai_provider = serializers.CharField(required=True, validators=[validate_model], help_text="An AI provider and model to be used for rule generation in format `provider:model` e.g. `openai:gpt-4o`. This is a txt2detection setting.")
@@ -100,7 +115,6 @@ class FileSerializer(serializers.ModelSerializer):
         exclude = ['markdown_file', 'status', 'level']
         read_only_fields = ['id']
 
-    
     def create(self, validated_data):
         return super().create(validated_data)
 
@@ -127,13 +141,13 @@ class FileSigmaSerializer(serializers.ModelSerializer):
         validators.UniqueValidator(queryset=File.objects.all(), message="File with report id already exists"),
     ], required=False)
     identity = STIXIdentityField(write_only=True, required=False, help_text="A full STIX 2.1 identity object (make sure to properly escape). e.g. `{\"type\":\"identity\",\"spec_version\":\"2.1\",\"id\":\"identity--b1ae1a15-6f4b-431e-b990-1b9678f35e15\",\"name\":\"Dummy Identity\"}` Will be validated by the STIX2 library. The ID is used to create the Indicator and Report STIX objects, and is used as the `author` property in the Sigma Rule. Will overwrite any existing `author` value. If `author` value in rule, will be converted into a STIX Identity")
-    labels = serializers.ListField(child=serializers.CharField(validators=[validate_label]), required=False, help_text=textwrap.dedent("""
+    labels = CharacterSeparatedField(child=serializers.CharField(validators=[validate_label]), required=False, help_text=textwrap.dedent("""
     Case-insensitive (will all be converted to lower-case). Allowed `a-z`, `0-9`. e.g.`"namespace.label1" "namespace.label2"` would create 2 labels. Added to both report and indicator objects created and the rule `tags`. Note, if any existing `tags` in the rule, these values will be appended to the list.
     * note: you can use reserved namespaces `cve.` and `attack.` when creating labels to perform external enrichment using Vulmatch and CTI Butler. Created tags will be appended to the list of existing tags.
     * note: you cannot use the namespace `tlp.` You can define this using the `tlp_level` setting.
     """))
     tlp_level = serializers.ChoiceField(choices=TLP_Levels.choices, default=TLP_Levels.CLEAR.value, help_text='If TLP exist in rule tags (e.g. `tlp.red`), setting a value for this property will overwrite the existing value. When unset, the `tlp.` tag in the report will be turned into a TLP level for the STIX objects created. Defaults to `clear` if there is no `tlp.` tag in rule and none passed in the request.')
-    references = serializers.ListField(child=serializers.URLField(), default=list, help_text='A list of URLs to be added as `references` in the Sigma Rule property and in the `external_references` property of the Indicator and Report STIX object created. e.g `"https://www.google.com/"`, `"https://www.facebook.com/"`. Will appended to any existing `references` in the rule.')
+    references = CharacterSeparatedField(child=serializers.URLField(), default=list, help_text='A list of URLs to be added as `references` in the Sigma Rule property and in the `external_references` property of the Indicator and Report STIX object created. e.g `"https://www.google.com/"`, `"https://www.facebook.com/"`. Will appended to any existing `references` in the rule.')
     status = serializers.ChoiceField(required=False, choices=[(tag.name, tag.value) for tag in txt2detection.models.Statuses], help_text="If passed, will overwrite any existing `status` recorded in the rule. Either `stable`, `test`, `experimental`, `deprecated`, or `unsupported` ")
     level  = serializers.ChoiceField(required=False, choices=[(level.name, level.value) for level in txt2detection.models.Level], help_text="If passed, will overwrite any existing `level` recorded in the rule. Either `informational`, `low`, `medium`, `high`, `critical`")
     ignore_embedded_relationships = serializers.BooleanField(default=False, help_text="Default is `false`. Setting this to `true` will stop stix2arango creating relationship objects for the embedded relationships found in objects created by txt2detection. If you want to target certain object types see `ignore_embedded_relationships_sro` and `ignore_embedded_relationships_sro` flags. This is a stix2arango setting.")
