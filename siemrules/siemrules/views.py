@@ -6,9 +6,11 @@ from rest_framework import (
     decorators,
     mixins,
     renderers,
-    exceptions,
     status,
     validators,
+)
+from txt2detection.models import (
+    SigmaRuleDetection
 )
 from txt2detection.utils import parse_model
 from siemrules.siemrules import correlations, models, reports
@@ -651,11 +653,11 @@ class RuleView(viewsets.GenericViewSet):
         old_detection = yaml_to_detection(
             indicator["pattern"], indicator.get("indicator_types", [])
         )
-        data = DRFDetection.merge_detection(old_detection, request.data)
-        s = DRFDetection.drf_serializer(data=data)
+        merged_data = DRFDetection.merge_detection(old_detection, request.data)
+        s = DRFDetection.drf_serializer(data=merged_data)
         s.is_valid(raise_exception=True)
         DRFDetection.is_valid(s, request.data)
-        detection = DRFDetection.model_validate(s.data)
+        detection = SigmaRuleDetection.model_validate(merged_data)
 
         return self.do_modify_base_rule(request, indicator_id, report, indicator, detection)
 
@@ -684,17 +686,17 @@ class RuleView(viewsets.GenericViewSet):
         )
         input_text = report["description"]
         input_text = "<SKIPPED INPUT>"
-        detection_container = get_modification(
+        detection = get_modification(
             parse_model(s.data["ai_provider"]),
             input_text,
             old_detection,
             s.data["prompt"],
         )
-        if not detection_container.success:
-            raise exceptions.ParseError("txt2detection: failed to execute")
+
+        print(old_detection, detection)
 
         return self.do_modify_base_rule(
-            request, indicator_id, report, indicator, detection_container.detections[0]
+            request, indicator_id, report, indicator, detection
         )
     
     @extend_schema(request=serializers.RuleRevertSerializer)

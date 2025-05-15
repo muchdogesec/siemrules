@@ -128,6 +128,7 @@ class FileSigmaYamlSerializer(serializers.ModelSerializer):
     type_label = 'siemrules.sigma'
     mode = serializers.HiddenField(default="sigma")
     ai_provider = serializers.HiddenField(default=None)
+    tlp_level = serializers.CharField(required=True)
     sigma_file = serializers.FileField(source='file', write_only=True)
     name = serializers.CharField(required=False)
     created = serializers.DateTimeField(default=None)

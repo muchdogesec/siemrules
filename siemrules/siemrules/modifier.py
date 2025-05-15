@@ -51,6 +51,7 @@ def modify_indicator(report, indicator: dict, detection: BaseDetection):
     bundler.report.object_marking_refs.clear()
     bundler.report.object_marking_refs.extend(report['object_marking_refs'])
     container = DetectionContainer(success=True, detections=[])
+    detection.modified = bundler.modified.date()
     container.detections.append(detection)
     bundler.bundle.objects.clear() # remove any default object
     bundler.bundle_detections(container)
@@ -72,16 +73,6 @@ class ModifierDetection(BaseDetection):
     logsource: dict = None
     detection: dict
 
-    @computed_field(alias="date")
-    @property
-    def date(self) -> dt_date:
-        return self._bundler.report.created.date()
-
-    @computed_field
-    @property
-    def modified(self) -> dt_date:
-        return self._bundler.report.modified.date()
-
 
 class DRFDetection(DRFBaseModel, ModifierDetection):
     drf_config = {"validate_pydantic": True}
@@ -90,7 +81,7 @@ class DRFDetection(DRFBaseModel, ModifierDetection):
     def is_valid(s, initial_data):
             unknown_keys = set(initial_data.keys()) - set(s.fields.keys())
             if unknown_keys:
-                raise validators.ValidationError("Got unknown fields: {}".format(unknown_keys))
+                raise validators.ValidationError("Got unexpected fields: {}".format(unknown_keys))
             
     @classmethod
     def merge_detection(cls, old_detection: BaseDetection, request_data: dict):
@@ -98,7 +89,10 @@ class DRFDetection(DRFBaseModel, ModifierDetection):
             v = request_data.pop(k, [])
             if v != None:
                 request_data.update({k: [*getattr(old_detection, k, []), *v]})
-        return {**old_detection.model_dump(exclude=['created', 'modified', 'date'], exclude_unset=True, exclude_none=True), **request_data}
+        return {**old_detection.model_dump(exclude=['date'], exclude_unset=True, exclude_none=True), **request_data}
+    
+    def to_sigma_rule_detection(self):
+        return SigmaRuleDetection.model_validate(self.model_dump())
     
 class DRFSigmaRule(DRFBaseModel, SigmaRuleDetection):
     drf_config = {"validate_pydantic": True}
@@ -135,6 +129,7 @@ class DRFSigmaRule(DRFBaseModel, SigmaRuleDetection):
                 name=self.title,
                 identity=self._identity,
                 sigma_file=SimpleUploadedFile(f"{slugify(self.title)}.yml", content=bytes(rule, 'utf-8'), content_type="application/sigma+yaml"),
+                tlp_level=self.tlp_level.name.replace('-', '+'),
             )
 
         s = FileSigmaYamlSerializer(
@@ -161,16 +156,14 @@ def yaml_to_detection(modification: str, indicator_types=[]):
     modification.update(indicator_types=indicator_types)
     return SigmaRuleDetection.model_validate(modification)
 
-class ModifierDetectionContainer(DetectionContainer):
-    detections: SigmaRuleDetection
 
 
-def get_modification(model, input_text, old_detection: SigmaRuleDetection, prompt) -> DetectionContainer:
+def get_modification(model, input_text, old_detection: SigmaRuleDetection, prompt) -> SigmaRuleDetection:
     old_detection._bundler = SimpleNamespace(report=SimpleNamespace(created=datetime.now(), modified=datetime.now()))
     assert isinstance(old_detection, BaseDetection), "rule must be of type detection"
     detections = DetectionContainer(success=True, detections=[old_detection])
     return LLMTextCompletionProgram.from_defaults(
-        output_parser=ParserWithLogging(ModifierDetectionContainer),
+        output_parser=ParserWithLogging(SigmaRuleDetection),
         prompt=ChatPromptTemplate(prompts.SIEMRULES_PROMPT.message_templates
         + [
             ChatMessage.from_str("{old_rule}", MessageRole.ASSISTANT),
