@@ -1,11 +1,16 @@
 from datetime import UTC, date as dt_date, datetime
 from enum import Enum
 import itertools
+import json
+import uuid
 from pydantic import BaseModel, ConfigDict, Field, ValidationInfo, field_validator, model_validator, NameEmail
 from typing import ClassVar, List, Dict, Optional
 from uuid import UUID
 from pydantic_core import Url
 from txt2detection.models import SigmaTag, BaseDetection, TLP_LEVEL, Statuses, Level, tlp_from_tags, set_tlp_level_in_tags
+import stix2
+
+from siemrules.siemrules.correlations.utils import validate_author
 
 
 class CorrelationType(str, Enum):
@@ -138,6 +143,12 @@ class RuleModel(BaseRuleModel, RuleModelExtraProperties):
     @rule_id.setter
     def rule_id(self, rule_id):
         self._rule_id = rule_id
+
+    @field_validator('author', mode='before')
+    @classmethod
+    def validate_author(cls, author):
+        return validate_author(author)
+
 
 
 class AIRuleModel(BaseRuleModel):
