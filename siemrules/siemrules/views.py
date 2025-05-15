@@ -657,7 +657,7 @@ class RuleView(viewsets.GenericViewSet):
         s = DRFDetection.drf_serializer(data=merged_data)
         s.is_valid(raise_exception=True)
         DRFDetection.is_valid(s, request.data)
-        detection = SigmaRuleDetection.model_validate(merged_data)
+        detection = old_detection.model_copy(update=s.data)
 
         return self.do_modify_base_rule(request, indicator_id, report, indicator, detection)
 

@@ -162,7 +162,7 @@ def get_modification(model, input_text, old_detection: SigmaRuleDetection, promp
     old_detection._bundler = SimpleNamespace(report=SimpleNamespace(created=datetime.now(), modified=datetime.now()))
     assert isinstance(old_detection, BaseDetection), "rule must be of type detection"
     detections = DetectionContainer(success=True, detections=[old_detection])
-    return LLMTextCompletionProgram.from_defaults(
+    ai_detection = LLMTextCompletionProgram.from_defaults(
         output_parser=ParserWithLogging(SigmaRuleDetection),
         prompt=ChatPromptTemplate(prompts.SIEMRULES_PROMPT.message_templates
         + [
@@ -179,4 +179,9 @@ def get_modification(model, input_text, old_detection: SigmaRuleDetection, promp
         old_rule=detections.model_dump(mode='json', exclude=['date', 'modified']),
         correction_prompt=prompt,
     )
+
+    retval = old_detection.model_copy()
+    for attr in ai_detection.model_fields_set:
+        setattr(retval, attr, getattr(ai_detection, attr))
+    return retval
 
