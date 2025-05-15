@@ -1,5 +1,4 @@
 from datetime import UTC, datetime
-import io
 import uuid
 from rest_framework import (
     viewsets,
@@ -7,18 +6,19 @@ from rest_framework import (
     decorators,
     mixins,
     renderers,
-    exceptions,
-    serializers as drf_serializers,
     status,
     validators,
 )
+from txt2detection.models import (
+    SigmaRuleDetection
+)
 from txt2detection.utils import parse_model
-import yaml
 from siemrules.siemrules import correlations, models, reports
 from siemrules.siemrules import serializers
 from siemrules.siemrules.correlations.serializers import CorrelationRuleSerializer, DRFCorrelationRule
 from siemrules.siemrules.modifier import (
     DRFDetection,
+    DRFSigmaRule,
     get_modification,
     modify_indicator,
     yaml_to_detection,
@@ -29,11 +29,11 @@ from siemrules.siemrules.serializers import (
     ImageSerializer,
     JobSerializer,
 )
-from rest_framework.exceptions import NotFound, ParseError
+from rest_framework.exceptions import ParseError
 from dogesec_commons.objects.helpers import OBJECT_TYPES
 
 from rest_framework import request
-from django.http import HttpRequest, HttpResponse
+from django.http import HttpRequest
 from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter
 import textwrap
 import typing
@@ -267,16 +267,16 @@ class FileView(
 
     @extend_schema(
         responses={200: serializers.JobSerializer, 400: DEFAULT_400_ERROR},
-        request=serializers.FileSigmaSerializer,
+        request=DRFSigmaRule.drf_serializer,
     )
-    @decorators.action(methods=["POST"], detail=False, url_path="sigma")
-    def create_from_sigma(self, request, *args, **kwargs):
-        serializer = serializers.FileSigmaSerializer(data=request.data)
+    @decorators.action(methods=["POST"], detail=False, url_path="sigma", parser_classes=[SigmaRuleParser])
+    def create_from_sigma(self, request: request.Request, *args, **kwargs):
+        request_body = request.body
+        serializer = DRFSigmaRule.drf_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        temp_file = request.FILES["sigma_file"]
-        if temp_file.content_type != "application/x-yaml":
-            validators.ValidationError("file content-type must be application/x-yaml")
-        file_instance = serializer.save(mimetype=temp_file.content_type)
+        rule = DRFSigmaRule.model_validate(serializer.validated_data)
+        file_serializer = rule.to_file_serializer(request_body=request_body)
+        file_instance = file_serializer.save(mimetype="application/x-yaml")
         job_instance = models.Job.objects.create(file=file_instance, type=models.JobType.FILE_SIGMA)
         job_serializer = JobSerializer(job_instance)
         tasks.new_task(job_instance)
@@ -653,11 +653,11 @@ class RuleView(viewsets.GenericViewSet):
         old_detection = yaml_to_detection(
             indicator["pattern"], indicator.get("indicator_types", [])
         )
-        data = DRFDetection.merge_detection(old_detection, request.data)
-        s = DRFDetection.drf_serializer(data=data)
+        merged_data = DRFDetection.merge_detection(old_detection, request.data)
+        s = DRFDetection.drf_serializer(data=merged_data)
         s.is_valid(raise_exception=True)
         DRFDetection.is_valid(s, request.data)
-        detection = DRFDetection.model_validate(s.data)
+        detection = old_detection.model_copy(update=s.data)
 
         return self.do_modify_base_rule(request, indicator_id, report, indicator, detection)
 
@@ -686,17 +686,15 @@ class RuleView(viewsets.GenericViewSet):
         )
         input_text = report["description"]
         input_text = "<SKIPPED INPUT>"
-        detection_container = get_modification(
+        detection = get_modification(
             parse_model(s.data["ai_provider"]),
             input_text,
             old_detection,
             s.data["prompt"],
         )
-        if not detection_container.success:
-            raise exceptions.ParseError("txt2detection: failed to execute")
 
         return self.do_modify_base_rule(
-            request, indicator_id, report, indicator, detection_container.detections[0]
+            request, indicator_id, report, indicator, detection
         )
     
     @extend_schema(request=serializers.RuleRevertSerializer)
