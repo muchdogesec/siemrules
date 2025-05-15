@@ -41,7 +41,7 @@ def  validate_author(author: str):
 
     if author.startswith('{'):
         try:
-            author = stix2.Identity(json.loads(author))
+            author = stix2.Identity(**json.loads(author))
         except Exception as e:
             raise ValueError(f'invalid stix identity object: {e}')
     elif author.startswith('identity--'):
