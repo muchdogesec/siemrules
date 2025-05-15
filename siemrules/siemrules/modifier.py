@@ -112,7 +112,8 @@ class DRFSigmaRule(DRFBaseModel, SigmaRuleDetection):
         return validate_author(author)
     
     def model_post_init(self, __context):
-        self._identity = json.loads(self.author)
+        if self.author:
+            self._identity = json.loads(self.author)
         return super().model_post_init(__context)
     
     def clean_author(self):

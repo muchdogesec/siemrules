@@ -693,8 +693,6 @@ class RuleView(viewsets.GenericViewSet):
             s.data["prompt"],
         )
 
-        print(old_detection, detection)
-
         return self.do_modify_base_rule(
             request, indicator_id, report, indicator, detection
         )

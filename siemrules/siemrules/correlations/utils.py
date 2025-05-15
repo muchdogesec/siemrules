@@ -36,6 +36,8 @@ def get_stix_object(stix_id):
     return helper.execute_query(query, bind_vars=binds, paginate=False)
 
 def  validate_author(author: str):
+    if not author:
+        return None
     if isinstance(author, dict):
         author = json.dumps(author)
 
