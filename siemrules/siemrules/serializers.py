@@ -76,6 +76,9 @@ class CharacterSeparatedField(serializers.ListField):
             retval = data
         else:
             for s in data:
+                if not isinstance(s, str):
+                    retval.append(s)
+                    continue
                 retval.extend(s.split(self.separator))
         return super().to_internal_value(retval)
 
