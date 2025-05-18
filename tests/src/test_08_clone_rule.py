@@ -122,7 +122,7 @@ def test_clone(subtests, client: django.test.Client, indicator_id, payload):
     with subtests.test("identity"):
         identity = payload.get("identity", settings.STIX_IDENTITY)
         assert identity["id"] == cloned_indicator["created_by_ref"]
-        assert cloned_detection.author == identity["id"]
+        assert identity["id"] in cloned_detection.author #author is a json string
 
     assert cloned_detection.date == orig_detection.date, "rule.date should be the same"
     assert (
