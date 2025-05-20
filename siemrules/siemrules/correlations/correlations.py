@@ -7,6 +7,7 @@ import uuid
 from django.conf import settings
 
 from siemrules.siemrules.correlations.prompts import CORRELATION_MODIFICATION_PROMPT, CORRELATION_RULES_PROMPT
+from siemrules.siemrules.correlations.utils import make_identity
 if typing.TYPE_CHECKING:
     from siemrules import settings
 from siemrules.siemrules.correlations.models import AIRuleModel, RuleModel
@@ -27,11 +28,8 @@ from txt2detection.ai_extractor.utils import (
 def create_indicator(correlation: RuleModel):
     pass
 
-def make_identity(name):
-    return Identity(id='identity--'+str(uuid.uuid5(settings.STIX_NAMESPACE, f"txt2detection+{name}")), name=name, created_by_ref=default_identity()['id'], created=datetime(2020, 1, 1), modified=datetime(2020, 1, 1))
-
 def make_rule(rule: RuleModel, other_documents: list[dict], id):
-    rule_dict = rule.model_dump(mode='json', exclude_none=True)
+    rule_dict = rule.model_dump(mode='json', exclude_none=True, by_alias=True)
     rule_dict.update(id=id)
     rule_str = yaml.safe_dump_all(
         [rule_dict, *other_documents],
@@ -44,8 +42,9 @@ def add_rule_indicator(rule: RuleModel, related_indicators = None, correlation_r
     job_data = job_data or dict()
     related_indicators = related_indicators or []
     identity = default_identity()
-    if rule.author and not rule.author.startswith('identity--'):
-        identity = make_identity(rule.author)
+    if rule.author:
+        #assumes rule.author must be pre-fetched identity
+        identity = parse_stix(rule.author)
     elif job_data and job_data.get('identity'):
         identity = job_data['identity']
 

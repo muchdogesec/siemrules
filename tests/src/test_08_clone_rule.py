@@ -68,7 +68,7 @@ def test_clone(subtests, client: django.test.Client, indicator_id, payload):
     orig_rule_resp = client.get(rule_url)
     assert orig_rule_resp.status_code == 200
     orig_indicator = orig_rule_resp.json()
-    clone_resp = client.post(rule_url + "clone/", data=payload)
+    clone_resp = client.post(rule_url + "clone/", data=payload, content_type='application/json')
     assert clone_resp.status_code == 200
     cloned_indicator = clone_resp.json()
     cloned_detection = rule_to_detection(cloned_indicator)
@@ -122,7 +122,7 @@ def test_clone(subtests, client: django.test.Client, indicator_id, payload):
     with subtests.test("identity"):
         identity = payload.get("identity", settings.STIX_IDENTITY)
         assert identity["id"] == cloned_indicator["created_by_ref"]
-        assert cloned_detection.author == identity["id"]
+        assert identity["id"] in cloned_detection.author #author is a json string
 
     assert cloned_detection.date == orig_detection.date, "rule.date should be the same"
     assert (

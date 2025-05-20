@@ -180,7 +180,7 @@ class TestRuleView:
    
     
     def test_revert_rule(self, client: django.test.Client):
-        rule_id = "indicator--8af82832-2abd-5765-903c-01d414dae1e9"
+        rule_id = "indicator--2683daab-aa64-52ff-a001-3ea5aee9dd72"
         rule_url = f"{self.url}{rule_id}/"
 
         versions_resp = client.get(rule_url + "versions/")
@@ -207,7 +207,7 @@ class TestRuleView:
             assert object_before_revert[k] == object_after_revert[k]
 
     def test_revert_to_latest(self, client: django.test.Client):
-        rule_id = "indicator--8af82832-2abd-5765-903c-01d414dae1e9"
+        rule_id = "indicator--2683daab-aa64-52ff-a001-3ea5aee9dd72"
         rule_url = f"{self.url}{rule_id}/"
 
         versions_resp = client.get(rule_url + "versions/")
@@ -219,7 +219,7 @@ class TestRuleView:
         assert response.status_code == 400, response.json()
 
     def test_revert_bad_version(self, client: django.test.Client):
-        rule_id = "indicator--8af82832-2abd-5765-903c-01d414dae1e9"
+        rule_id = "indicator--2683daab-aa64-52ff-a001-3ea5aee9dd72"
         rule_url = f"{self.url}{rule_id}/"
 
         revert_version = "2001-01-01T01:01:01.001Z" #bad version
