@@ -57,7 +57,7 @@
   "ai_provider": "openai:gpt-4o",
   "text_input": "Create a detection rule for 1[.]1[.]1[.]1",
   "name": "testing tlp amber+strict",
-  "report_id": "report--f913ff8a-a024-4d97-ac94-ab8721fc10a8",
+  "report_id": "report--f913ff8a-a024-4d97-ac94-ab8721fc10a9",
   "tlp_level": "amber+strict",
   "defang": true,
   "ignore_embedded_relationships": false,
