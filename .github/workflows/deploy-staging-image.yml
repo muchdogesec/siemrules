@@ -42,7 +42,7 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
             DJANGO_DEBUG=True
-            R2_ACCESS_KEY=67db4a890de33950ef9d582391ee0d99
+            R2_ACCESS_KEY=a934db14238d5303d37c15927f35789d
             R2_BUCKET_NAME=siemrules-web-core-staging
             DJANGO_SECRET=${{ secrets.DJANGO_SECRET }}
             POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
