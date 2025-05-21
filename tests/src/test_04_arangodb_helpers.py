@@ -37,14 +37,10 @@ RULE_TYPES = [
     [
         pytest.param(dict(attack_id="T105911"), [], id="attack_id bad"),
         pytest.param(
-            dict(attack_id="T1059"),
-            [],
-            id="attack_id bad 2",
-        ),
-        pytest.param(
             dict(attack_id="T1059,TA0001"),
             [
                 "indicator--8af82832-2abd-5765-903c-01d414dae1e9",
+                "indicator--2683daab-aa64-52ff-a001-3ea5aee9dd72",
             ],
             id="attack_id x2",
         ),

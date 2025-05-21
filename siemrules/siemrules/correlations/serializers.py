@@ -58,10 +58,6 @@ class DRFCorrelationRuleModify(DRFBaseModel, BaseRuleModel, RuleModelExtraProper
 
     @classmethod
     def merge_detection(cls, old_detection: CorrelationRule, request_data: dict):
-        for k in ['tags', 'falsepositives', 'references']:
-            v = request_data.pop(k, [])
-            if v != None:
-                request_data.update({k: [*getattr(old_detection, k, []), *v]})
         return {**old_detection.model_dump(exclude=['created', 'modified', 'date', 'author'], exclude_unset=True, exclude_none=True), **request_data}
 
     

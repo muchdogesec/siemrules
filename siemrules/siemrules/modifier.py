@@ -85,10 +85,6 @@ class DRFDetection(DRFBaseModel, ModifierDetection):
             
     @classmethod
     def merge_detection(cls, old_detection: BaseDetection, request_data: dict):
-        for k in ['tags', 'falsepositives', 'references']:
-            v = request_data.pop(k, [])
-            if v != None:
-                request_data.update({k: [*getattr(old_detection, k, []), *v]})
         return {**old_detection.model_dump(exclude=['date'], exclude_unset=True, exclude_none=True), **request_data}
     
     def to_sigma_rule_detection(self):
