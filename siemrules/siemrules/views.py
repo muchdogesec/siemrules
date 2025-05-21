@@ -654,6 +654,7 @@ class RuleView(viewsets.GenericViewSet):
             indicator["pattern"], indicator.get("indicator_types", [])
         )
         merged_data = DRFDetection.merge_detection(old_detection, request.data)
+        old_detection.indicator_types = indicator.get("indicator_types", [])
         s = DRFDetection.drf_serializer(data=merged_data)
         s.is_valid(raise_exception=True)
         DRFDetection.is_valid(s, request.data)
