@@ -33,10 +33,10 @@ from tests.src.utils import is_sorted
 
 
 @pytest.mark.parametrize(
-    "indicator_id",
+    ["indicator_id", "rule_type"],
     [
-        "indicator--9e2536b0-988b-598d-8cc3-407f9f13fc61",  # base rule
-        "indicator--0e95725d-7320-415d-80f7-004da920fc11",  # correlation rule
+        ("indicator--9e2536b0-988b-598d-8cc3-407f9f13fc61", "base-rules"),
+        ("indicator--0e95725d-7320-415d-80f7-004da920fc11", "correlation-rules"),
     ],
 )
 @pytest.mark.parametrize(
@@ -63,8 +63,8 @@ from tests.src.utils import is_sorted
         {"description": "Cloned Description for Sigma Rule 4"},
     ],
 )
-def test_clone(subtests, client: django.test.Client, indicator_id, payload):
-    rule_url = f"/api/v1/rules/{indicator_id}/"
+def test_clone(subtests, client: django.test.Client, indicator_id, rule_type, payload):
+    rule_url = f"/api/v1/{rule_type}/{indicator_id}/"
     orig_rule_resp = client.get(rule_url)
     assert orig_rule_resp.status_code == 200
     orig_indicator = orig_rule_resp.json()

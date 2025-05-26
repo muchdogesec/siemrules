@@ -54,7 +54,7 @@ def add_rule_indicator(rule: RuleModel, related_indicators = None, correlation_r
     rule_str = make_rule(rule, rules_from_indicators(related_indicators), indicator_id)
 
     ext_refs = [
-        dict(source_name="siemrules-type", external_id=correlation_rule_type)
+        dict(source_name="siemrules-created-type", external_id=correlation_rule_type)
     ]
     for ref in getattr(rule, 'references', None) or []:
         ext_refs.append(dict(source_name='siemrules', description='siemrules-references', url=ref))

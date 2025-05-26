@@ -388,6 +388,30 @@ class JobView(
         return models.Job.objects.all()
 
 
+class RulesFilterSet(FilterSet):
+    indicator_id = BaseInFilter(
+        help_text="Filter the results by the ID of the Rule. Pass the full STIX ID of the Indicator object, e.g. `indicator--3fa85f64-5717-4562-b3fc-2c963f66afa6`."
+    )
+    name = CharFilter(
+        help_text="Filter by the name of the Rule (automatically created by the AI). Search is wildcard so `exploit` will match `exploited`, `exploits`, etc."
+    )
+    tlp_level = ChoiceFilter(
+        help_text="Filter the Rules by the TLP level of the File they were generated from.",
+        choices=models.TLP_Levels.choices,
+    )
+    created_by_ref = BaseInFilter(
+        help_text="Filter the results by only the reports created by this identity. Pass the full STIX ID of the Identity object, e.g. `identity--b1ae1a15-6f4b-431e-b990-1b9678f35e15`."
+    )
+    sort = ChoiceFilter(
+        help_text="Sort results by property",
+        choices=[(f, f) for f in arangodb_helpers.RULES_SORT_FIELDS],
+    )
+    visible_to = CharFilter(help_text="Only show rules that are visible to the Identity id passed. e.g. passing `identity--b1ae1a15-6f4b-431e-b990-1b9678f35e15` would only show rules created by that identity (with any TLP level) or reports created by another identity ID but only if they are marked with `TLP:CLEAR` or `TLP:GREEN`.")
+    # rule_type = ChoiceFilter(
+    #     choices=[("base-rule", "Base Rule"), ("correlation-rule", "Correlation Rule")],
+    #     help_text="Filter the results by the rule type, either `base-rule` or `correlation-rule`. If none passed will return all types."
+    # )
+
 @extend_schema_view(
     list=extend_schema(
         summary="Search and retrieve created Rules",
@@ -495,6 +519,118 @@ class JobView(
             """
         ),
     ),
+    objects=extend_schema(
+        summary="Get objects linked to Base Rule",
+        description=textwrap.dedent(
+            """
+            A Base Rule can be directly linked to a range of other STIX objects representing MITRE ATT&CK references, CVE references, or detected observables inside the detection part of the rule.
+
+            Use the endpoint to return all objects linked a Base Rule, including the Base Rule.
+            """
+        ),
+        responses=arangodb_helpers.ArangoDBHelper.get_paginated_response_schema(),
+        parameters=arangodb_helpers.ArangoDBHelper.get_schema_operation_parameters() + [
+            OpenApiParameter('version', description="The version of the rule you want to retrieve (e.g. `2025-04-04T06:12:59.482478Z`). The `version` value is the same as the STIX objects `modified` time. You can see all of the versions of a rule using the version endpoint.",),
+            OpenApiParameter(
+                "types",
+                many=True,
+                explode=False,
+                description="Filter the results by one or more STIX Object types",
+                enum=OBJECT_TYPES,
+            ),
+            OpenApiParameter('ignore_embedded_sro', type=bool, description="If set to `true` all embedded SROs are removed from the response."),
+        ],
+    ),
+)
+class RuleView(viewsets.GenericViewSet):
+    openapi_tags = ["Rules"]
+    pagination_class = Pagination("rules")
+    serializer_class = serializers.RuleSerializer
+    lookup_url_kwarg = "indicator_id"
+
+    lookup_value_regex = r'indicator--[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'
+    rule_type = None
+
+    openapi_path_params = [
+        OpenApiParameter(
+            lookup_url_kwarg,
+            location=OpenApiParameter.PATH,
+            description="The `id` of the Indicator. e.g. `indicator--3fa85f64-5717-4562-b3fc-2c963f66afa6`. Note the UUID part of the STIX `id` used here will match the `id` in the Rule.",
+        )
+    ]
+
+
+    def get_renderers(self):
+        if self.action == "retrieve":
+            return [renderers.JSONRenderer(), SigmaRuleRenderer()]
+        return super().get_renderers()
+
+    def list(self, request: request.Request, *args, **kwargs):
+        request._request.GET = request.GET.copy()
+        request._request.GET['rule_type'] = self.rule_type
+        return arangodb_helpers.get_rules(request)
+
+    @extend_schema(
+        parameters=[
+            OpenApiParameter(
+                "format",
+                description="The format of the report, either `sigma` (returns only the Sigma YAML) or `json` (returns the STIX 2.1 Indicator object containing the Rule). Make sure to set the `Accept` header correctly.",
+                enum=["sigma", "json"],
+            )
+        ]
+    )
+    def retrieve(self, request, *args, indicator_id=None, **kwargs):
+        return arangodb_helpers.get_single_rule(
+            indicator_id, version=request.query_params.get("version"),
+        )
+
+    @extend_schema(
+        responses={
+            200: {"type": "array", "items": {"type": "string", "format": "date-time"}}
+        },
+    )
+    @decorators.action(methods=["GET"], detail=True, pagination_class=None)
+    def versions(self, request, *args, indicator_id=None, **kwargs):
+        return arangodb_helpers.get_single_rule_versions(
+            indicator_id,
+        )
+    
+    @extend_schema(request=serializers.RuleRevertSerializer)
+    @decorators.action(methods=['PATCH'], detail=True, url_path="modify/revert")
+    def revert(self, request, *args, indicator_id=None, **kwargs):
+        s = serializers.RuleRevertSerializer(data=request.data)
+        s.is_valid(raise_exception=True)
+        versions = arangodb_helpers.get_single_rule_versions(indicator_id).data
+        selected_version = s.initial_data['version']
+        if selected_version not in versions:
+            raise validators.ValidationError("selected version does not exist")
+        if selected_version == versions[0]:
+            raise validators.ValidationError("You cannot revert to the latest version of the rule")
+        rev = arangodb_helpers.delete_rule(indicator_id, rule_date=selected_version, delete=False)
+        return self.retrieve(request, indicator_id=indicator_id)
+    
+
+    @extend_schema(request=serializers.RuleCloneSerializer)
+    @decorators.action(methods=['POST'], detail=True)
+    def clone(self, request, *args, indicator_id=None, **kwargs):
+        s = serializers.RuleCloneSerializer(data=request.data)
+        s.is_valid(raise_exception=True)
+        new_rule_indicator_id = arangodb_helpers.make_clone(indicator_id, s.validated_data)
+        return self.retrieve(request, indicator_id=new_rule_indicator_id)
+
+    def destroy(self, request, *args, indicator_id=None, **kwargs):
+        arangodb_helpers.delete_rule(indicator_id, 
+        )
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @decorators.action(methods=["GET"], detail=True)
+    def objects(self, request, *args, indicator_id=None, **kwargs):
+        return arangodb_helpers.get_objects_for_rule(
+            indicator_id, request, version=request.query_params.get("version"),
+        )
+    
+
+@extend_schema_view(
     modify_base_rule_from_prompt=extend_schema(
         summary="Use AI to modify a Base Rule by ID",
         description=textwrap.dedent(
@@ -536,59 +672,14 @@ class JobView(
             """
         ),
     ),
-    objects=extend_schema(
-        summary="Get objects linked to Base Rule",
-        description=textwrap.dedent(
-            """
-            A Base Rule can be directly linked to a range of other STIX objects representing MITRE ATT&CK references, CVE references, or detected observables inside the detection part of the rule.
-
-            Use the endpoint to return all objects linked a Base Rule, including the Base Rule.
-            """
-        ),
-        responses=arangodb_helpers.ArangoDBHelper.get_paginated_response_schema(),
-        parameters=arangodb_helpers.ArangoDBHelper.get_schema_operation_parameters() + [
-            OpenApiParameter('version', description="The version of the rule you want to retrieve (e.g. `2025-04-04T06:12:59.482478Z`). The `version` value is the same as the STIX objects `modified` time. You can see all of the versions of a rule using the version endpoint.",),
-            OpenApiParameter(
-                "types",
-                many=True,
-                explode=False,
-                description="Filter the results by one or more STIX Object types",
-                enum=OBJECT_TYPES,
-            ),
-            OpenApiParameter('ignore_embedded_sro', type=bool, description="If set to `true` all embedded SROs are removed from the response."),
-        ],
-    ),
 )
-class RuleView(viewsets.GenericViewSet):
-    openapi_tags = ["Rules"]
-    pagination_class = Pagination("rules")
-    serializer_class = serializers.RuleSerializer
-    lookup_url_kwarg = "indicator_id"
+class BaseRuleView(RuleView):
+    rule_type = "base-rule"
+    openapi_tags = ["Base Rules"]
 
-    lookup_value_regex = r'indicator--[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'
-    rule_type = "base"
-
-    openapi_path_params = [
-        OpenApiParameter(
-            lookup_url_kwarg,
-            location=OpenApiParameter.PATH,
-            description="The `id` of the Indicator. e.g. `indicator--3fa85f64-5717-4562-b3fc-2c963f66afa6`. Note the UUID part of the STIX `id` used here will match the `id` in the Rule.",
-        )
-    ]
-
-    class filterset_class(FilterSet):
+    class filterset_class(RulesFilterSet):
         file_id = BaseInFilter(
             help_text="Filter the results by the ID of the File, e.g. `2632fd7a-ae33-4d35-9652-425e488c97af`."
-        )
-        indicator_id = BaseInFilter(
-            help_text="Filter the results by the ID of the Rule. Pass the full STIX ID of the Indicator object, e.g. `indicator--3fa85f64-5717-4562-b3fc-2c963f66afa6`."
-        )
-        name = CharFilter(
-            help_text="Filter by the name of the Rule (automatically created by the AI). Search is wildcard so `exploit` will match `exploited`, `exploits`, etc."
-        )
-        tlp_level = ChoiceFilter(
-            help_text="Filter the Rules by the TLP level of the File they were generated from.",
-            choices=models.TLP_Levels.choices,
         )
         attack_id = BaseInFilter(
             help_text="Filter the results return rules linked to a particular ATT&CK Technique. Pass the full ATT&CK ID, e.g. `T1047`. Note, only Base Rules have ATT&CK tags."
@@ -596,60 +687,18 @@ class RuleView(viewsets.GenericViewSet):
         cve_id = BaseInFilter(
             help_text="Filter the results return rules linked to a particular CVE. Pass the full CVE ID, e.g. `CVE-2024-28374`. Note, only Base Rules have CVE tags."
         )
-        created_by_ref = BaseInFilter(
-            help_text="Filter the results by only the reports created by this identity. Pass the full STIX ID of the Identity object, e.g. `identity--b1ae1a15-6f4b-431e-b990-1b9678f35e15`."
-        )
-        sort = ChoiceFilter(
-            help_text="Sort results by property",
-            choices=[(f, f) for f in arangodb_helpers.RULES_SORT_FIELDS],
-        )
-        visible_to = CharFilter(help_text="Only show rules that are visible to the Identity id passed. e.g. passing `identity--b1ae1a15-6f4b-431e-b990-1b9678f35e15` would only show rules created by that identity (with any TLP level) or reports created by another identity ID but only if they are marked with `TLP:CLEAR` or `TLP:GREEN`.")
         report_id = BaseInFilter(
             help_text="Filter the results by the report_id of the rule. Pass the full STIX ID of the Indicator object, e.g. `report--3fa85f64-5717-4562-b3fc-2c963f66afa6`."
         )
-        rule_type = ChoiceFilter(
-            choices=[("base-rule", "Base Rule"), ("correlation-rule", "Correlation Rule")],
-            help_text="Filter the results by the rule type, either `base-rule` or `correlation-rule`. If none passed will return all types."
+        create_type = ChoiceFilter(
+            choices=[(c, c) for c in ["file.file", "file.prompt", "file.sigma"]],
+            help_text="Filter results by ingestion method",
         )
-
-    def get_renderers(self):
-        if self.action == "retrieve":
-            return [renderers.JSONRenderer(), SigmaRuleRenderer()]
-        return super().get_renderers()
-
-    def list(self, request, *args, **kwargs):
-        return arangodb_helpers.get_rules(request)
-
-    @extend_schema(
-        parameters=[
-            OpenApiParameter(
-                "format",
-                description="The format of the report, either `sigma` (returns only the Sigma YAML) or `json` (returns the STIX 2.1 Indicator object containing the Rule). Make sure to set the `Accept` header correctly.",
-                enum=["sigma", "json"],
-            )
-        ]
-    )
-    def retrieve(self, request, *args, indicator_id=None, **kwargs):
-        return arangodb_helpers.get_single_rule(
-            indicator_id, version=request.query_params.get("version"),
-        )
-
-    @extend_schema(
-        responses={
-            200: {"type": "array", "items": {"type": "string", "format": "date-time"}}
-        },
-    )
-    @decorators.action(methods=["GET"], detail=True, pagination_class=None)
-    def versions(self, request, *args, indicator_id=None, **kwargs):
-        return arangodb_helpers.get_single_rule_versions(
-            indicator_id,
-        )
-
     @extend_schema(
         request=DRFDetection.drf_serializer,
         responses={200: serializers.RuleSerializer, 400: DEFAULT_400_ERROR},
     )
-    @decorators.action(methods=["POST"], detail=True, parser_classes=[SigmaRuleParser], url_path="modify/base-rule/manual")
+    @decorators.action(methods=["POST"], detail=True, parser_classes=[SigmaRuleParser], url_path="modify/manual")
     def modify_base_rule_manual(self, request, *args, indicator_id=None, **kwargs):
         report, indicator, all_objs = arangodb_helpers.get_objects_by_id(indicator_id)
 
@@ -683,7 +732,7 @@ class RuleView(viewsets.GenericViewSet):
         request=serializers.AIModifySerializer,
         responses={200: serializers.RuleSerializer, 400: DEFAULT_400_ERROR},
     )
-    @decorators.action(methods=['POST'], detail=True, url_path="modify/base-rule/prompt")
+    @decorators.action(methods=['POST'], detail=True, url_path="modify/prompt")
     def modify_base_rule_from_prompt(self, request, *args, indicator_id=None, **kwargs):
         report, indicator, all_objs = arangodb_helpers.get_objects_by_id(indicator_id)
         s = serializers.AIModifySerializer(data=request.data)
@@ -703,41 +752,7 @@ class RuleView(viewsets.GenericViewSet):
         return self.do_modify_base_rule(
             request, indicator_id, report, indicator, detection
         )
-    
-    @extend_schema(request=serializers.RuleRevertSerializer)
-    @decorators.action(methods=['PATCH'], detail=True, url_path="modify/revert")
-    def revert(self, request, *args, indicator_id=None, **kwargs):
-        s = serializers.RuleRevertSerializer(data=request.data)
-        s.is_valid(raise_exception=True)
-        versions = arangodb_helpers.get_single_rule_versions(indicator_id).data
-        selected_version = s.initial_data['version']
-        if selected_version not in versions:
-            raise validators.ValidationError("selected version does not exist")
-        if selected_version == versions[0]:
-            raise validators.ValidationError("You cannot revert to the latest version of the rule")
-        rev = arangodb_helpers.delete_rule(indicator_id, rule_date=selected_version, delete=False)
-        return self.retrieve(request, indicator_id=indicator_id)
-    
 
-    @extend_schema(request=serializers.RuleCloneSerializer)
-    @decorators.action(methods=['POST'], detail=True)
-    def clone(self, request, *args, indicator_id=None, **kwargs):
-        s = serializers.RuleCloneSerializer(data=request.data)
-        s.is_valid(raise_exception=True)
-        new_rule_indicator_id = arangodb_helpers.make_clone(indicator_id, s.validated_data)
-        return self.retrieve(request, indicator_id=new_rule_indicator_id)
-
-    def destroy(self, request, *args, indicator_id=None, **kwargs):
-        arangodb_helpers.delete_rule(indicator_id, 
-        )
-        return Response(status=status.HTTP_204_NO_CONTENT)
-
-    @decorators.action(methods=["GET"], detail=True)
-    def objects(self, request, *args, indicator_id=None, **kwargs):
-        return arangodb_helpers.get_objects_for_rule(
-            indicator_id, request, version=request.query_params.get("version"),
-        )
-    
 @extend_schema_view(
     modify_correlation_manual=extend_schema(
         summary="Manually edit a Correlation Rule by ID",
@@ -873,12 +888,23 @@ class RuleView(viewsets.GenericViewSet):
     ),
     
 )
-class RuleViewWithCorrelationModifier(RuleView):
+class CorrelationRuleView(RuleView):
+    openapi_tags = ['Correlation Rules']
+    rule_type = "correlation-rule"
+
+    class filterset_class(RulesFilterSet):
+        
+        create_type = ChoiceFilter(
+            choices=[(c, c) for c in ["correlation.prompt", "correlation.sigma"]],
+            help_text="Filter results by ingestion method",
+        )
+
+
     @extend_schema(
         request=correlations.serializers.DRFCorrelationRuleModify.drf_serializer,
         responses={200: serializers.RuleSerializer, 400: DEFAULT_400_ERROR},
     )
-    @decorators.action(methods=['POST'], detail=True, url_path="modify/correlation-rule/manual", parser_classes=[SigmaRuleParser])
+    @decorators.action(methods=['POST'], detail=True, url_path="modify/manual", parser_classes=[SigmaRuleParser])
     def modify_correlation_manual(self, request, *args, indicator_id=None, **kwargs):
         report, indicator, all_objs = arangodb_helpers.get_objects_by_id(indicator_id)
         old_rule, _ = correlations.correlations.yaml_to_rule(
@@ -890,7 +916,7 @@ class RuleViewWithCorrelationModifier(RuleView):
 
     def do_modify_correlation(self, request, indicator_id, report, indicator, rule):
         for ref in indicator.get('external_references', []):
-            if ref['source_name'] == "siemrules-type":
+            if ref['source_name'] == "siemrules-created-type":
                 rule_type = ref['external_id']
                 break
         else:
@@ -910,7 +936,7 @@ class RuleViewWithCorrelationModifier(RuleView):
         request=serializers.AIModifySerializer,
         responses={200: serializers.RuleSerializer, 400: DEFAULT_400_ERROR},
     )
-    @decorators.action(methods=['POST'], detail=True, url_path="modify/correlation-rule/prompt")
+    @decorators.action(methods=['POST'], detail=True, url_path="modify/prompt")
     def modify_correlation_from_prompt(self, request, *args, indicator_id=None, **kwargs):
         report, indicator, all_objs = arangodb_helpers.get_objects_by_id(indicator_id)
         s = serializers.AIModifySerializer(data=request.data)
@@ -954,7 +980,7 @@ class RuleViewWithCorrelationModifier(RuleView):
         request=DRFCorrelationRule.drf_serializer,
         responses={200: serializers.CorrelationJobSerializer, 400: DEFAULT_400_ERROR},
     )
-    @decorators.action(methods=['POST'], detail=False, serializer_class=serializers.CorrelationJobSerializer, url_path="create/correlation-rule/manual", parser_classes=[SigmaRuleParser])
+    @decorators.action(methods=['POST'], detail=False, serializer_class=serializers.CorrelationJobSerializer, url_path="create/manual", parser_classes=[SigmaRuleParser])
     def create_from_sigma(self, request, *args, **kwargs):
         rule_s = DRFCorrelationRule.drf_serializer(data=request.data)
         rule_s.is_valid(raise_exception=True)
@@ -975,7 +1001,7 @@ class RuleViewWithCorrelationModifier(RuleView):
         request=CorrelationRuleSerializer,
         responses={200: serializers.CorrelationJobSerializer, 400: DEFAULT_400_ERROR},
     )
-    @decorators.action(methods=['POST'], detail=False, serializer_class=CorrelationJobSerializer, url_path="create/correlation-rule/prompt")
+    @decorators.action(methods=['POST'], detail=False, serializer_class=CorrelationJobSerializer, url_path="create/prompt")
     def create_from_prompt(self, request, *args, **kwargs):
         s = CorrelationRuleSerializer(data=request.data)
         s.is_valid(raise_exception=True)

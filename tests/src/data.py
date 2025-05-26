@@ -119,7 +119,7 @@ BUNDLE_1 = {
                 },
 
                 {
-                    "source_name": "siemrules-type",
+                    "source_name": "siemrules-created-type",
                     "external_id": "file.file"
                 },
             ],
@@ -297,7 +297,7 @@ BUNDLE_2 = {
             ],
             "external_references": [
                 {
-                    "source_name": "siemrules-type",
+                    "source_name": "siemrules-created-type",
                     "external_id": "file.sigma"
                 },
                 {
@@ -898,7 +898,7 @@ BUNDLE_3 = {
             ],
             "external_references": [
                 {
-                    "source_name": "siemrules-type",
+                    "source_name": "siemrules-created-type",
                     "external_id": "file.prompt"
                 },
                 {

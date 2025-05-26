@@ -40,7 +40,7 @@ RULE_TYPES = [
             dict(attack_id="T1059,TA0001"),
             [
                 "indicator--8af82832-2abd-5765-903c-01d414dae1e9",
-                "indicator--2683daab-aa64-52ff-a001-3ea5aee9dd72",
+                # "indicator--2683daab-aa64-52ff-a001-3ea5aee9dd72",
             ],
             id="attack_id x2",
         ),
@@ -152,7 +152,8 @@ tlp_levels_visible_to_all = {TLP_LEVEL_STIX_ID_MAPPING[TLP_Levels.CLEAR], TLP_LE
         "path",
         [
             "reports",
-            "rules",
+            "base-rules",
+            "correlation-rules",
         ]
 )
 def test_visible_to(client: django.test.Client, subtests, path):

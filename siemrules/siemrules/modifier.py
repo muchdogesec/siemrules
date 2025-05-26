@@ -41,7 +41,7 @@ def modify_indicator(report, indicator: dict, detection: BaseDetection):
         report_id=report['id'].replace('report--', ''),
         modified=datetime.now(UTC),
         external_refs=[
-            ref for ref in indicator.get('external_references', []) if ref['source_name'] == "siemrules-type"
+            ref for ref in indicator.get('external_references', []) if ref['source_name'] == "siemrules-created-type"
         ]
     )
     
