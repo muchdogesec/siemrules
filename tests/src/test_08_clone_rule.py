@@ -70,6 +70,7 @@ def test_clone(subtests, client: django.test.Client, indicator_id, payload):
     orig_indicator = orig_rule_resp.json()
     clone_resp = client.post(rule_url + "clone/", data=payload, content_type='application/json')
     assert clone_resp.status_code == 200
+    time.sleep(1)
     cloned_indicator = clone_resp.json()
     cloned_detection = rule_to_detection(cloned_indicator)
     orig_detection = rule_to_detection(orig_indicator)

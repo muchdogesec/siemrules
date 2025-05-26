@@ -161,6 +161,6 @@ CORRELATION_RULES_PROMPT = [
 
 CORRELATION_MODIFICATION_PROMPT = [
     ChatMessage.from_str(PROMPT),
-    ChatMessage.from_str('The following is the correlation rule, you are to make modifications on: \n{old_rule}'),
+    ChatMessage.from_str('The following is the correlation rule, you are to make the following changes on: \n{old_rule}'),
     ChatMessage.from_str('{user_prompt}'),
 ]

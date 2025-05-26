@@ -136,6 +136,10 @@ class RuleModel(BaseRuleModel, RuleModelExtraProperties):
     def tlp_level(self):
         return tlp_from_tags(self.tags)
     
+    @tlp_level.setter
+    def tlp_level(self, level):
+        return set_tlp_level_in_tags(self.tags, level)
+    
     @property
     def rule_id(self):
         return self._rule_id
