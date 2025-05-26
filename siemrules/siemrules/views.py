@@ -924,6 +924,7 @@ class RuleViewWithCorrelationModifier(RuleView):
             old_detection,
             s.data["prompt"],
         )
+        new_rule.tlp_level = old_detection.tlp_level.name
 
         return self.do_modify_correlation(
             request, indicator_id, report, indicator, new_rule

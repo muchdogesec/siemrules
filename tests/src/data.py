@@ -899,7 +899,7 @@ BUNDLE_3 = {
             "external_references": [
                 {
                     "source_name": "siemrules-type",
-                    "external_id": "file.text"
+                    "external_id": "file.prompt"
                 },
                 {
                     "external_id": "TA0002",
