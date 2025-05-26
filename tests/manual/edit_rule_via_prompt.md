@@ -1,0 +1,1 @@
+Add the MITRE ATT&CK technique: Office Application Startup T1137, to the rule
