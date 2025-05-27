@@ -413,134 +413,6 @@ class RulesFilterSet(FilterSet):
     # )
 
 @extend_schema_view(
-    list=extend_schema(
-        summary="Search and retrieve created Rules",
-        description=textwrap.dedent(
-            """
-            Can be used to return Sigma Base and Correlation Rules.
-
-            Base Rules are created from the Files endpoints. During processing, txt2detection turns a File into one or more Base Rules.
-
-            Correlation Rules can be created using the Rule endpoints. Correlation Rules reference one or more Base Rules
-
-            You can use this endpoint to retrieve either type of rule. Filter by `rule_type` if you want a specific type.
-            """
-        ),
-        responses={200: serializers.RuleSerializer, 400: DEFAULT_400_ERROR},
-    ),
-    retrieve=extend_schema(
-        summary="Get a Rule by ID",
-        description=textwrap.dedent(
-            """
-            Can be used to return Sigma Base and Correlation Rules.
-
-            Use this endpoint to retrieve a Rule using its STIX Indicator ID.
-
-            If you do not know the ID of the Rule you can use the GET Rules endpoint.
-            """
-        ),
-        responses={
-            200: serializers.RuleSerializer,
-            (200, "application/sigma+yaml"): serializers.RuleSigmaSerializer,
-        },
-        parameters=[
-            OpenApiParameter(
-                "version",
-                description="The version of the rule you want to retrieve (e.g. `2025-04-04T06:12:59.482478Z`). The `version` value is the same as the STIX objects `modified` time. You can see all of the versions of a rule using the version endpoint. ",
-            )
-        ],
-    ),
-    destroy=extend_schema(
-        summary="Delete a Rule by ID",
-        description=textwrap.dedent(
-            """
-            Can be used to delete Sigma Base and Correlation Rules.
-
-            Use this endpoint to delete a Rule. All versions of the Rule that exist will be removed.
-
-            This endpoint will remove the `indicator` representing the rule, and any relationships linking to the Indicator.
-
-            If you are deleting a Base Rule, this endpoint will not delete the STIX report object representing the file this rule was generated from, nor any STIX objects representing observables extracted from the rule, MITRE ATT&CK enrichments, or CVE enrichments.
-
-            If you wish to delete the `report` object and all `indicators` (rules) connected to it, use the Delete Reports endpoint.
-            """
-        ),
-    ),
-    revert=extend_schema(
-        summary="Revert a Rule to older version",
-        description=textwrap.dedent(
-            """
-            Can be used to revert Sigma Base and Correlation Rules.
-
-            This endpoint allows you to roll back (revert) the content of a Rule to an old version.
-
-            This body requires the following values:
-
-            * `version` The version of the rule you want to roll back (e.g. `2025-04-04T06:12:59.482478Z`). The `version` value is the same as the STIX objects `modified` time. You can see all of the versions of a rule using the version endpoint.
-
-            Note, this will not delete the current version of the rule. It will create a new version with the content of the rule at the point you want to revert to, except for `modified` times, which will match the time of revert.
-            """
-        ),
-    ),
-    clone=extend_schema(
-        summary="Duplicate a Rule",
-        description=textwrap.dedent(
-            """
-            This endpoint allows you to duplicate the content of a Rule.
-
-            It will also clone any external enrichments (MITRE ATT&CK and Vulnerabilities) as well as an extracted Observables.
-
-            Note, this rule will be linked original Indicator object using an SRO created by the `identity` used to clone it. It will not be directly linked to a Report or File object.
-
-            This body requires the following values:
-
-            * `identity` (optional): This will be used as the `created_by_ref` for all created SDOs and SROs. This is a full STIX Identity JSON. e.g. `{"type":"identity","spec_version":"2.1","id":"identity--b1ae1a15-6f4b-431e-b990-1b9678f35e15","name":"Dummy Identity"}`. If no value is passed, the SIEM Rules identity object will be used.
-            * `title` (optional): The `title` of the rule. If none passed, the current `title` of the rule will be used.
-            * `description` (optional): The `description` of the rule. If none passed, the current `description` of the rule will be used.
-            * `tlp_level` (optional, dictionary): either `clear`, `green`, `amber`, `amber+strict`, `red`. If none passed, the current TLP level of the rule will be used.
-
-            You cannot modify any other values when cloning a rule. Edit the rule after cloning it to do this.
-            """
-        ),
-    ),
-    versions=extend_schema(
-        summary="Get all Versions of a Rule by ID",
-        description=textwrap.dedent(
-            """
-            Can be used to return Sigma Base and Correlation Rules.
-
-            Rules can be modified over time. Each modification versions the Rule.
-
-            Use this endpoint to retrieve all versions of a Rule using its STIX Indicator ID.
-
-            If you do not know the ID of the Rule you can use the GET Rules endpoint.
-
-            You can use the list of versions returned on this endpoint to get a specific version of a rule using the  GET Rule endpoint.
-            """
-        ),
-    ),
-    objects=extend_schema(
-        summary="Get objects linked to Base Rule",
-        description=textwrap.dedent(
-            """
-            A Base Rule can be directly linked to a range of other STIX objects representing MITRE ATT&CK references, CVE references, or detected observables inside the detection part of the rule.
-
-            Use the endpoint to return all objects linked a Base Rule, including the Base Rule.
-            """
-        ),
-        responses=arangodb_helpers.ArangoDBHelper.get_paginated_response_schema(),
-        parameters=arangodb_helpers.ArangoDBHelper.get_schema_operation_parameters() + [
-            OpenApiParameter('version', description="The version of the rule you want to retrieve (e.g. `2025-04-04T06:12:59.482478Z`). The `version` value is the same as the STIX objects `modified` time. You can see all of the versions of a rule using the version endpoint.",),
-            OpenApiParameter(
-                "types",
-                many=True,
-                explode=False,
-                description="Filter the results by one or more STIX Object types",
-                enum=OBJECT_TYPES,
-            ),
-            OpenApiParameter('ignore_embedded_sro', type=bool, description="If set to `true` all embedded SROs are removed from the response."),
-        ],
-    ),
 )
 class RuleView(viewsets.GenericViewSet):
     openapi_tags = ["Rules"]
@@ -631,6 +503,135 @@ class RuleView(viewsets.GenericViewSet):
     
 
 @extend_schema_view(
+    list=extend_schema(
+        summary="[BASE] Search and retrieve created Rules",
+        description=textwrap.dedent(
+            """
+            Can be used to return Sigma Base and Correlation Rules.
+
+            Base Rules are created from the Files endpoints. During processing, txt2detection turns a File into one or more Base Rules.
+
+            Correlation Rules can be created using the Rule endpoints. Correlation Rules reference one or more Base Rules
+
+            You can use this endpoint to retrieve either type of rule. Filter by `rule_type` if you want a specific type.
+            """
+        ),
+        responses={200: serializers.RuleSerializer, 400: DEFAULT_400_ERROR},
+    ),
+    retrieve=extend_schema(
+        summary="[BASE] Get a Rule by ID",
+        description=textwrap.dedent(
+            """
+            Can be used to return Sigma Base and Correlation Rules.
+
+            Use this endpoint to retrieve a Rule using its STIX Indicator ID.
+
+            If you do not know the ID of the Rule you can use the GET Rules endpoint.
+            """
+        ),
+        responses={
+            200: serializers.RuleSerializer,
+            (200, "application/sigma+yaml"): serializers.RuleSigmaSerializer,
+        },
+        parameters=[
+            OpenApiParameter(
+                "version",
+                description="The version of the rule you want to retrieve (e.g. `2025-04-04T06:12:59.482478Z`). The `version` value is the same as the STIX objects `modified` time. You can see all of the versions of a rule using the version endpoint. ",
+            )
+        ],
+    ),
+    destroy=extend_schema(
+        summary="[BASE] Delete a Rule by ID",
+        description=textwrap.dedent(
+            """
+            Can be used to delete Sigma Base and Correlation Rules.
+
+            Use this endpoint to delete a Rule. All versions of the Rule that exist will be removed.
+
+            This endpoint will remove the `indicator` representing the rule, and any relationships linking to the Indicator.
+
+            If you are deleting a Base Rule, this endpoint will not delete the STIX report object representing the file this rule was generated from, nor any STIX objects representing observables extracted from the rule, MITRE ATT&CK enrichments, or CVE enrichments.
+
+            If you wish to delete the `report` object and all `indicators` (rules) connected to it, use the Delete Reports endpoint.
+            """
+        ),
+    ),
+    revert=extend_schema(
+        summary="[BASE] Revert a Rule to older version",
+        description=textwrap.dedent(
+            """
+            Can be used to revert Sigma Base and Correlation Rules.
+
+            This endpoint allows you to roll back (revert) the content of a Rule to an old version.
+
+            This body requires the following values:
+
+            * `version` The version of the rule you want to roll back (e.g. `2025-04-04T06:12:59.482478Z`). The `version` value is the same as the STIX objects `modified` time. You can see all of the versions of a rule using the version endpoint.
+
+            Note, this will not delete the current version of the rule. It will create a new version with the content of the rule at the point you want to revert to, except for `modified` times, which will match the time of revert.
+            """
+        ),
+    ),
+    clone=extend_schema(
+        summary="[BASE] Duplicate a Rule",
+        description=textwrap.dedent(
+            """
+            This endpoint allows you to duplicate the content of a Rule.
+
+            It will also clone any external enrichments (MITRE ATT&CK and Vulnerabilities) as well as an extracted Observables.
+
+            Note, this rule will be linked original Indicator object using an SRO created by the `identity` used to clone it. It will not be directly linked to a Report or File object.
+
+            This body requires the following values:
+
+            * `identity` (optional): This will be used as the `created_by_ref` for all created SDOs and SROs. This is a full STIX Identity JSON. e.g. `{"type":"identity","spec_version":"2.1","id":"identity--b1ae1a15-6f4b-431e-b990-1b9678f35e15","name":"Dummy Identity"}`. If no value is passed, the SIEM Rules identity object will be used.
+            * `title` (optional): The `title` of the rule. If none passed, the current `title` of the rule will be used.
+            * `description` (optional): The `description` of the rule. If none passed, the current `description` of the rule will be used.
+            * `tlp_level` (optional, dictionary): either `clear`, `green`, `amber`, `amber+strict`, `red`. If none passed, the current TLP level of the rule will be used.
+
+            You cannot modify any other values when cloning a rule. Edit the rule after cloning it to do this.
+            """
+        ),
+    ),
+    versions=extend_schema(
+        summary="[BASE] Get all Versions of a Rule by ID",
+        description=textwrap.dedent(
+            """
+            Can be used to return Sigma Base and Correlation Rules.
+
+            Rules can be modified over time. Each modification versions the Rule.
+
+            Use this endpoint to retrieve all versions of a Rule using its STIX Indicator ID.
+
+            If you do not know the ID of the Rule you can use the GET Rules endpoint.
+
+            You can use the list of versions returned on this endpoint to get a specific version of a rule using the  GET Rule endpoint.
+            """
+        ),
+    ),
+    objects=extend_schema(
+        summary="[BASE] Get objects linked to Base Rule",
+        description=textwrap.dedent(
+            """
+            A Base Rule can be directly linked to a range of other STIX objects representing MITRE ATT&CK references, CVE references, or detected observables inside the detection part of the rule.
+
+            Use the endpoint to return all objects linked a Base Rule, including the Base Rule.
+            """
+        ),
+        responses=arangodb_helpers.ArangoDBHelper.get_paginated_response_schema(),
+        parameters=arangodb_helpers.ArangoDBHelper.get_schema_operation_parameters() + [
+            OpenApiParameter('version', description="The version of the rule you want to retrieve (e.g. `2025-04-04T06:12:59.482478Z`). The `version` value is the same as the STIX objects `modified` time. You can see all of the versions of a rule using the version endpoint.",),
+            OpenApiParameter(
+                "types",
+                many=True,
+                explode=False,
+                description="Filter the results by one or more STIX Object types",
+                enum=OBJECT_TYPES,
+            ),
+            OpenApiParameter('ignore_embedded_sro', type=bool, description="If set to `true` all embedded SROs are removed from the response."),
+        ],
+    ),
+
     modify_base_rule_from_prompt=extend_schema(
         summary="Use AI to modify a Base Rule by ID",
         description=textwrap.dedent(
@@ -754,6 +755,136 @@ class BaseRuleView(RuleView):
         )
 
 @extend_schema_view(
+
+    list=extend_schema(
+        summary="[CORRELATION] Search and retrieve created Rules",
+        description=textwrap.dedent(
+            """
+            Can be used to return Sigma Base and Correlation Rules.
+
+            Base Rules are created from the Files endpoints. During processing, txt2detection turns a File into one or more Base Rules.
+
+            Correlation Rules can be created using the Rule endpoints. Correlation Rules reference one or more Base Rules
+
+            You can use this endpoint to retrieve either type of rule. Filter by `rule_type` if you want a specific type.
+            """
+        ),
+        responses={200: serializers.RuleSerializer, 400: DEFAULT_400_ERROR},
+    ),
+    retrieve=extend_schema(
+        summary="[CORRELATION] Get a Rule by ID",
+        description=textwrap.dedent(
+            """
+            Can be used to return Sigma Base and Correlation Rules.
+
+            Use this endpoint to retrieve a Rule using its STIX Indicator ID.
+
+            If you do not know the ID of the Rule you can use the GET Rules endpoint.
+            """
+        ),
+        responses={
+            200: serializers.RuleSerializer,
+            (200, "application/sigma+yaml"): serializers.RuleSigmaSerializer,
+        },
+        parameters=[
+            OpenApiParameter(
+                "version",
+                description="The version of the rule you want to retrieve (e.g. `2025-04-04T06:12:59.482478Z`). The `version` value is the same as the STIX objects `modified` time. You can see all of the versions of a rule using the version endpoint. ",
+            )
+        ],
+    ),
+    destroy=extend_schema(
+        summary="[CORRELATION] Delete a Rule by ID",
+        description=textwrap.dedent(
+            """
+            Can be used to delete Sigma Base and Correlation Rules.
+
+            Use this endpoint to delete a Rule. All versions of the Rule that exist will be removed.
+
+            This endpoint will remove the `indicator` representing the rule, and any relationships linking to the Indicator.
+
+            If you are deleting a Base Rule, this endpoint will not delete the STIX report object representing the file this rule was generated from, nor any STIX objects representing observables extracted from the rule, MITRE ATT&CK enrichments, or CVE enrichments.
+
+            If you wish to delete the `report` object and all `indicators` (rules) connected to it, use the Delete Reports endpoint.
+            """
+        ),
+    ),
+    revert=extend_schema(
+        summary="[CORRELATION] Revert a Rule to older version",
+        description=textwrap.dedent(
+            """
+            Can be used to revert Sigma Base and Correlation Rules.
+
+            This endpoint allows you to roll back (revert) the content of a Rule to an old version.
+
+            This body requires the following values:
+
+            * `version` The version of the rule you want to roll back (e.g. `2025-04-04T06:12:59.482478Z`). The `version` value is the same as the STIX objects `modified` time. You can see all of the versions of a rule using the version endpoint.
+
+            Note, this will not delete the current version of the rule. It will create a new version with the content of the rule at the point you want to revert to, except for `modified` times, which will match the time of revert.
+            """
+        ),
+    ),
+    clone=extend_schema(
+        summary="[CORRELATION] Duplicate a Rule",
+        description=textwrap.dedent(
+            """
+            This endpoint allows you to duplicate the content of a Rule.
+
+            It will also clone any external enrichments (MITRE ATT&CK and Vulnerabilities) as well as an extracted Observables.
+
+            Note, this rule will be linked original Indicator object using an SRO created by the `identity` used to clone it. It will not be directly linked to a Report or File object.
+
+            This body requires the following values:
+
+            * `identity` (optional): This will be used as the `created_by_ref` for all created SDOs and SROs. This is a full STIX Identity JSON. e.g. `{"type":"identity","spec_version":"2.1","id":"identity--b1ae1a15-6f4b-431e-b990-1b9678f35e15","name":"Dummy Identity"}`. If no value is passed, the SIEM Rules identity object will be used.
+            * `title` (optional): The `title` of the rule. If none passed, the current `title` of the rule will be used.
+            * `description` (optional): The `description` of the rule. If none passed, the current `description` of the rule will be used.
+            * `tlp_level` (optional, dictionary): either `clear`, `green`, `amber`, `amber+strict`, `red`. If none passed, the current TLP level of the rule will be used.
+
+            You cannot modify any other values when cloning a rule. Edit the rule after cloning it to do this.
+            """
+        ),
+    ),
+    versions=extend_schema(
+        summary="[CORRELATION] Get all Versions of a Rule by ID",
+        description=textwrap.dedent(
+            """
+            Can be used to return Sigma Base and Correlation Rules.
+
+            Rules can be modified over time. Each modification versions the Rule.
+
+            Use this endpoint to retrieve all versions of a Rule using its STIX Indicator ID.
+
+            If you do not know the ID of the Rule you can use the GET Rules endpoint.
+
+            You can use the list of versions returned on this endpoint to get a specific version of a rule using the  GET Rule endpoint.
+            """
+        ),
+    ),
+    objects=extend_schema(
+        summary="[CORRELATION] Get objects linked to Base Rule",
+        description=textwrap.dedent(
+            """
+            A Base Rule can be directly linked to a range of other STIX objects representing MITRE ATT&CK references, CVE references, or detected observables inside the detection part of the rule.
+
+            Use the endpoint to return all objects linked a Base Rule, including the Base Rule.
+            """
+        ),
+        responses=arangodb_helpers.ArangoDBHelper.get_paginated_response_schema(),
+        parameters=arangodb_helpers.ArangoDBHelper.get_schema_operation_parameters() + [
+            OpenApiParameter('version', description="The version of the rule you want to retrieve (e.g. `2025-04-04T06:12:59.482478Z`). The `version` value is the same as the STIX objects `modified` time. You can see all of the versions of a rule using the version endpoint.",),
+            OpenApiParameter(
+                "types",
+                many=True,
+                explode=False,
+                description="Filter the results by one or more STIX Object types",
+                enum=OBJECT_TYPES,
+            ),
+            OpenApiParameter('ignore_embedded_sro', type=bool, description="If set to `true` all embedded SROs are removed from the response."),
+        ],
+    ),
+
     modify_correlation_manual=extend_schema(
         summary="Manually edit a Correlation Rule by ID",
         description=textwrap.dedent(
