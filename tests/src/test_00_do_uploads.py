@@ -70,7 +70,7 @@ def test_make_uploads():
     'modification',
     [test_data.MODIFY_1, test_data.MODIFY_2]
 )
-def test_modify_rule(client: django.test.Client, modification):
+def test_modify_base_rule_manual(client: django.test.Client, modification):
     indicator_id = modification['rule_id']
     indicator = [obj for obj in all_objects() if obj['id'] == indicator_id][0]
     indicator_refs = [x['external_id'] for x in indicator['external_references']]
@@ -78,7 +78,7 @@ def test_modify_rule(client: django.test.Client, modification):
     with patch('txt2detection.bundler.Bundler.get_attack_objects') as get_attack_objects, patch('txt2detection.bundler.Bundler.get_cve_objects') as get_cve_objects:
         get_attack_objects.return_value = [obj for obj in all_objects() if obj['type'] != 'indicator' and obj.get('external_references') and obj['external_references'][0]['external_id'] in indicator_refs and obj['external_references'][0]['source_name'] == 'mitre-attack']
         get_cve_objects.return_value = [obj for obj in all_objects() if obj['type'] != 'indicator' and obj.get('external_references') and obj['external_references'][0]['external_id'] in indicator_refs and obj['external_references'][0]['source_name'] == 'cve']
-        resp = client.post(f'/api/v1/rules/{indicator_id}/modify/base-rule/manual/', data=modification['sigma'], content_type='application/sigma+yaml')
+        resp = client.post(f'/api/v1/base-rules/{indicator_id}/modify/manual/', data=modification['sigma'], content_type='application/sigma+yaml')
         assert resp.status_code == 200, resp.json()
         time.sleep(1)
 
@@ -89,13 +89,13 @@ def test_modify_rule(client: django.test.Client, modification):
 @pytest.mark.django_db
 def test_upload_correlation(client, rule):
     rule_id, rule = rule
-    correlation_url = '/api/v1/rules/'
+    correlation_url = '/api/v1/correlation-rules/'
     from siemrules.worker.celery import app
     app.conf.task_always_eager = True
 
     with patch.object(RuleModel, "rule_id", rule_id):
         response = client.post(
-            correlation_url + "create/correlation-rule/manual/", format="sigma", data=rule, content_type='application/sigma+yaml'
+            correlation_url + "create/manual/", format="sigma", data=rule, content_type='application/sigma+yaml'
         )
         assert response.status_code == 200
         resp = client.get(

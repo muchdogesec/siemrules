@@ -74,7 +74,7 @@ def run_txt2detection(file: models.File):
     job: Job = file.job
     kwargs.update(
         external_refs=[
-            dict(source_name="siemrules-type", external_id=job.type)
+            dict(source_name="siemrules-created-type", external_id=job.type)
         ],
         created=file.created,
     )

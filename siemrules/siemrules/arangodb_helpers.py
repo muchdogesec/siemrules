@@ -126,13 +126,16 @@ def get_rules(request: request.Request, paginate=True, all_versions=False, nokee
                 FILTER doc.external_references[? ANY FILTER CURRENT.source_name == 'cve' AND CURRENT.external_id IN @cve_ids]
             ''')
     
-    if rule_type := helper.query.get('rule_type'):
+    if ingestion_method := helper.query.get('create_type'):
+        filters.append('FILTER @ingestion_method IN doc.external_references')
+        binds.update(ingestion_method=dict(source_name='siemrules-created-type', external_id=ingestion_method))
+    elif rule_type := helper.query.get('rule_type'):
         match rule_type:
             case 'base-rule':
                 rule_type = 'file'
             case 'correlation-rule':
                 rule_type = 'correlation'
-        filters.append('FILTER doc.external_references[? ANY FILTER CURRENT.source_name == "siemrules-type" AND STARTS_WITH(CURRENT.external_id, @rule_type)]')
+        filters.append('FILTER doc.external_references[? ANY FILTER CURRENT.source_name == "siemrules-created-type" AND STARTS_WITH(CURRENT.external_id, @rule_type)]')
         binds.update(rule_type=rule_type)
 
     query = """
@@ -439,7 +442,7 @@ def do_reversion(helper, revision_id):
 
 def indicator_to_rule(indicator: dict) -> SigmaRuleDetection|tuple[RuleModel, list[dict]]:
     for ref in indicator.get('external_references', []):
-        if ref['source_name'] == 'siemrules-type':
+        if ref['source_name'] == 'siemrules-created-type':
             if ref.get('external_id', '').startswith('file'):
                 return yaml_to_detection(indicator['pattern'])
             else:

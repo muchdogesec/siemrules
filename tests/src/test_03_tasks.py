@@ -144,7 +144,7 @@ def test_run_txt2detection():
             license=mock_file.license,
             level=mock_file.level,
             status=mock_file.status,
-            external_refs=[{'source_name': 'siemrules-type', 'external_id': mock_file.job.type}],
+            external_refs=[{'source_name': 'siemrules-created-type', 'external_id': mock_file.job.type}],
             created=mock_file.created,
         )
 

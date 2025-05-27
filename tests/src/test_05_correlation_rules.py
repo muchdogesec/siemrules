@@ -12,7 +12,7 @@ from rest_framework import status
 from unittest.mock import patch
 from django.core.files.uploadedfile import SimpleUploadedFile
 from siemrules.siemrules import models, reports
-from siemrules.siemrules.views import RuleViewWithCorrelationModifier, RuleView
+from siemrules.siemrules.views import CorrelationRuleView, RuleView
 from siemrules.worker import tasks
 from tests.src import data as test_data
 from rest_framework.response import Response
@@ -25,7 +25,7 @@ from rest_framework.request import Request
 from tests.src.utils import is_sorted
 
 
-correlation_url = '/api/v1/rules/'
+correlation_url = '/api/v1/correlation-rules/'
 
 @pytest.mark.django_db
 def test_correlation_create__manual(client: django.test.Client):
@@ -47,7 +47,7 @@ tags:
 '''
     with patch("siemrules.worker.tasks.new_correlation_task") as mock_task:
         response = client.post(
-            correlation_url + "create/correlation-rule/manual/", format="sigma", data=rule, content_type='application/sigma+yaml'
+            correlation_url + "create/manual/", format="sigma", data=rule, content_type='application/sigma+yaml'
         )
         assert response.status_code == status.HTTP_200_OK, response.content
         mock_task.assert_called_once()
@@ -71,7 +71,7 @@ def test_correlation_create__prompt(client: django.test.Client):
     }
     with patch("siemrules.worker.tasks.new_correlation_task") as mock_task:
         response = client.post(
-            correlation_url + "create/correlation-rule/prompt/", data=rule_payload, content_type='application/json',
+            correlation_url + "create/prompt/", data=rule_payload, content_type='application/json',
         )
         assert response.status_code == status.HTTP_200_OK, response.content
         mock_task.assert_called_once()
@@ -93,7 +93,7 @@ def test_correlation_create__prompt(client: django.test.Client):
 def test_get_rules(rule_ids, should_fail):
     if should_fail:
         with pytest.raises(ValidationError):
-            RuleViewWithCorrelationModifier().get_rules(rule_ids)
+            CorrelationRuleView().get_rules(rule_ids)
     else:
-        rules = RuleViewWithCorrelationModifier().get_rules(rule_ids)
+        rules = CorrelationRuleView().get_rules(rule_ids)
         assert set([r['id'][11:] for r in rules]) == set(rule_ids)

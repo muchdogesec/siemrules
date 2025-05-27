@@ -109,10 +109,10 @@ class TestJobView:
 
 
 @pytest.mark.django_db
-class TestRuleView:
+class TestBaseRuleView:
     @pytest.fixture(autouse=True)
     def setup(self):
-        self.url = "/api/v1/rules/"
+        self.url = "/api/v1/base-rules/"
         self.rule_id = "indicator--3f2b1a6e-8c9d-4f75-902c-2d6f88c5e3a1"
         # yield tasks.upload_to_arango(job, BUNDLE_1)
 
@@ -120,6 +120,7 @@ class TestRuleView:
         with patch("siemrules.siemrules.arangodb_helpers.get_rules") as mock_get_rules:
             mock_get_rules.return_value = Response()
             response = client.get(self.url)
+            assert response.status_code == 200
             mock_get_rules.assert_called_once()
 
     def test_retrieve_rule(self, client):
