@@ -1,13 +1,17 @@
+from datetime import UTC, datetime
 import io
 import json
 import logging
 import os
 from pathlib import Path
 import uuid
+
+import txt2detection.models
+from siemrules.siemrules import modifier as base_rule_modifier
 from siemrules.siemrules.correlations import correlations
 from siemrules.siemrules.correlations.models import RuleModel
 from siemrules.siemrules.models import Job, File, JobType
-from siemrules.siemrules import models
+from siemrules.siemrules import arangodb_helpers, models
 from celery import Task, shared_task
 from txt2detection.utils import validate_token_count, parse_model as parse_ai_model
 from txt2detection.bundler import Bundler as txt2detectionBundler
@@ -16,6 +20,8 @@ from file2txt.converter import Fanger, get_parser_class
 from file2txt.parsers.core import BaseParser
 from django.conf import settings
 import typing
+
+from siemrules.siemrules.modifier import get_modification, yaml_to_detection
 if typing.TYPE_CHECKING:
     from siemrules import settings
 from rest_framework import validators
@@ -60,6 +66,89 @@ def new_correlation_task(job: Job, correlation: RuleModel, related_indicators, d
         link=job_completed.si(job.id),
         link_error=job_failed.s(job_id=job.id),
     )
+
+def new_modify_rule_task(job: Job, old_indicator, new_rule_data, report=None):
+    task: Task
+    match job.type:
+        case JobType.BASE_MODIFY:
+            task = modify_base_rule.s(job.id, old_indicator, report, new_rule_data)
+        case JobType.CORRELATION_MODIFY:
+            task = modify_correlation.s(job.id, old_indicator, new_rule_data)
+    task.apply_async(
+        countdown=POLL_INTERVAL, root_id=str(job.id), task_id=str(job.id),
+        link=job_completed.si(job.id),
+        link_error=job_failed.s(job_id=job.id),
+    )
+
+@shared_task
+def modify_correlation(job_id, indicator, new_rule_data):
+    from siemrules.siemrules.views import CorrelationRuleView
+
+    job = Job.objects.get(id=job_id)
+    old_detection, _ = correlations.yaml_to_rule(
+            indicator["pattern"]
+    )
+    match modify_type := job.data['modification_method']:
+        case 'prompt':
+            new_rule = correlations.get_modification(
+                parse_ai_model(job.data["ai_provider"]),
+                "",
+                old_detection,
+                job.data["prompt"],
+            )
+        case 'sigma':
+            new_rule = RuleModel.model_validate(new_rule_data)
+        case _:
+            raise ValueError(f'unknown type `{modify_type}`')
+        
+    base_rule_indicators = CorrelationRuleView.get_rules(new_rule.correlation.rules or [])
+    new_rule.tlp_level = old_detection.tlp_level.name
+    _, _, new_rule.rule_id = indicator['id'].rpartition('--')
+    new_objects = correlations.add_rule_indicator(new_rule, base_rule_indicators, get_rule_type(indicator), dict(modified=datetime.now(UTC)))
+    arangodb_helpers.modify_rule(
+        indicator["id"],
+        indicator["modified"],
+        new_objects[0]["modified"],
+        new_objects,
+    )
+
+def get_rule_type(indicator):
+    rule_type = "base.modify"
+    for ref in indicator.get('external_references', []):
+        if ref['source_name'] == "siemrules-created-type":
+            rule_type = ref['external_id']
+            break
+    return rule_type
+        
+@shared_task
+def modify_base_rule(job_id, indicator, report, new_rule_data):
+    job = Job.objects.get(id=job_id)
+    old_detection = yaml_to_detection(
+        indicator["pattern"], indicator.get("indicator_types", [])
+    )
+    match modify_type := job.data['modification_method']:
+        case 'prompt':
+            input_text = "<SKIPPED INPUT>"
+            new_rule = base_rule_modifier.get_modification(
+                parse_ai_model(job.data["ai_provider"]),
+                input_text,
+                old_detection,
+                job.data["prompt"],
+            )
+        case 'sigma':
+            new_rule = txt2detection.models.SigmaRuleDetection.model_validate(new_rule_data)
+        case _:
+            raise ValueError(f'unknown type `{modify_type}`')
+    
+    new_rule.tlp_level = old_detection.tlp_level.name
+    new_objects = base_rule_modifier.modify_indicator(report, indicator, new_rule)
+    arangodb_helpers.modify_rule(
+        indicator["id"],
+        indicator["modified"],
+        new_objects[0]["modified"],
+        new_objects,
+    )
+
 
 def run_txt2detection(file: models.File):
     input_str = None
@@ -155,6 +244,8 @@ def upload_objects(job: models.Job, bundle, extra_data: dict, link_collection=Fa
 
     s2a.run(data=bundle)
     return s2a
+
+
 
 
 def make_bundle(objects):

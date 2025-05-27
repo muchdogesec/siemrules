@@ -25,9 +25,6 @@ from txt2detection.ai_extractor.utils import (
 )
 
 
-def create_indicator(correlation: RuleModel):
-    pass
-
 def make_rule(rule: RuleModel, other_documents: list[dict], id):
     rule_dict = rule.model_dump(mode='json', exclude_none=True, by_alias=True)
     rule_dict.update(id=id)
@@ -38,10 +35,12 @@ def make_rule(rule: RuleModel, other_documents: list[dict], id):
     )
     return rule_str
 
-def add_rule_indicator(rule: RuleModel, related_indicators = None, correlation_rule_type='manual', job_data=None):
+def add_rule_indicator(rule: RuleModel, base_rule_indicators = None, correlation_rule_type='manual', job_data=None):
     job_data = job_data or dict()
-    related_indicators = related_indicators or []
+    base_rule_indicators = base_rule_indicators or []
     identity = default_identity()
+    # if rule_ids := rule.correlation.rules:
+    #     assert len(rule_ids) == len(base_rule_indicators or []), "base rules not passed"
     if rule.author:
         #assumes rule.author must be pre-fetched identity
         identity = parse_stix(rule.author)
@@ -50,8 +49,8 @@ def add_rule_indicator(rule: RuleModel, related_indicators = None, correlation_r
 
     rule.author = identity['id']
     job_correlation_id = job_data and job_data.get('correlation_id')
-    indicator_id = rule.rule_id or job_correlation_id or str(uuid.uuid4())
-    rule_str = make_rule(rule, rules_from_indicators(related_indicators), indicator_id)
+    rule.rule_id = rule.rule_id or job_correlation_id or str(uuid.uuid4())
+    rule_str = make_rule(rule, rules_from_indicators(base_rule_indicators), rule.rule_id)
 
     ext_refs = [
         dict(source_name="siemrules-created-type", external_id=correlation_rule_type)
@@ -61,7 +60,7 @@ def add_rule_indicator(rule: RuleModel, related_indicators = None, correlation_r
 
     correlation_indicator = {
         "type": "indicator",
-        "id": "indicator--"+indicator_id,
+        "id": "indicator--"+rule.rule_id,
         "spec_version": "2.1",
         "created_by_ref": identity["id"],
         "created": job_data.get('created', rule.date),
@@ -72,21 +71,21 @@ def add_rule_indicator(rule: RuleModel, related_indicators = None, correlation_r
         "labels": [],
         "pattern_type": 'sigma',
         "pattern": rule_str,
-        "valid_from": rule.date,
         "object_marking_refs": [
             rule.tlp_level.value['id'],
             "marking-definition--97ba4e8b-04f6-57e8-8f6e-3a0f0a7dc0fb"
         ],
         "external_references": ext_refs
     }
+    correlation_indicator['valid_from'] = correlation_indicator['created']
     
-    logging.debug(f"===== rule {indicator_id} =====")
+    logging.debug(f"===== rule {rule.rule_id} =====")
     logging.debug("```yaml\n"+str(correlation_indicator['pattern'])+"\n```")
     logging.debug(f" =================== end of rule =================== ")
         
     correlation_indicator = parse_stix(correlation_indicator, allow_custom=True)
-    objects = [correlation_indicator, identity]
-    for related_indicator in related_indicators:
+    objects = [correlation_indicator, identity, rule.tlp_level.value]
+    for related_indicator in base_rule_indicators:
         objects.append(
             dict(
                 type="relationship",

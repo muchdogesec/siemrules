@@ -58,7 +58,7 @@ class DRFCorrelationRuleModify(DRFBaseModel, BaseRuleModel, RuleModelExtraProper
 
     @classmethod
     def merge_detection(cls, old_detection: CorrelationRule, request_data: dict):
-        return {**old_detection.model_dump(exclude=['created', 'modified', 'date', 'author'], exclude_unset=True, exclude_none=True), **request_data}
+        return {**old_detection.model_dump(exclude=['created', 'modified', 'date', 'author'], exclude_unset=True, exclude_none=True, by_alias=True), **request_data}
 
     
 # class _CorrelationPatch(create_serializer_from_model(Correlation, {"validate_pydantic": True})):
