@@ -93,7 +93,7 @@ def test_upload_correlation(client, rule):
     from siemrules.worker.celery import app
     app.conf.task_always_eager = True
 
-    with patch.object(RuleModel, "rule_id", rule_id):
+    with patch.object(RuleModel, "_rule_id", rule_id):
         response = client.post(
             correlation_url + "create/manual/", format="sigma", data=rule, content_type='application/sigma+yaml'
         )
