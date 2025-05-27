@@ -282,7 +282,7 @@ class FileView(
         responses={200: serializers.JobSerializer, 400: DEFAULT_400_ERROR},
         request=DRFSigmaRule.drf_serializer,
     )
-    @decorators.action(methods=["POST"], detail=False, url_path="sigma", parser_classes=[SigmaRuleParser])
+    @decorators.action(methods=["POST"], detail=False, url_path="yml", parser_classes=[SigmaRuleParser])
     def create_from_sigma(self, request: request.Request, *args, **kwargs):
         request_body = request.body
         serializer = DRFSigmaRule.drf_serializer(data=request.data)
@@ -699,7 +699,7 @@ class BaseRuleView(RuleView):
         request=DRFDetection.drf_serializer,
         responses={200: serializers.RuleSerializer, 400: DEFAULT_400_ERROR},
     )
-    @decorators.action(methods=["POST"], detail=True, parser_classes=[SigmaRuleParser], url_path="modify/manual")
+    @decorators.action(methods=["POST"], detail=True, parser_classes=[SigmaRuleParser], url_path="modify/yml")
     def modify_base_rule_manual(self, request, *args, indicator_id=None, **kwargs):
         report, indicator, all_objs = arangodb_helpers.get_objects_by_id(indicator_id)
 
@@ -1035,7 +1035,7 @@ class CorrelationRuleView(RuleView):
         request=correlations.serializers.DRFCorrelationRuleModify.drf_serializer,
         responses={200: serializers.RuleSerializer, 400: DEFAULT_400_ERROR},
     )
-    @decorators.action(methods=['POST'], detail=True, url_path="modify/manual", parser_classes=[SigmaRuleParser])
+    @decorators.action(methods=['POST'], detail=True, url_path="modify/yml", parser_classes=[SigmaRuleParser])
     def modify_correlation_manual(self, request, *args, indicator_id=None, **kwargs):
         report, indicator, all_objs = arangodb_helpers.get_objects_by_id(indicator_id)
         old_rule, _ = correlations.correlations.yaml_to_rule(
@@ -1111,7 +1111,7 @@ class CorrelationRuleView(RuleView):
         request=DRFCorrelationRule.drf_serializer,
         responses={200: serializers.CorrelationJobSerializer, 400: DEFAULT_400_ERROR},
     )
-    @decorators.action(methods=['POST'], detail=False, serializer_class=serializers.CorrelationJobSerializer, url_path="create/manual", parser_classes=[SigmaRuleParser])
+    @decorators.action(methods=['POST'], detail=False, serializer_class=serializers.CorrelationJobSerializer, url_path="create/yml", parser_classes=[SigmaRuleParser])
     def create_from_sigma(self, request, *args, **kwargs):
         rule_s = DRFCorrelationRule.drf_serializer(data=request.data)
         rule_s.is_valid(raise_exception=True)
