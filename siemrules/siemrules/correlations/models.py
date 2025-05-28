@@ -146,7 +146,7 @@ class RuleModel(BaseRuleModel, RuleModelExtraProperties):
     
     @rule_id.setter
     def rule_id(self, rule_id):
-        self._rule_id = rule_id
+        self._rule_id = str(rule_id)
 
     @field_validator('author', mode='before')
     @classmethod

@@ -56,10 +56,7 @@ tags:
 """
     with patch("siemrules.worker.tasks.new_correlation_task") as mock_task:
         response = client.post(
-            correlation_url + "create/manual/",
-            format="sigma",
-            data=rule,
-            content_type="application/sigma+yaml",
+            correlation_url + "create/yml/", format="sigma", data=rule, content_type='application/sigma+yaml'
         )
         assert response.status_code == status.HTTP_200_OK, response.content
         mock_task.assert_called_once()

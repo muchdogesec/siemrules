@@ -95,7 +95,7 @@ def test_upload_correlation(client, rule):
 
     with patch.object(RuleModel, "_rule_id", rule_id):
         response = client.post(
-            correlation_url + "create/manual/", format="sigma", data=rule, content_type='application/sigma+yaml'
+            correlation_url + "create/yml/", format="sigma", data=rule, content_type='application/sigma+yaml'
         )
         assert response.status_code == 200
         resp = client.get(
