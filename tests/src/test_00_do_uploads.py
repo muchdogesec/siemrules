@@ -102,3 +102,4 @@ def test_upload_correlation(client, rule):
             correlation_url + f"indicator--{rule_id}/"
         )
         assert resp.status_code == 200
+
