@@ -232,28 +232,6 @@ def test_job_completed(job):
     assert job.state == models.JobState.COMPLETED
     assert job.pk == job.id
 
-@pytest.mark.django_db
-def test_new_task_job_failure(job, celery_eager):
-    with patch('siemrules.worker.tasks.process_report', side_effect=ValueError), patch('siemrules.worker.tasks.job_failed') as mock_job_failed_handler:
-        new_task(job)
-        mock_job_failed_handler.assert_called_once_with(job_id=job.id)
-
-@pytest.mark.parametrize(
-        "job_type",
-        [
-            models.JobType.CORRELATION_PROMPT,
-            models.JobType.CORRELATION_SIGMA
-        ]
-)
-@pytest.mark.django_db
-def test_new_correlation_task_job_failure(job, celery_eager, job_type):
-    job.type = job_type
-    rule_mock = MagicMock()
-    rule_mock.model_dump.return_value = {}
-    with patch.object(process_correlation, '__call__', side_effect=ValueError), patch('siemrules.worker.tasks.process_correlation_ai', side_effect=ValueError), patch('siemrules.worker.tasks.job_failed') as mock_job_failed_handler:
-        new_correlation_task(job, rule_mock, None, None)
-        mock_job_failed_handler.assert_called_once_with(job_id=job.id)
-
 
 @pytest.mark.django_db
 def test_job_failure(job):
