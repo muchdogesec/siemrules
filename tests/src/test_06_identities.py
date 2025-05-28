@@ -42,3 +42,20 @@ def test_destroy_identity(client: django.test.Client):
         for call in delete_many.mock_calls:
             objects_removed += len(delete_many.mock_calls[0].args[0])
         assert objects_removed > 10, "at least 10 objects must have been removed"
+
+
+def test_list_identities(client: django.test.Client, subtests):
+    response = client.get(url)
+    identities = {obj['id']: obj for obj in response.data['objects']}
+    for identity in identities.values():
+        assert identity['type'] == 'identity'
+        identity_id = identity['id']
+        with subtests.test('test_retrieve_identity', identity_id=identity_id):
+            assert identity == retrieve_identity(client, identity_id)
+
+
+def retrieve_identity(client: django.test.Client, identity_id: str):
+    response = client.get(url+identity_id+'/')
+    identity = response.data['objects'][0]
+    assert identity['id'] == identity_id
+    return identity

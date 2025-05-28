@@ -1098,3 +1098,22 @@ tags:
     - tlp.amber
 '''
 )
+
+CORRELATION_RULE_2 = (
+    "8072047b-998e-43fc-a807-15c669c7343b", 
+'''
+title: Bad login
+description: Bad description
+correlation:
+    type: event_count
+    rules:
+        - 9e2536b0-988b-598d-8cc3-407f9f13fc61
+    group-by:
+        - SampleGroup
+    timespan: 1h
+    condition:
+        lt: 15
+tags:
+    - tlp.green
+'''
+)

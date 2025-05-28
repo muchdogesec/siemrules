@@ -280,6 +280,9 @@ def test_correlation_create__prompt(client: django.test.Client, rule_payload: di
         assert "correlation_id" in job.data
         assert rule_payload.get("tlp_level", "clear") == job.data["tlp_level"]
 
+def test_modify_correlation_from_prompt(client: django.test.Client):
+    pass
+
 
 @pytest.mark.parametrize(
     ["rule_ids", "should_fail"],
