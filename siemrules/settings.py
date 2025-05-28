@@ -218,8 +218,8 @@ SPECTACULAR_SETTINGS = {
     "TAGS": [
         {"name": "Files", "description": "Upload files and retrieve uploaded files that create Base Rules"},
         {"name": "Reports", "description": "Search and retrieve Reports created from uploaded files"},
-        {"name": "Base Rules", "description": "Search, retrieve and modify Rules"},
-        {"name": "Correlation Rules", "description": "Search, retrieve and modify Rules"},
+        {"name": "Base Rules", "description": "Search, retrieve and modify Base Rules"},
+        {"name": "Correlation Rules", "description": "Search, retrieve and modify Correlation Rules"},
         {"name": "Identities", "description": "Manage the Identities used to create Rules"},
         {"name": "Objects", "description": "Search through all STIX objects"},
         {"name": "Jobs", "description": "Check the status of data retrieval from files"},
