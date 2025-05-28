@@ -17,7 +17,7 @@ from siemrules.siemrules.correlations import correlations
 from siemrules.siemrules.correlations.correlations import yaml_to_rule
 from siemrules.siemrules.modifier import yaml_to_detection
 from siemrules.siemrules.utils import TLP_LEVEL_STIX_ID_MAPPING, TLP_Levels
-from siemrules.worker.tasks import upload_to_arango
+
 from txt2detection.models import TLP_LEVEL as T2D_TLP_LEVEL, SigmaRuleDetection
 from siemrules.siemrules.correlations.models import RuleModel, set_tlp_level_in_tags
 

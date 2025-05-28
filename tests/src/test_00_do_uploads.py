@@ -1,55 +1,37 @@
 import copy
-from functools import lru_cache
 from itertools import chain
-import os
 import time
 import django
 import pytest
+from llama_index.core.program import LLMTextCompletionProgram
 
 
 import django.test
-from rest_framework import status
-from unittest.mock import patch
-from django.core.files.uploadedfile import SimpleUploadedFile
+from unittest.mock import MagicMock, patch
 import yaml
-from siemrules.siemrules import models, reports
+from siemrules.siemrules import models
+from siemrules.siemrules.correlations.correlations import yaml_to_rule
 from siemrules.siemrules.correlations.models import RuleModel
 from siemrules.worker import tasks
 from tests.src import data as test_data
-from rest_framework.response import Response
-from rest_framework.validators import ValidationError
-from .utils import celery_eager
 
-from tests.src.utils import is_sorted
 
-from functools import lru_cache
 import os
 import time
 import django
-from django.http import HttpRequest
 import pytest
 
-
+from txt2detection.models import (
+    SigmaRuleDetection, AIDetection
+)
 import django.test
-from rest_framework import status
 from unittest.mock import patch
-from django.core.files.uploadedfile import SimpleUploadedFile
-from siemrules.siemrules import models, reports
+from siemrules.siemrules import models
 from siemrules.worker import tasks
 from tests.src import data as test_data
-from rest_framework.response import Response
-from rest_framework.validators import ValidationError
+from .utils import celery_eager
 
-from siemrules.siemrules.arangodb_helpers import (
-    RULES_SORT_FIELDS,
-    get_rules,
-    get_single_rule,
-    delete_rule,
-)
-from rest_framework.exceptions import NotFound
-from rest_framework.request import Request
 
-from tests.src.utils import is_sorted
 
 
 def upload_bundles():
@@ -166,3 +148,47 @@ def test_modify_correlation_manual(celery_eager, client, rule_id, modification):
     
     if expected_name := modification.get('title'):
         assert indicator['name'] == expected_name
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    ["rule_id", "modification"],
+    [
+        [
+            "indicator--8072047b-998e-43fc-a807-15c669c7343b",
+            dict(description="ai generated description"),
+        ],
+        [
+            "indicator--8072047b-998e-43fc-a807-15c669c7343b",
+            dict(tags=['some.other_tag']),
+        ]
+    ]
+)
+def test_modify_correlation_rule_from_prompt(celery_eager, client, rule_id, modification):
+    url = correlation_url
+    indicator = client.get(
+        url + rule_id + '/'
+    ).data
+    rule, _ = yaml_to_rule(indicator['pattern'])
+    ai_modification = rule.model_copy(update=modification)
+    with patch.object(LLMTextCompletionProgram, '__call__', new=MagicMock(return_value=ai_modification)) as mock_ai_call:
+        response = client.post(
+            url + f"{rule_id}/modify/prompt/",
+            data={'ai_provider': 'openai', 'prompt': 'some prompt'},
+            content_type='application/json'
+        )
+        assert response.status_code == 201
+        job_resp = client.get(f"/api/v1/jobs/{response.data['id']}/")
+        assert job_resp.status_code == 200
+        assert job_resp.data['state'] == 'completed', job_resp.data
+        indicator = client.get(
+            url + rule_id + '/'
+        ).data
+        rule, _ = yaml_to_rule(indicator['pattern'])
+
+        if expected_descr := modification.get('description'):
+            assert indicator['description'] == expected_descr
+            assert rule.description == expected_descr
+        assert indicator['name'] == ai_modification.title
+        if expected_tags := modification.get('tags'):
+            assert set(expected_tags).issubset(rule.tags)

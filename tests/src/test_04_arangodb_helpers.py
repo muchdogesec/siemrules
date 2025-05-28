@@ -41,7 +41,7 @@ RULE_TYPES = [
             dict(attack_id="T1059,TA0001"),
             [
                 "indicator--8af82832-2abd-5765-903c-01d414dae1e9",
-                # "indicator--2683daab-aa64-52ff-a001-3ea5aee9dd72",
+                "indicator--2683daab-aa64-52ff-a001-3ea5aee9dd72",
             ],
             id="attack_id x2",
         ),
@@ -80,7 +80,8 @@ RULE_TYPES = [
         pytest.param(dict(name='eLemENtor'), ["indicator--2683daab-aa64-52ff-a001-3ea5aee9dd72"], id='good name bad case 2'),
         pytest.param(dict(tlp_level='green'), [
             'indicator--8af82832-2abd-5765-903c-01d414dae1e9',
-            'indicator--9e2536b0-988b-598d-8cc3-407f9f13fc61'
+            'indicator--9e2536b0-988b-598d-8cc3-407f9f13fc61',
+            "indicator--8072047b-998e-43fc-a807-15c669c7343b",
         ], id='tlp level green'),
         pytest.param(dict(tlp_level='amber'), ['indicator--2683daab-aa64-52ff-a001-3ea5aee9dd72', "indicator--0e95725d-7320-415d-80f7-004da920fc11"], id='tlp level amber 1'),
         pytest.param(dict(rule_type="base-rule"), [
@@ -88,7 +89,7 @@ RULE_TYPES = [
             "indicator--9e2536b0-988b-598d-8cc3-407f9f13fc61",
             "indicator--8af82832-2abd-5765-903c-01d414dae1e9",
         ], id="only base-rules"),
-        pytest.param(dict(rule_type="correlation-rule"), ["indicator--0e95725d-7320-415d-80f7-004da920fc11"], id="only correlation-rules"),
+        pytest.param(dict(rule_type="correlation-rule"), ["indicator--0e95725d-7320-415d-80f7-004da920fc11", "indicator--8072047b-998e-43fc-a807-15c669c7343b"], id="only correlation-rules"),
         pytest.param(dict(tlp_level='clear'), [], id='tlp level clear'),
     ],
 )
