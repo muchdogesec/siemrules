@@ -38,6 +38,8 @@ def get_stix_object(stix_id):
 def  validate_author(author: str):
     if not author:
         return None
+    if author == 'identity--8ef05850-cb0d-51f7-80be-50e4376dbe63':
+        author = default_identity()
     if isinstance(author, dict):
         author = json.dumps(author)
 
