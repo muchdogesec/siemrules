@@ -113,8 +113,8 @@ class JobType(models.TextChoices):
     FILE_TEXT          = "file.prompt"
     CORRELATION_SIGMA  = "correlation.sigma"
     CORRELATION_PROMPT = "correlation.prompt"
-    # BASE_MODIFY = "base-rule.modify"
-    # CORRELATION_MODIFY = "correlation.modify"
+    BASE_MODIFY        = "base.modify"
+    CORRELATION_MODIFY = "correlation.modify"
 
 
 class Job(models.Model):

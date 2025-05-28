@@ -715,43 +715,40 @@ class BaseRuleView(RuleView):
         DRFDetection.is_valid(s, request.data)
         detection = old_detection.model_copy(update=s.data)
 
-        return self.do_modify_base_rule(request, indicator_id, report, indicator, detection)
 
-    def do_modify_base_rule(self, request, indicator_id, report, indicator, detection):
-        new_objects = modify_indicator(report, indicator, detection)
-        arangodb_helpers.modify_rule(
-            indicator["id"],
-            indicator["modified"],
-            new_objects[0]["modified"],
-            new_objects,
+        job_instance = models.Job.objects.create(
+            type=models.JobType.BASE_MODIFY,
+            data=dict(
+                modification_method='sigma',
+                indicator_id=indicator_id,
+                **s.data
+            )
         )
-
-        return self.retrieve(request, indicator_id=indicator_id)
+        job_s = JobSerializer(job_instance)
+        tasks.new_modify_rule_task(job_instance, indicator, detection.model_dump(mode='json', by_alias=True), report=report)
+        return Response(job_s.data, status=status.HTTP_201_CREATED)
     
     @extend_schema(
         request=serializers.AIModifySerializer,
-        responses={200: serializers.RuleSerializer, 400: DEFAULT_400_ERROR},
+        responses={201: serializers.JobSerializer, 400: DEFAULT_400_ERROR},
     )
     @decorators.action(methods=['POST'], detail=True, url_path="modify/prompt")
     def modify_base_rule_from_prompt(self, request, *args, indicator_id=None, **kwargs):
         report, indicator, all_objs = arangodb_helpers.get_objects_by_id(indicator_id)
         s = serializers.AIModifySerializer(data=request.data)
         s.is_valid(raise_exception=True)
-        old_detection = yaml_to_detection(
-            indicator["pattern"], indicator.get("indicator_types", [])
-        )
-        input_text = report["description"]
-        input_text = "<SKIPPED INPUT>"
-        detection = get_modification(
-            parse_model(s.data["ai_provider"]),
-            input_text,
-            old_detection,
-            s.data["prompt"],
-        )
 
-        return self.do_modify_base_rule(
-            request, indicator_id, report, indicator, detection
+        job_instance = models.Job.objects.create(
+            type=models.JobType.BASE_MODIFY,
+            data=dict(
+                modification_method='prompt',
+                indicator_id=indicator_id,
+                **s.data
+            )
         )
+        job_s = JobSerializer(job_instance)
+        tasks.new_modify_rule_task(job_instance, indicator, None, report=report)
+        return Response(job_s.data, status=status.HTTP_201_CREATED)
 
 @extend_schema_view(
     modify_correlation_manual=extend_schema(
@@ -902,65 +899,54 @@ class CorrelationRuleView(RuleView):
 
     @extend_schema(
         request=correlations.serializers.DRFCorrelationRuleModify.drf_serializer,
-        responses={200: serializers.RuleSerializer, 400: DEFAULT_400_ERROR},
+        responses={201: serializers.JobSerializer, 400: DEFAULT_400_ERROR},
     )
     @decorators.action(methods=['POST'], detail=True, url_path="modify/manual", parser_classes=[SigmaRuleParser])
     def modify_correlation_manual(self, request, *args, indicator_id=None, **kwargs):
-        report, indicator, all_objs = arangodb_helpers.get_objects_by_id(indicator_id)
+        _, indicator, _ = arangodb_helpers.get_objects_by_id(indicator_id)
         old_rule, _ = correlations.correlations.yaml_to_rule(
             indicator["pattern"]
         )
         new_rule = correlations.serializers.DRFCorrelationRuleModify.serialize_rule_from(old_rule, request.data)
-
-        return self.do_modify_correlation(request, indicator_id, report, indicator, new_rule)
-
-    def do_modify_correlation(self, request, indicator_id, report, indicator, rule):
-        for ref in indicator.get('external_references', []):
-            if ref['source_name'] == "siemrules-created-type":
-                rule_type = ref['external_id']
-                break
-        else:
-            rule_type = "correlation.modify"
-        _, _, rule.rule_id = indicator_id.rpartition('--')
-        new_objects = correlations.correlations.add_rule_indicator(rule, [], rule_type, dict(modified=datetime.now(UTC)))
-        arangodb_helpers.modify_rule(
-            indicator["id"],
-            indicator["modified"],
-            new_objects[0]["modified"],
-            new_objects,
+        job_instance = models.Job.objects.create(
+            type=models.JobType.CORRELATION_MODIFY,
+            data=dict(
+                modification_method='sigma',
+                correlation_id=indicator_id,
+            )
         )
-
-        return self.retrieve(request, indicator_id=indicator_id)
+        job_s = CorrelationJobSerializer(job_instance)
+        tasks.new_modify_rule_task(job_instance, indicator, new_rule.model_dump(mode='json', by_alias=True))
+        return Response(job_s.data, status=status.HTTP_201_CREATED)
     
     @extend_schema(
         request=serializers.AIModifySerializer,
-        responses={200: serializers.RuleSerializer, 400: DEFAULT_400_ERROR},
+        responses={201: serializers.CorrelationJobSerializer, 400: DEFAULT_400_ERROR},
     )
     @decorators.action(methods=['POST'], detail=True, url_path="modify/prompt")
     def modify_correlation_from_prompt(self, request, *args, indicator_id=None, **kwargs):
-        report, indicator, all_objs = arangodb_helpers.get_objects_by_id(indicator_id)
+        _, indicator, _ = arangodb_helpers.get_objects_by_id(indicator_id)
         s = serializers.AIModifySerializer(data=request.data)
         s.is_valid(raise_exception=True)
-        old_detection, _ = correlations.correlations.yaml_to_rule(
-            indicator["pattern"]
-        )
-        new_rule = correlations.correlations.get_modification(
-            parse_model(s.data["ai_provider"]),
-            "",
-            old_detection,
-            s.data["prompt"],
-        )
-        new_rule.tlp_level = old_detection.tlp_level.name
 
-        return self.do_modify_correlation(
-            request, indicator_id, report, indicator, new_rule
+        job_instance = models.Job.objects.create(
+            type=models.JobType.CORRELATION_MODIFY,
+            data=dict(
+                modification_method='prompt',
+                correlation_id=indicator_id,
+                **s.data
+            )
         )
+        job_s = CorrelationJobSerializer(job_instance)
+        tasks.new_modify_rule_task(job_instance, indicator, None)
+        return Response(job_s.data, status=status.HTTP_201_CREATED)
 
 
     def get_parsers(self):
         return super().get_parsers()
 
-    def get_rules(self, rule_ids):
+    @staticmethod
+    def get_rules(rule_ids):
         r = request.Request(HttpRequest())
         rule_ids = [str(r) for r in rule_ids]
         indicator_ids = ["indicator--" + rule_id for rule_id in rule_ids]
