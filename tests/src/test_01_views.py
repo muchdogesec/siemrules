@@ -177,9 +177,7 @@ class TestBaseRuleView:
                 assert rule_resp.data['id'] == rule_id
                 assert rule_resp.data["modified"] == version or response.data[0]
 
-    
-   
-    
+
     def test_revert_rule(self, client: django.test.Client):
         rule_id = "indicator--2683daab-aa64-52ff-a001-3ea5aee9dd72"
         rule_url = f"{self.url}{rule_id}/"

@@ -1,4 +1,5 @@
 import copy
+from types import SimpleNamespace
 from unittest.mock import patch, MagicMock, mock_open
 from unittest import mock
 import uuid
@@ -8,11 +9,11 @@ from siemrules.siemrules import models
 from siemrules.siemrules.correlations.models import RuleModel
 from siemrules.siemrules.models import File
 from siemrules.worker.tasks import (
-    new_correlation_task, new_task, process_report, run_txt2detection, run_file2txt, upload_to_arango, job_completed, upload_objects
+    job_failed, new_correlation_task, new_task, process_correlation, process_report, run_txt2detection, run_file2txt, upload_to_arango, job_completed, upload_objects
 )
 from siemrules.worker import tasks
 import stix2
-from .utils import job
+from .utils import job, celery_eager
 
 
 
@@ -231,6 +232,12 @@ def test_job_completed(job):
     assert job.state == models.JobState.COMPLETED
     assert job.pk == job.id
 
+
+@pytest.mark.django_db
+def test_job_failure(job):
+    with mock.patch('siemrules.siemrules.models.Job.objects.get', return_value=job):
+        job_failed(SimpleNamespace(id=uuid.uuid4()), None, None, job.id)
+        assert job.state == models.JobState.FAILED
 
 @pytest.mark.django_db
 def test_process_report_success(job):

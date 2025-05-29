@@ -13,7 +13,14 @@ def is_sorted(iterable, key=None, reverse=False):
     return not any(map(lt, b, a))
 
 @pytest.fixture
-@pytest.mark.django_db
 def job():
     file = File.objects.create(name="test.txt", file=SimpleUploadedFile("test.txt", b"dummy content", content_type="text/plain"))
     return Job.objects.create(file=file)
+
+
+@pytest.fixture
+def celery_eager():
+    from siemrules.worker.celery import app
+    app.conf.task_always_eager = True
+    yield
+    app.conf.task_always_eager = False

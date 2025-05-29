@@ -17,7 +17,7 @@ from siemrules.siemrules.correlations import correlations
 from siemrules.siemrules.correlations.correlations import yaml_to_rule
 from siemrules.siemrules.modifier import yaml_to_detection
 from siemrules.siemrules.utils import TLP_LEVEL_STIX_ID_MAPPING, TLP_Levels
-from siemrules.worker.tasks import upload_to_arango
+
 from txt2detection.models import TLP_LEVEL as T2D_TLP_LEVEL, SigmaRuleDetection
 from siemrules.siemrules.correlations.models import RuleModel, set_tlp_level_in_tags
 
@@ -175,9 +175,9 @@ def request_from_queries(**queries):
     r.query_params.update(queries)
     return r
 
-def get_single_rule(indicator_id, version=None):
+def get_single_rule(indicator_id, version=None, nokeep=True):
     r = request_from_queries(indicator_id=indicator_id, version=version)
-    rules = get_rules(r, paginate=False)
+    rules = get_rules(r, paginate=False, nokeep=nokeep)
     if not rules:
         raise NotFound(f"no rule with id `{indicator_id}`")
     return Response(rules[0])
@@ -189,14 +189,8 @@ def get_single_rule_versions(indicator_id):
         raise NotFound(f"no rule with id `{indicator_id}`")
     return Response(sorted([rule['modified'] for rule in rules], reverse=True))
 
-def get_objects_for_rule(indicator_id, request, version=None, types: str=None):
-    types = types or ''
-    r = request_from_queries(indicator_id=indicator_id, version=version)
-    helper = ArangoDBHelper(settings.VIEW_NAME, r)
-    rules = get_rules(r, paginate=False, nokeep=False)
-    if not rules:
-        raise NotFound(f"no rule with id `{indicator_id}`")
-    rule = rules[0]
+def get_objects_for_rule(indicator_id, request, version=None):
+    rule = get_single_rule(indicator_id, version=version, nokeep=False).data
 
     helper = ArangoDBHelper(settings.VIEW_NAME, request)
     filters = []
@@ -208,12 +202,11 @@ def get_objects_for_rule(indicator_id, request, version=None, types: str=None):
     if helper.query_as_bool('ignore_embedded_sro', default=False):
         filters.append('FILTER doc._is_ref != TRUE')
 
-
     query = '''
     LET rel_ids = (FOR rel IN siemrules_edge_collection FILTER rel._from == @rule_key OR rel._to == @rule_key RETURN [rel._from, rel._to, rel._id])
     LET obj_ids = FLATTEN([@rule_key, rel_ids], 3)
     FOR doc IN @@view
-    FILTER doc._id IN obj_ids
+    SEARCH doc._id IN obj_ids
     #filters
     LIMIT @offset, @count
     RETURN KEEP(doc, KEYS(doc, TRUE))

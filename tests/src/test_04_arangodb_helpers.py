@@ -17,9 +17,10 @@ from tests.src import data as test_data
 from rest_framework.response import Response
 from rest_framework.validators import ValidationError
 
-from siemrules.siemrules.arangodb_helpers import RULES_SORT_FIELDS, get_rules, get_single_rule, delete_rule
+from siemrules.siemrules.arangodb_helpers import RULES_SORT_FIELDS, get_objects_for_rule, get_rules, get_single_rule, delete_rule, request_from_queries
 from rest_framework.exceptions import NotFound
 from rest_framework.request import Request
+from dogesec_commons.objects.helpers import ArangoDBHelper
 
 from tests.src.utils import is_sorted
 
@@ -40,7 +41,7 @@ RULE_TYPES = [
             dict(attack_id="T1059,TA0001"),
             [
                 "indicator--8af82832-2abd-5765-903c-01d414dae1e9",
-                # "indicator--2683daab-aa64-52ff-a001-3ea5aee9dd72",
+                "indicator--2683daab-aa64-52ff-a001-3ea5aee9dd72",
             ],
             id="attack_id x2",
         ),
@@ -79,7 +80,8 @@ RULE_TYPES = [
         pytest.param(dict(name='eLemENtor'), ["indicator--2683daab-aa64-52ff-a001-3ea5aee9dd72"], id='good name bad case 2'),
         pytest.param(dict(tlp_level='green'), [
             'indicator--8af82832-2abd-5765-903c-01d414dae1e9',
-            'indicator--9e2536b0-988b-598d-8cc3-407f9f13fc61'
+            'indicator--9e2536b0-988b-598d-8cc3-407f9f13fc61',
+            "indicator--8072047b-998e-43fc-a807-15c669c7343b",
         ], id='tlp level green'),
         pytest.param(dict(tlp_level='amber'), ['indicator--2683daab-aa64-52ff-a001-3ea5aee9dd72', "indicator--0e95725d-7320-415d-80f7-004da920fc11"], id='tlp level amber 1'),
         pytest.param(dict(rule_type="base-rule"), [
@@ -87,7 +89,7 @@ RULE_TYPES = [
             "indicator--9e2536b0-988b-598d-8cc3-407f9f13fc61",
             "indicator--8af82832-2abd-5765-903c-01d414dae1e9",
         ], id="only base-rules"),
-        pytest.param(dict(rule_type="correlation-rule"), ["indicator--0e95725d-7320-415d-80f7-004da920fc11"], id="only correlation-rules"),
+        pytest.param(dict(rule_type="correlation-rule"), ["indicator--0e95725d-7320-415d-80f7-004da920fc11", "indicator--8072047b-998e-43fc-a807-15c669c7343b"], id="only correlation-rules"),
         pytest.param(dict(tlp_level='clear'), [], id='tlp level clear'),
     ],
 )
@@ -98,6 +100,23 @@ def test_get_rules(params, expected_ids):
     result = get_rules(request)
 
     assert {obj["id"] for obj in result.data["rules"]} == expected_ids
+
+@pytest.mark.parametrize(
+    'create_type',
+    [
+        "file.file",
+        "file.prompt",
+        "file.sigma",
+        "correlation.prompt",
+        "correlation.sigma",
+    ]
+)
+def test_get_rules__ingestion_method(create_type):
+    request = request_from_queries(create_type=create_type)
+    result = get_rules(request)
+
+    for obj in result.data["rules"]:
+        assert dict(source_name='siemrules-created-type', external_id=create_type) in obj['external_references']
 
 @pytest.mark.parametrize(
         'sort_param',
@@ -118,7 +137,7 @@ def test_get_single_rule():
         get_single_rule(indicator_id)
         mock_get_rules.assert_called_once()
         request = mock_get_rules.mock_calls[0].args[0]
-        mock_get_rules.assert_called_once_with(request, paginate=False)
+        mock_get_rules.assert_called_once_with(request, paginate=False, nokeep=True)
         assert isinstance(request, Request)
         assert request.query_params.get("indicator_id") == indicator_id
 
@@ -128,6 +147,54 @@ def test_get_single_rule_404():
         mock_get_rules.return_value = []
         get_single_rule(indicator_id)
         mock_get_rules.assert_called_once()
+
+@pytest.mark.parametrize(
+    'ignore_embedded_sro',
+    [
+        True, False
+    ]
+)
+@pytest.mark.parametrize(
+    'types',
+    [
+        ("indicator",), ("indicator", "attack-pattern", "relationship"), ("indicator")
+    ]
+)
+@pytest.mark.parametrize(
+    'rule_id',
+    [
+        'indicator--2683daab-aa64-52ff-a001-3ea5aee9dd72',
+        'indicator--0e95725d-7320-415d-80f7-004da920fc11'
+    ]
+)
+def test_get_objects_for_rule(rule_id, ignore_embedded_sro, types):
+    types_str = ','.join(types)
+    version=''
+    r = request_from_queries(indicator_id=rule_id, version=version, ignore_embedded_sro=str(ignore_embedded_sro), types=types_str)
+    with patch('siemrules.siemrules.arangodb_helpers.get_single_rule', wraps=get_single_rule) as mock_get_single_rule:
+        resp = get_objects_for_rule(rule_id, r, version)
+        assert resp.status_code == 200
+        objects = resp.data['objects']
+        objects_map = {obj['id']: obj for obj in objects}
+        assert len(objects_map) == len(objects), "duplicates in output"
+        mock_get_single_rule.assert_called_once_with(rule_id, version=version, nokeep=False)
+        helper = ArangoDBHelper('', r)
+        if not objects:
+            return
+
+        for obj in helper.db.collection('siemrules_edge_collection').all():
+            if obj['source_ref'] != rule_id or obj['modified'] != objects_map[rule_id]['modified']:
+                continue
+            if types and obj['_target_type'] not in types:
+                assert obj['target_ref'] not in objects_map
+                continue
+            if ignore_embedded_sro and obj.get('_is_ref', False):
+                assert obj['id'] not in objects_map
+                assert obj['target_ref'] not in objects_map, obj
+            else:
+                assert (types and 'relationship' not in types) or obj['id'] in objects_map
+                assert obj['target_ref'] in objects_map
+
 
 
 def test_delete_rules():
