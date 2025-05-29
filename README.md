@@ -1,5 +1,7 @@
 # SIEM Rules
 
+[![codecov](https://codecov.io/gh/muchdogesec/siemrules/graph/badge.svg?token=H4AF99P1TE)](https://codecov.io/gh/muchdogesec/siemrules)
+
 ## Before you begin...
 
 We offer a fully hosted web version of SIEM Rules which includes many additional features over those in this codebase. [You can find out more about the web version here](https://www.siemrules.com/).
