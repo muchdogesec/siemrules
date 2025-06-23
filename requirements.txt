@@ -405,7 +405,7 @@ regex==2024.11.6
     #   nltk
     #   tiktoken
     #   transformers
-requests==2.32.3
+requests==2.32.4
     # via
     #   file2txt
     #   google-api-core
