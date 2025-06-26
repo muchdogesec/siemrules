@@ -139,8 +139,8 @@ def test_clone(subtests, celery_eager, client: django.test.Client, indicator_id,
         or cloned_detection.modified == parse_date(cloned_indicator["modified"]).date()
     ), "rule.modified must match indicator.modified"
     assert (
-        cloned_indicator["created"] == orig_indicator["created"]
-    ), "indicator.created must be the same"
+        cloned_indicator["created"] != orig_indicator["created"]
+    ), "indicator.created must not be the same"
     assert cloned_indicator["id"] != orig_indicator["id"], "stix id should change"
 
 
