@@ -80,6 +80,21 @@ def new_modify_rule_task(job: Job, old_indicator, new_rule_data, report=None):
         link_error=job_failed.s(job_id=job.id),
     )
 
+def new_clone_rule_task(job):
+    task: Task = clone_rule.si(job.id)
+    task.apply_async(
+        countdown=POLL_INTERVAL, root_id=str(job.id), task_id=str(job.id),
+        link=job_completed.si(job.id),
+        link_error=job_failed.s(job_id=job.id),
+    )
+
+@shared_task
+def clone_rule(job_id):
+    job = Job.objects.get(id=job_id)
+    _, _, new_indicator_uuid = job.data['indicator_id'].rpartition('--')
+    arangodb_helpers.make_clone(job.data['cloned_from'], new_indicator_uuid, job.data)
+
+
 @shared_task
 def modify_correlation(job_id, indicator, new_rule_data):
     from siemrules.siemrules.views import CorrelationRuleView

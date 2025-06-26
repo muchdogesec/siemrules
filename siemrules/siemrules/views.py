@@ -485,10 +485,25 @@ class RuleView(viewsets.GenericViewSet):
     @extend_schema(request=serializers.RuleCloneSerializer)
     @decorators.action(methods=['POST'], detail=True)
     def clone(self, request, *args, indicator_id=None, **kwargs):
+        original_indicator = self.retrieve(request, indicator_id=indicator_id)
         s = serializers.RuleCloneSerializer(data=request.data)
         s.is_valid(raise_exception=True)
-        new_rule_indicator_id = arangodb_helpers.make_clone(indicator_id, s.validated_data)
-        return self.retrieve(request, indicator_id=new_rule_indicator_id)
+        new_rule_indicator_id = 'indicator--'+str(uuid.uuid4())
+        # arangodb_helpers.make_clone(indicator_id, new_rule_indicator_id, s.validated_data)
+        # return self.retrieve(request, indicator_id=new_rule_indicator_id)
+    
+
+        job_instance = models.Job.objects.create(
+            type=models.JobType.DUPLICATE_RULE,
+            data=dict(
+                cloned_from=indicator_id,
+                indicator_id=new_rule_indicator_id,
+                **s.validated_data
+            )
+        )
+        job_s = JobSerializer(job_instance)
+        tasks.new_clone_rule_task(job_instance)
+        return Response(job_s.data, status=status.HTTP_201_CREATED)
 
     def destroy(self, request, *args, indicator_id=None, **kwargs):
         arangodb_helpers.delete_rule(indicator_id, 

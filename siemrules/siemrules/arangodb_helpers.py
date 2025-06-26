@@ -443,7 +443,7 @@ def indicator_to_rule(indicator: dict) -> SigmaRuleDetection|tuple[RuleModel, li
     else:
         raise ParseError("unable to determine rule type")
 
-def make_clone(indicator_id, data):
+def make_clone(indicator_id, new_uuid, data):
     r = request_from_queries(indicator_id=indicator_id)
     helper = ArangoDBHelper(settings.VIEW_NAME, r)
     now = datetime.now(UTC)
@@ -453,7 +453,6 @@ def make_clone(indicator_id, data):
     if not rules:
         raise NotFound(f"no rule with id `{indicator_id}`")
     rule = rules[0]
-    new_uuid = str(uuid.uuid4())
     old_stix_id = rule['id']
     _, _, old_uuid = old_stix_id.rpartition('--')
     old_arango_id = rule['_id']
@@ -505,7 +504,6 @@ def make_clone(indicator_id, data):
         {
             "type": "relationship",
             "spec_version": "2.1",
-            "id": "relationship--"+str(uuid.uuid5(settings.STIX_NAMESPACE, f"{rule['id']}+{old_stix_id}")),
             "created_by_ref": author_ref,
             "created": now_str,
             "modified": now_str,
@@ -519,23 +517,31 @@ def make_clone(indicator_id, data):
     )
     
     for obj in objects:
-        if hasattr(obj, 'source_ref'):
-            obj['source_ref'] = rule['id']
+        for k, v in [
+            ('source_ref', rule['id']),
+            ('object_marking_refs', new_marking_refs),
+            ('created_by_ref', author_ref),
+            ('created', now_str),
+            ('modified', now_str),
+        ]:
+            if k in obj:
+                obj[k] = v
 
-        obj['object_marking_refs'] = new_marking_refs
-        obj['created_by_ref'] = author_ref
+        if obj.get('type') == 'relationship':
+            obj.update(id="relationship--"+str(uuid.uuid5(settings.STIX_NAMESPACE, f"{obj['source_ref']}+{obj['target_ref']}")))
         
         for k in [
             '_record_modified',
             '_record_created',
             '_record_md5_hash',
+            '_stixify_report_id', #should not be removed when report is purged
             '_from',
             '_id',
             '_key',
         ]:
             obj.pop(k, None)
         obj['_is_latest'] = True
-        obj['modified'] = now_str
+
     
     ext_refs: list[dict] = [ref for ref in rule.get('external_references', []) if ref['source_name'] != 'siemrules-cloned-from']
     ext_refs.append(dict(source_name='siemrules-cloned-from', external_id=old_uuid))

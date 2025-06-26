@@ -115,6 +115,7 @@ class JobType(models.TextChoices):
     CORRELATION_PROMPT = "correlation.prompt"
     BASE_MODIFY        = "base.modify"
     CORRELATION_MODIFY = "correlation.modify"
+    DUPLICATE_RULE     = "duplicate-rule"
 
 
 class Job(models.Model):

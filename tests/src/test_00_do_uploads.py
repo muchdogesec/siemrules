@@ -29,7 +29,6 @@ from unittest.mock import patch
 from siemrules.siemrules import models
 from siemrules.worker import tasks
 from tests.src import data as test_data
-from .utils import celery_eager
 
 
 
