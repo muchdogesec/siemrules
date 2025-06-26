@@ -13,7 +13,7 @@ from siemrules.worker.tasks import (
 )
 from siemrules.worker import tasks
 import stix2
-from .utils import job, celery_eager
+from .utils import job
 
 
 

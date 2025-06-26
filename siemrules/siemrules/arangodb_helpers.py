@@ -443,7 +443,7 @@ def indicator_to_rule(indicator: dict) -> SigmaRuleDetection|tuple[RuleModel, li
     else:
         raise ParseError("unable to determine rule type")
 
-def make_clone(indicator_id, data):
+def make_clone(indicator_id, new_uuid, data):
     r = request_from_queries(indicator_id=indicator_id)
     helper = ArangoDBHelper(settings.VIEW_NAME, r)
     now = datetime.now(UTC)
@@ -453,7 +453,6 @@ def make_clone(indicator_id, data):
     if not rules:
         raise NotFound(f"no rule with id `{indicator_id}`")
     rule = rules[0]
-    new_uuid = str(uuid.uuid4())
     old_stix_id = rule['id']
     _, _, old_uuid = old_stix_id.rpartition('--')
     old_arango_id = rule['_id']

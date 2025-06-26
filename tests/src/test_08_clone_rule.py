@@ -63,15 +63,23 @@ from tests.src.utils import is_sorted
         {"description": "Cloned Description for Sigma Rule 4"},
     ],
 )
-def test_clone(subtests, client: django.test.Client, indicator_id, rule_type, payload):
+@pytest.mark.django_db
+def test_clone(subtests, celery_eager, client: django.test.Client, indicator_id, rule_type, payload):
     rule_url = f"/api/v1/{rule_type}/{indicator_id}/"
     orig_rule_resp = client.get(rule_url)
     assert orig_rule_resp.status_code == 200
     orig_indicator = orig_rule_resp.json()
-    clone_resp = client.post(rule_url + "clone/", data=payload, content_type='application/json')
-    assert clone_resp.status_code == 200
+    clone_resp = client.post(
+        rule_url + "clone/", data=payload, content_type="application/json"
+    )
+    assert clone_resp.status_code == 201
+    clone_job_resp = client.get(f"/api/v1/jobs/{clone_resp.data['id']}/")
+    assert clone_job_resp.status_code == 200
+    assert clone_job_resp.data["state"] == "completed"
+    new_indicator_id = clone_job_resp.data['extra']['indicator_id']
+    cloned_resp = client.get(f"/api/v1/{rule_type}/{new_indicator_id}/")
     time.sleep(1)
-    cloned_indicator = clone_resp.json()
+    cloned_indicator = cloned_resp.json()
     cloned_detection = rule_to_detection(cloned_indicator)
     orig_detection = rule_to_detection(orig_indicator)
     with subtests.test("description"):
@@ -123,7 +131,7 @@ def test_clone(subtests, client: django.test.Client, indicator_id, rule_type, pa
     with subtests.test("identity"):
         identity = payload.get("identity", settings.STIX_IDENTITY)
         assert identity["id"] == cloned_indicator["created_by_ref"]
-        assert identity["id"] in cloned_detection.author #author is a json string
+        assert identity["id"] in cloned_detection.author  # author is a json string
 
     assert cloned_detection.date == orig_detection.date, "rule.date should be the same"
     assert (
