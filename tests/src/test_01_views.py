@@ -9,9 +9,6 @@ from rest_framework import status
 from unittest.mock import patch
 from django.core.files.uploadedfile import SimpleUploadedFile
 from siemrules.siemrules import models
-from siemrules.siemrules.views import RuleView
-from siemrules.worker import tasks
-from tests.src.data import BUNDLE_1
 from rest_framework.response import Response
 
 from tests.src.utils import is_sorted
@@ -46,7 +43,7 @@ class TestFileView:
             response = client.post(
                 self.url + "intel/", data=file_data, format="multipart"
             )
-            assert response.status_code == status.HTTP_200_OK, response.content
+            assert response.status_code == status.HTTP_201_CREATED, response.content
             mock_task.assert_called_once()
             job: models.Job = mock_task.mock_calls[0].args[0]
             assert job.type == models.JobType.FILE_FILE
@@ -64,7 +61,7 @@ class TestFileView:
             response = client.post(
                 self.url + "prompt/", data=file_data, content_type="application/json"
             )
-            assert response.status_code == status.HTTP_200_OK, response.content
+            assert response.status_code == status.HTTP_201_CREATED, response.content
             mock_task.assert_called_once()
             job: models.Job = mock_task.mock_calls[0].args[0]
             file: models.File = job.file

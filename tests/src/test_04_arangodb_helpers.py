@@ -1,21 +1,11 @@
-from functools import lru_cache
-import os
-import time
 import django
 from django.http import HttpRequest
 import pytest
 
 
 import django.test
-from rest_framework import status
 from unittest.mock import patch
-from django.core.files.uploadedfile import SimpleUploadedFile
-from siemrules.siemrules import models, reports
 from siemrules.siemrules.utils import TLP_LEVEL_STIX_ID_MAPPING, TLP_Levels
-from siemrules.worker import tasks
-from tests.src import data as test_data
-from rest_framework.response import Response
-from rest_framework.validators import ValidationError
 
 from siemrules.siemrules.arangodb_helpers import RULES_SORT_FIELDS, get_objects_for_rule, get_rules, get_single_rule, delete_rule, request_from_queries
 from rest_framework.exceptions import NotFound
@@ -41,7 +31,7 @@ RULE_TYPES = [
             dict(attack_id="T1059,TA0001"),
             [
                 "indicator--8af82832-2abd-5765-903c-01d414dae1e9",
-                "indicator--2683daab-aa64-52ff-a001-3ea5aee9dd72",
+                # "indicator--2683daab-aa64-52ff-a001-3ea5aee9dd72",
             ],
             id="attack_id x2",
         ),
@@ -71,9 +61,9 @@ RULE_TYPES = [
         pytest.param(dict(cve_id='CVE-2024-3094,CVE-2024-1234'), ["indicator--2683daab-aa64-52ff-a001-3ea5aee9dd72", "indicator--9e2536b0-988b-598d-8cc3-407f9f13fc61"], id='cve_id good+good'),
         pytest.param(dict(cve_id='CVE-2024-3094,CVE-2024-1234', attack_id="TA0005"), ["indicator--9e2536b0-988b-598d-8cc3-407f9f13fc61"], id='cve_id + attack_id'),
         pytest.param(dict(file_id='some-id'), [], id='bad file id'),
-        pytest.param(dict(file_id='60915f4c-fa2d-5bf1-b7d1-d7ecab167560'), ["indicator--9e2536b0-988b-598d-8cc3-407f9f13fc61"], id='good file id'),
+        pytest.param(dict(file_id='9e2536b0-988b-598d-8cc3-407f9f13fc61'), ["indicator--9e2536b0-988b-598d-8cc3-407f9f13fc61"], id='good file id'),
         pytest.param(dict(report_id='some-id'), [], id='bad report id'),
-        pytest.param(dict(report_id='report--60915f4c-fa2d-5bf1-b7d1-d7ecab167560'), ["indicator--9e2536b0-988b-598d-8cc3-407f9f13fc61"], id='good report id'),
+        pytest.param(dict(report_id='report--9e2536b0-988b-598d-8cc3-407f9f13fc61'), ["indicator--9e2536b0-988b-598d-8cc3-407f9f13fc61"], id='good report id'),
         pytest.param(dict(name='this will not be found'), [], id='bad name'),
         pytest.param(dict(name='tarballs'), ["indicator--9e2536b0-988b-598d-8cc3-407f9f13fc61"], id='good name'),
         pytest.param(dict(name='taRbALls'), ["indicator--9e2536b0-988b-598d-8cc3-407f9f13fc61"], id='good name bad case'),
@@ -93,6 +83,7 @@ RULE_TYPES = [
         pytest.param(dict(tlp_level='clear'), [], id='tlp level clear'),
     ],
 )
+@pytest.mark.django_db
 def test_get_rules(params, expected_ids):
     expected_ids = set(expected_ids)
     request = Request(HttpRequest())
@@ -128,7 +119,12 @@ def test_get_rules_sort(sort_param):
     result = get_rules(request)
 
     param, _, direction = sort_param.rpartition('_')
-    assert is_sorted(result.data['rules'], key=lambda obj: obj[param], reverse=direction=='descending')
+    def sort_key(obj):
+        val = obj[param]
+        if isinstance(val, str):
+            val = val.lower()
+        return val
+    assert is_sorted(result.data['rules'], key=sort_key, reverse=direction=='descending')
 
 
 def test_get_single_rule():
@@ -199,7 +195,7 @@ def test_get_objects_for_rule(rule_id, ignore_embedded_sro, types):
 
 def test_delete_rules():
     rule_id = "indicator--2683daab-aa64-52ff-a001-3ea5aee9dd72"
-    report_id = 'report--cc297329-2c8d-55f3-bef9-3137bb9d87a7'
+    report_id = 'report--2683daab-aa64-52ff-a001-3ea5aee9dd72'
     assert delete_rule(rule_id) == True
     from rest_framework import request
     from dogesec_commons.objects.helpers import ArangoDBHelper

@@ -11,8 +11,3 @@ def is_sorted(iterable, key=None, reverse=False):
     if reverse:
         b, a = a, b
     return not any(map(lt, b, a))
-
-@pytest.fixture
-def job():
-    file = File.objects.create(name="test.txt", file=SimpleUploadedFile("test.txt", b"dummy content", content_type="text/plain"))
-    return Job.objects.create(file=file)

@@ -91,3 +91,4 @@ jobs:
           checks: all
           wait-for-schema: '30'
           args: '--generation-allow-x00 false -H "Host: localhost"'
+          hooks: 'tests.st_hook'

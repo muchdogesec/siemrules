@@ -264,7 +264,7 @@ class FileView(
             return qs.filter(pk__in=file_id)
 
     @extend_schema(
-        responses={200: serializers.JobSerializer, 400: DEFAULT_400_ERROR},
+        responses={201: serializers.JobSerializer, 400: DEFAULT_400_ERROR},
         request=serializers.FileSerializer,
     )
     @decorators.action(methods=["POST"], detail=False, url_path="intel")
@@ -276,10 +276,10 @@ class FileView(
         job_instance = models.Job.objects.create(file=file_instance, type=models.JobType.FILE_FILE)
         job_serializer = JobSerializer(job_instance)
         tasks.new_task(job_instance)
-        return Response(job_serializer.data)
+        return Response(job_serializer.data, status=status.HTTP_201_CREATED)
 
     @extend_schema(
-        responses={200: serializers.JobSerializer, 400: DEFAULT_400_ERROR},
+        responses={201: serializers.JobSerializer, 400: DEFAULT_400_ERROR},
         request=DRFSigmaRule.drf_serializer,
     )
     @decorators.action(methods=["POST"], detail=False, url_path="yml", parser_classes=[SigmaRuleParser])
@@ -293,10 +293,10 @@ class FileView(
         job_instance = models.Job.objects.create(file=file_instance, type=models.JobType.FILE_SIGMA)
         job_serializer = JobSerializer(job_instance)
         tasks.new_task(job_instance)
-        return Response(job_serializer.data)
+        return Response(job_serializer.data, status=status.HTTP_201_CREATED)
 
     @extend_schema(
-        responses={200: serializers.JobSerializer, 400: DEFAULT_400_ERROR},
+        responses={201: serializers.JobSerializer, 400: DEFAULT_400_ERROR},
         request=serializers.FilePromptSerializer,
     )
     @decorators.action(
@@ -309,7 +309,7 @@ class FileView(
         job_instance = models.Job.objects.create(file=file_instance, type=models.JobType.FILE_TEXT)
         job_serializer = JobSerializer(job_instance)
         tasks.new_task(job_instance)
-        return Response(job_serializer.data)
+        return Response(job_serializer.data, status=status.HTTP_201_CREATED)
 
     @decorators.action(detail=True, methods=["GET"])
     def markdown(self, request, *args, file_id=None, **kwargs):
