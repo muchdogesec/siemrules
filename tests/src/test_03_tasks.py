@@ -1,19 +1,16 @@
 import copy
 from types import SimpleNamespace
-from unittest.mock import patch, MagicMock, mock_open
+from unittest.mock import patch, MagicMock
 from unittest import mock
 import uuid
 import pytest
-from django.core.files.uploadedfile import InMemoryUploadedFile
 from siemrules.siemrules import models
-from siemrules.siemrules.correlations.models import RuleModel
 from siemrules.siemrules.models import File
 from siemrules.worker.tasks import (
-    job_failed, new_correlation_task, new_task, process_correlation, process_report, run_txt2detection, run_file2txt, upload_to_arango, job_completed, upload_objects
+    job_failed, new_correlation_task, new_task, process_report, run_txt2detection, run_file2txt, upload_to_arango, job_completed, upload_objects
 )
 from siemrules.worker import tasks
 import stix2
-from .utils import job
 
 
 

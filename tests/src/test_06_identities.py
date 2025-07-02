@@ -1,25 +1,10 @@
 import django.test
-from functools import lru_cache
-import os
-import time
 import django
-import pytest
 
 
 import django.test
-from rest_framework import status
 from unittest.mock import MagicMock, patch
-from django.core.files.uploadedfile import SimpleUploadedFile
-from siemrules.siemrules import models, reports
-from siemrules.siemrules.arangodb_helpers import request_from_queries
-from siemrules.siemrules.identities import IdentityView
-from siemrules.worker import tasks
-from tests.src import data as test_data
-from rest_framework.response import Response
-from rest_framework.validators import ValidationError
-from dogesec_commons.objects.helpers import ArangoDBHelper
 
-from tests.src.utils import is_sorted
 
 url = "/api/v1/identities/"
 def test_destroy_identity(client: django.test.Client):

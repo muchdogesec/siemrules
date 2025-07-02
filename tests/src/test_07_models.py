@@ -1,7 +1,6 @@
 
 from unittest.mock import patch
 from siemrules.siemrules import models
-from tests.src.utils import job
 import pytest
 
 @pytest.mark.django_db

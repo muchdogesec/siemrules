@@ -23,13 +23,12 @@ from django.http import HttpRequest
 def get_stix_object(stix_id):
     helper = ArangoDBHelper(settings.VIEW_NAME, request.Request(HttpRequest()))
     binds = {
-        "@view": settings.VIEW_NAME,
         "identity_id": stix_id,
     }
     query = """
-    FOR doc IN @@view
-    SEARCH doc._is_latest == TRUE AND doc.id == @identity_id
-    COLLECT id = doc.id INTO docs LET doc = docs[0].doc
+    FOR doc IN siemrules_vertex_collection
+    FILTER doc._is_latest == TRUE AND doc.id == @identity_id
+    SORT doc.modified DESC, doc._record_modified DESC
     LIMIT 1
     RETURN KEEP(doc, KEYS(doc, TRUE))
     """

@@ -9,7 +9,7 @@ from dogesec_commons.objects.helpers import ArangoDBHelper
 @pytest.mark.parametrize(
     "report_id",
     [
-        "report--bc14a07a-5189-5f64-85c3-33161b923627"
+        "report--8af82832-2abd-5765-903c-01d414dae1e9"
     ]
 )
 def test_remove_report(report_id):

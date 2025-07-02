@@ -1,5 +1,4 @@
-import copy
-from itertools import chain
+from functools import lru_cache
 import time
 import django
 import pytest
@@ -9,54 +8,57 @@ from llama_index.core.program import LLMTextCompletionProgram
 import django.test
 from unittest.mock import MagicMock, patch
 import yaml
-from siemrules.siemrules import models
 from siemrules.siemrules.correlations.correlations import yaml_to_rule
 from siemrules.siemrules.correlations.models import RuleModel
+from siemrules.siemrules.serializers import FileSigmaYamlSerializer
 from siemrules.worker import tasks
 from tests.src import data as test_data
 
 
-import os
 import time
 import django
 import pytest
 
-from txt2detection.models import (
-    SigmaRuleDetection, AIDetection
-)
 import django.test
 from unittest.mock import patch
-from siemrules.siemrules import models
 from siemrules.worker import tasks
 from tests.src import data as test_data
 
 
-
-
-def upload_bundles():
-    for bundle in [test_data.BUNDLE_1, test_data.BUNDLE_2, test_data.BUNDLE_3]:
-        file = models.File.objects.create(
-            name="test_file.txt",
-            mimetype="text/plain",
-            id=bundle["id"].replace("bundle--", ""),
-        )
-        job = models.Job.objects.create(file=file, id=file.id)
-        tasks.upload_to_arango(job, copy.deepcopy(bundle))
+@lru_cache
+def upload_identities():
+    tasks.upload_objects(MagicMock(), dict(objects=test_data.identities, type='bundle', id='bundle--identities'), {})
     time.sleep(5)
 
 
-def all_objects():
-    bundle_objects = [
-        bundle["objects"]
-        for bundle in [test_data.BUNDLE_1, test_data.BUNDLE_2, test_data.BUNDLE_3]
+@pytest.mark.parametrize(
+    ["rule_id", "sigma_yaml"],
+    [
+        pytest.param(*test_data.SIGMA_RULE_1, id="item 1"),
+        pytest.param(*test_data.SIGMA_RULE_2, id="item 2"),
+        pytest.param(*test_data.SIGMA_RULE_3, id="item 3"),
     ]
-    bundle_objects = copy.deepcopy(bundle_objects)
-    return [obj for obj in chain(*bundle_objects) if obj["type"] != "relationship"]
-
-
+)
 @pytest.mark.django_db
-def test_make_uploads():
-    upload_bundles()
+def test_make_uploads(client, celery_eager, rule_id, sigma_yaml):
+    upload_identities()
+
+    save_model = FileSigmaYamlSerializer.save
+    with patch(
+        "txt2detection.bundler.Bundler.get_attack_objects", side_effect=lambda attack_ids: [v for k,v in test_data.objects_lookup.items() if k in attack_ids]
+    ) as get_attack_objects, patch(
+        "txt2detection.bundler.Bundler.get_cve_objects", side_effect=lambda cve_ids: [v for k,v in test_data.objects_lookup.items() if k in cve_ids]
+    ) as get_cve_objects, patch.object(FileSigmaYamlSerializer, "save", autospec=True, side_effect=lambda *x, **t: save_model(*x, **{**t, "id":rule_id})):
+        resp = client.post(
+            f"/api/v1/files/yml/",
+            data=sigma_yaml,
+            content_type="application/sigma+yaml",
+        )
+        assert resp.status_code == 201, resp.json()
+
+        job_resp = client.get(f"/api/v1/jobs/{resp.data['id']}/")
+        assert job_resp.status_code == 200
+        assert job_resp.data['state'] == 'completed'
 
 
 @pytest.mark.django_db
@@ -65,30 +67,11 @@ def test_modify_base_rule_manual(
     celery_eager, client: django.test.Client, modification
 ):
     indicator_id = modification["rule_id"]
-    indicator = [obj for obj in all_objects() if obj["id"] == indicator_id][0]
-    indicator_refs = [x["external_id"] for x in indicator["external_references"]]
-    time.sleep(2)
     with patch(
-        "txt2detection.bundler.Bundler.get_attack_objects"
+        "txt2detection.bundler.Bundler.get_attack_objects", side_effect=lambda attack_ids: [v for k,v in test_data.objects_lookup.items() if k in attack_ids]
     ) as get_attack_objects, patch(
-        "txt2detection.bundler.Bundler.get_cve_objects"
+        "txt2detection.bundler.Bundler.get_cve_objects", side_effect=lambda cve_ids: [v for k,v in test_data.objects_lookup.items() if k in cve_ids]
     ) as get_cve_objects:
-        get_attack_objects.return_value = [
-            obj
-            for obj in all_objects()
-            if obj["type"] != "indicator"
-            and obj.get("external_references")
-            and obj["external_references"][0]["external_id"] in indicator_refs
-            and obj["external_references"][0]["source_name"] == "mitre-attack"
-        ]
-        get_cve_objects.return_value = [
-            obj
-            for obj in all_objects()
-            if obj["type"] != "indicator"
-            and obj.get("external_references")
-            and obj["external_references"][0]["external_id"] in indicator_refs
-            and obj["external_references"][0]["source_name"] == "cve"
-        ]
         resp = client.post(
             f"/api/v1/base-rules/{indicator_id}/modify/yml/",
             data=modification["sigma"],

@@ -1,36 +1,17 @@
-from functools import lru_cache
-import json
-import os
-import time
 import uuid
 import django
-from django.http import HttpRequest
 import pytest
 
 
 import django.test
 from rest_framework import status
 from unittest.mock import patch
-from django.core.files.uploadedfile import SimpleUploadedFile
-from siemrules.siemrules import models, reports
-import siemrules.siemrules.correlations
-from siemrules.siemrules.views import CorrelationRuleView, RuleView
-from siemrules.worker import tasks
-from tests.src import data as test_data
-from rest_framework.response import Response
+from siemrules.siemrules import models
+from siemrules.siemrules.views import CorrelationRuleView
 from rest_framework.validators import ValidationError
 from siemrules.siemrules import correlations
 
-from siemrules.siemrules.arangodb_helpers import (
-    RULES_SORT_FIELDS,
-    get_rules,
-    get_single_rule,
-    delete_rule,
-)
-from rest_framework.exceptions import NotFound
-from rest_framework.request import Request
 
-from tests.src.utils import is_sorted
 
 
 correlation_url = "/api/v1/correlation-rules/"

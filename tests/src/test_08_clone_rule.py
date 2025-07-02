@@ -1,35 +1,17 @@
-from functools import lru_cache
-import os
 import time
 import django
 from django.conf import settings
-from django.http import HttpRequest
 import pytest
 
 from dateutil.parser import parse as parse_date
 
 import django.test
-from rest_framework import status
-from unittest.mock import patch
-from django.core.files.uploadedfile import SimpleUploadedFile
-from siemrules.siemrules import models, reports
 from siemrules.siemrules.utils import TLP_LEVEL_STIX_ID_MAPPING, TLP_Levels
-from siemrules.worker import tasks
-from tests.src import data as test_data
-from rest_framework.response import Response
-from rest_framework.validators import ValidationError
 
 from siemrules.siemrules.arangodb_helpers import (
-    RULES_SORT_FIELDS,
-    get_rules,
-    get_single_rule,
-    delete_rule,
     indicator_to_rule,
 )
-from rest_framework.exceptions import NotFound
-from rest_framework.request import Request
 
-from tests.src.utils import is_sorted
 
 
 @pytest.mark.parametrize(
