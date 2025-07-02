@@ -113,7 +113,8 @@ class DRFSigmaRule(DRFBaseModel, SigmaRuleDetection):
         return super().model_post_init(__context)
     
     def clean_author(self):
-        self.author = self._identity['id']
+        if self.author and self._identity:
+            self.author = self._identity['id']
     
     def to_file_serializer(self, request_body):
         try:
