@@ -1145,3 +1145,20 @@ class CorrelationRuleView(RuleView):
         job_s = CorrelationJobSerializer(job_instance)
         tasks.new_correlation_task(job_instance, s.validated_data, related_indicators, s.validated_data)
         return Response(job_s.data)
+
+
+
+
+@extend_schema(
+    responses={204:{}},
+    tags=["Server Status"],
+    summary="Check if service is running",
+    description=textwrap.dedent(
+        """
+        If this endpoint returns a 204, the service is running as expected.
+        """
+        ),
+    )
+@decorators.api_view(["GET"])
+def health_check(request):
+   return Response(status=status.HTTP_204_NO_CONTENT)

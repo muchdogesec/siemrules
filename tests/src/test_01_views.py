@@ -222,3 +222,9 @@ class TestBaseRuleView:
 
         response = client.patch(rule_url + "modify/revert/", data=dict(version=revert_version), content_type="application/json")
         assert response.status_code == 400, response.json()
+
+
+
+def test_healthcheck(client):
+    resp = client.get('/api/healthcheck/')
+    assert resp.status_code == 204
