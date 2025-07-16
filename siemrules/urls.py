@@ -49,6 +49,7 @@ router.register('objects/sdos', arango_views.SDOView, "object-view-sdo")
 router.register("objects", arango_views.ObjectsWithReportsView, "object-view-orig")
 
 urlpatterns = [
+    path(f'api/healthcheck/', views.health_check),
     path('admin/', admin.site.urls),
     path('api/v1/', include(router.urls))
 ]

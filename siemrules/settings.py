@@ -223,6 +223,7 @@ SPECTACULAR_SETTINGS = {
         {"name": "Identities", "description": "Manage the Identities used to create Rules"},
         {"name": "Objects", "description": "Search through all STIX objects"},
         {"name": "Jobs", "description": "Check the status of data retrieval from files"},
+        {"name": "Server Status", "description": "Checks health of the server."},
     ],
     'COMPONENT_SPLIT_REQUEST': True,
     'ENUM_GENERATE_CHOICE_DESCRIPTION': False,
