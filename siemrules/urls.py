@@ -18,6 +18,7 @@ from django.contrib import admin
 from django.urls import include, path
 from rest_framework import routers
 
+from siemrules.siemrules import converters
 from siemrules.siemrules.identities import IdentityView
 from .siemrules import views, reports
 from drf_spectacular.views import SpectacularAPIView, SpectacularRedocView, SpectacularSwaggerView
@@ -37,6 +38,7 @@ router.register('files', views.FileView, 'files')
 router.register('jobs', views.JobView, 'jobs')
 router.register('correlation-rules', views.CorrelationRuleView, 'correlation-rules')
 router.register('base-rules', views.BaseRuleView, 'base-rules')
+router.register('base-rules', converters.ConvertRuleView, 'convert-base-rules')
 router.register('reports', reports.ReportView, 'reports')
 router.register('identities', IdentityView, "identity-view")
 
