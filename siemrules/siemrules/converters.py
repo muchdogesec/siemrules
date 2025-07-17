@@ -32,18 +32,6 @@ from siemrules.siemrules import arangodb_helpers
 from siemrules.siemrules.utils import PlaintextRenderer
 
 
-
-
-
-
-
-
-
-
-
-
-
-
 kusto_pipelines = dict(
     azure_monitor=azure_monitor_pipeline,
     microsoft_xdr=microsoft_xdr_pipeline,
