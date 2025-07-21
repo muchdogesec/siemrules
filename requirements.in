@@ -29,3 +29,6 @@ txt2detection
 stix2arango
 file2txt
 dogesec_commons
+
+## production
+gunicorn==23.0.0
