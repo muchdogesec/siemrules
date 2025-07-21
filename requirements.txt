@@ -191,6 +191,8 @@ grpcio-status==1.71.2
     # via
     #   file2txt
     #   google-api-core
+gunicorn==23.0.0
+    # via -r requirements.in
 h11==0.16.0
     # via httpcore
 hf-xet==1.1.5
