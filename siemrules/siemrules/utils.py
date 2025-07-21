@@ -27,6 +27,13 @@ class SigmaRuleRenderer(renderers.OpenAPIRenderer):
     def render(self, data, media_type=None, renderer_context=None):
         return data['pattern'].encode('utf-8')
     
+
+class PlaintextRenderer(renderers.BaseRenderer):
+    format = 'siemrule'
+    media_type = 'plain/text'
+    def render(self, data, accepted_media_type=None, renderer_context=None):
+        return data
+    
 class SigmaRuleParser(parsers.BaseParser):
     format = 'sigma'
     media_type = 'application/sigma+yaml'

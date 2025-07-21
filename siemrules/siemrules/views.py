@@ -33,7 +33,7 @@ from rest_framework.exceptions import ParseError
 from dogesec_commons.objects.helpers import OBJECT_TYPES
 
 from rest_framework import request
-from django.http import HttpRequest
+from django.http import HttpRequest, HttpResponse
 from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter
 import textwrap
 import typing
