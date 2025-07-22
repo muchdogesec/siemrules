@@ -79,7 +79,7 @@ def test_convert__transformation_error(rf):
     with patch.object(KustoBackend, "convert_rule") as mock_convert_rule:
         mock_convert_rule.side_effect = SigmaTransformationError("fail")
         req = rf.get("/?pipeline=azure_monitor")
-        resp = view(req, indicator_id="indicator--2683daab-aa64-52ff-a001-3ea5aee9dd72")
+        resp = view(req, indicator_id="indicator--8af82832-2abd-5765-903c-01d414dae1e9")
         assert resp.status_code == 400
         assert "fail" in json.loads(resp.content)["details"]['error']
 
@@ -95,7 +95,7 @@ def test_convert__transformation_error(rf):
     ]
 )
 def test_convert(client, path, backend, pipeline):
-    indicator_id = "indicator--2683daab-aa64-52ff-a001-3ea5aee9dd72"
+    indicator_id = "indicator--8af82832-2abd-5765-903c-01d414dae1e9"
     
     resp = client.get(f"/api/v1/base-rules/{indicator_id}/convert/{path}/", query_params=dict(backend=backend, pipeline=pipeline))
     assert resp.status_code == 200
@@ -108,7 +108,7 @@ def test_convert(client, path, backend, pipeline):
 def test_splunk_output_format(client, format):
     with patch.object(SplunkBackend, 'convert_rule') as mock_convert_rule:
         mock_convert_rule.return_value = ["converted-rule"]
-        indicator_id = "indicator--2683daab-aa64-52ff-a001-3ea5aee9dd72"
+        indicator_id = "indicator--8af82832-2abd-5765-903c-01d414dae1e9"
     
         resp = client.get(f"/api/v1/base-rules/{indicator_id}/convert/splunk/", query_params=dict(output_format=format))
         assert resp.status_code == 200
