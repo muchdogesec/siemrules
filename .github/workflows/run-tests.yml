@@ -42,6 +42,9 @@ jobs:
             echo >> tests/tests.env
             echo POSTGRES_HOST="$IP_ADDRESS" >> tests/tests.env
             echo ARANGODB_HOST_URL="http://$IP_ADDRESS:18529" >> tests/tests.env
+            export DJANGO_WWW_PATH=$PWD/django_www_path/
+            echo DJANGO_WWW_PATH="$DJANGO_WWW_PATH" >> tests/tests.env
+            mkdir -p $DJANGO_WWW_PATH
 
             pip install -r tests/requirements.txt -r requirements.txt
   
