@@ -9,13 +9,14 @@ from rest_framework import (
     status,
     validators,
 )
-from txt2detection.models import (
-    SigmaRuleDetection
-)
+from txt2detection.models import SigmaRuleDetection
 from txt2detection.utils import parse_model
 from siemrules.siemrules import correlations, models, reports
 from siemrules.siemrules import serializers
-from siemrules.siemrules.correlations.serializers import CorrelationRuleSerializer, DRFCorrelationRule
+from siemrules.siemrules.correlations.serializers import (
+    CorrelationRuleSerializer,
+    DRFCorrelationRule,
+)
 from siemrules.siemrules.modifier import (
     DRFDetection,
     DRFSigmaRule,
@@ -61,18 +62,28 @@ from siemrules.siemrules import arangodb_helpers
 from drf_spectacular.views import SpectacularAPIView
 from rest_framework.response import Response
 
+
 class SchemaViewCached(SpectacularAPIView):
     _schema = None
-    
+
     def _get_schema_response(self, request):
-        version = self.api_version or request.version or self._get_version_parameter(request)
+        version = (
+            self.api_version or request.version or self._get_version_parameter(request)
+        )
         if not self.__class__._schema:
-            generator = self.generator_class(urlconf=self.urlconf, api_version=version, patterns=self.patterns)
-            self.__class__._schema = generator.get_schema(request=request, public=self.serve_public)
+            generator = self.generator_class(
+                urlconf=self.urlconf, api_version=version, patterns=self.patterns
+            )
+            self.__class__._schema = generator.get_schema(
+                request=request, public=self.serve_public
+            )
         return Response(
             data=self.__class__._schema,
-            headers={"Content-Disposition": f'inline; filename="{self._get_filename(request, version)}"'}
+            headers={
+                "Content-Disposition": f'inline; filename="{self._get_filename(request, version)}"'
+            },
         )
+
 
 @extend_schema_view(
     create_from_intel=extend_schema(
@@ -273,7 +284,9 @@ class FileView(
         serializer.is_valid(raise_exception=True)
         temp_file = request.FILES["file"]
         file_instance = serializer.save(mimetype=temp_file.content_type)
-        job_instance = models.Job.objects.create(file=file_instance, type=models.JobType.FILE_FILE)
+        job_instance = models.Job.objects.create(
+            file=file_instance, type=models.JobType.FILE_FILE
+        )
         job_serializer = JobSerializer(job_instance)
         tasks.new_task(job_instance)
         return Response(job_serializer.data, status=status.HTTP_201_CREATED)
@@ -282,7 +295,9 @@ class FileView(
         responses={201: serializers.JobSerializer, 400: DEFAULT_400_ERROR},
         request=DRFSigmaRule.drf_serializer,
     )
-    @decorators.action(methods=["POST"], detail=False, url_path="yml", parser_classes=[SigmaRuleParser])
+    @decorators.action(
+        methods=["POST"], detail=False, url_path="yml", parser_classes=[SigmaRuleParser]
+    )
     def create_from_sigma(self, request: request.Request, *args, **kwargs):
         request_body = request.body
         serializer = DRFSigmaRule.drf_serializer(data=request.data)
@@ -290,7 +305,9 @@ class FileView(
         rule = DRFSigmaRule.model_validate(serializer.validated_data)
         file_serializer = rule.to_file_serializer(request_body=request_body)
         file_instance = file_serializer.save(mimetype="application/x-yaml")
-        job_instance = models.Job.objects.create(file=file_instance, type=models.JobType.FILE_SIGMA)
+        job_instance = models.Job.objects.create(
+            file=file_instance, type=models.JobType.FILE_SIGMA
+        )
         job_serializer = JobSerializer(job_instance)
         tasks.new_task(job_instance)
         return Response(job_serializer.data, status=status.HTTP_201_CREATED)
@@ -300,13 +317,18 @@ class FileView(
         request=serializers.FilePromptSerializer,
     )
     @decorators.action(
-        methods=["POST"], detail=False, parser_classes=[parsers.JSONParser], url_path="prompt"
+        methods=["POST"],
+        detail=False,
+        parser_classes=[parsers.JSONParser],
+        url_path="prompt",
     )
     def create_from_prompt(self, request, *args, **kwargs):
         serializer = serializers.FilePromptSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         file_instance = serializer.save(mimetype="text/plain")
-        job_instance = models.Job.objects.create(file=file_instance, type=models.JobType.FILE_TEXT)
+        job_instance = models.Job.objects.create(
+            file=file_instance, type=models.JobType.FILE_TEXT
+        )
         job_serializer = JobSerializer(job_instance)
         tasks.new_task(job_instance)
         return Response(job_serializer.data, status=status.HTTP_201_CREATED)
@@ -341,7 +363,7 @@ class FileView(
 
         serializer = self.get_serializer(queryset, many=True)
         return Response(serializer.data)
-    
+
     def destroy(self, request, *args, file_id=None, **kwargs):
         reports.can_remove_report(reports.ReportView.path_param_as_report_id(file_id))
         return super().destroy(request, *args, **kwargs)
@@ -406,21 +428,25 @@ class RulesFilterSet(FilterSet):
         help_text="Sort results by property",
         choices=[(f, f) for f in arangodb_helpers.RULES_SORT_FIELDS],
     )
-    visible_to = CharFilter(help_text="Only show rules that are visible to the Identity id passed. e.g. passing `identity--b1ae1a15-6f4b-431e-b990-1b9678f35e15` would only show rules created by that identity (with any TLP level) or reports created by another identity ID but only if they are marked with `TLP:CLEAR` or `TLP:GREEN`.")
+    visible_to = CharFilter(
+        help_text="Only show rules that are visible to the Identity id passed. e.g. passing `identity--b1ae1a15-6f4b-431e-b990-1b9678f35e15` would only show rules created by that identity (with any TLP level) or reports created by another identity ID but only if they are marked with `TLP:CLEAR` or `TLP:GREEN`."
+    )
     # rule_type = ChoiceFilter(
     #     choices=[("base-rule", "Base Rule"), ("correlation-rule", "Correlation Rule")],
     #     help_text="Filter the results by the rule type, either `base-rule` or `correlation-rule`. If none passed will return all types."
     # )
 
-@extend_schema_view(
-)
+
+@extend_schema_view()
 class RuleView(viewsets.GenericViewSet):
     openapi_tags = ["Rules"]
     pagination_class = Pagination("rules")
     serializer_class = serializers.RuleSerializer
     lookup_url_kwarg = "indicator_id"
 
-    lookup_value_regex = r'indicator--[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'
+    lookup_value_regex = (
+        r"indicator--[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+    )
     rule_type = None
 
     openapi_path_params = [
@@ -431,7 +457,6 @@ class RuleView(viewsets.GenericViewSet):
         )
     ]
 
-
     def get_renderers(self):
         if self.action == "retrieve":
             return [renderers.JSONRenderer(), SigmaRuleRenderer()]
@@ -439,7 +464,7 @@ class RuleView(viewsets.GenericViewSet):
 
     def list(self, request: request.Request, *args, **kwargs):
         request._request.GET = request.GET.copy()
-        request._request.GET['rule_type'] = self.rule_type
+        request._request.GET["rule_type"] = self.rule_type
         return arangodb_helpers.get_rules(request)
 
     @extend_schema(
@@ -453,7 +478,8 @@ class RuleView(viewsets.GenericViewSet):
     )
     def retrieve(self, request, *args, indicator_id=None, **kwargs):
         return arangodb_helpers.get_single_rule(
-            indicator_id, version=request.query_params.get("version"),
+            indicator_id,
+            version=request.query_params.get("version"),
         )
 
     @extend_schema(
@@ -466,56 +492,64 @@ class RuleView(viewsets.GenericViewSet):
         return arangodb_helpers.get_single_rule_versions(
             indicator_id,
         )
-    
-    @extend_schema(request=serializers.RuleRevertSerializer)
-    @decorators.action(methods=['PATCH'], detail=True, url_path="modify/revert")
+
+    @extend_schema(
+        request=serializers.RuleRevertSerializer,
+        responses={200: serializers.RuleSerializer, 400: DEFAULT_400_ERROR},
+    )
+    @decorators.action(methods=["PATCH"], detail=True, url_path="modify/revert")
     def revert(self, request, *args, indicator_id=None, **kwargs):
         s = serializers.RuleRevertSerializer(data=request.data)
         s.is_valid(raise_exception=True)
         versions = arangodb_helpers.get_single_rule_versions(indicator_id).data
-        selected_version = s.initial_data['version']
+        selected_version = s.initial_data["version"]
         if selected_version not in versions:
             raise validators.ValidationError("selected version does not exist")
         if selected_version == versions[0]:
-            raise validators.ValidationError("You cannot revert to the latest version of the rule")
-        rev = arangodb_helpers.delete_rule(indicator_id, rule_date=selected_version, delete=False)
+            raise validators.ValidationError(
+                "You cannot revert to the latest version of the rule"
+            )
+        rev = arangodb_helpers.delete_rule(
+            indicator_id, rule_date=selected_version, delete=False
+        )
         return self.retrieve(request, indicator_id=indicator_id)
-    
 
     @extend_schema(request=serializers.RuleCloneSerializer)
-    @decorators.action(methods=['POST'], detail=True)
+    @decorators.action(methods=["POST"], detail=True)
     def clone(self, request, *args, indicator_id=None, **kwargs):
         original_indicator = self.retrieve(request, indicator_id=indicator_id)
         s = serializers.RuleCloneSerializer(data=request.data)
         s.is_valid(raise_exception=True)
-        new_rule_indicator_id = 'indicator--'+str(uuid.uuid4())
+        new_rule_indicator_id = "indicator--" + str(uuid.uuid4())
         # arangodb_helpers.make_clone(indicator_id, new_rule_indicator_id, s.validated_data)
         # return self.retrieve(request, indicator_id=new_rule_indicator_id)
-    
 
         job_instance = models.Job.objects.create(
             type=models.JobType.DUPLICATE_RULE,
             data=dict(
                 cloned_from=indicator_id,
                 indicator_id=new_rule_indicator_id,
-                **s.validated_data
-            )
+                **s.validated_data,
+            ),
         )
         job_s = JobSerializer(job_instance)
         tasks.new_clone_rule_task(job_instance)
         return Response(job_s.data, status=status.HTTP_201_CREATED)
 
     def destroy(self, request, *args, indicator_id=None, **kwargs):
-        arangodb_helpers.delete_rule(indicator_id, 
+        arangodb_helpers.delete_rule(
+            indicator_id,
         )
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     @decorators.action(methods=["GET"], detail=True)
     def objects(self, request, *args, indicator_id=None, **kwargs):
         return arangodb_helpers.get_objects_for_rule(
-            indicator_id, request, version=request.query_params.get("version"),
+            indicator_id,
+            request,
+            version=request.query_params.get("version"),
         )
-    
+
 
 @extend_schema_view(
     list=extend_schema(
@@ -634,8 +668,12 @@ class RuleView(viewsets.GenericViewSet):
             """
         ),
         responses=arangodb_helpers.ArangoDBHelper.get_paginated_response_schema(),
-        parameters=arangodb_helpers.ArangoDBHelper.get_schema_operation_parameters() + [
-            OpenApiParameter('version', description="The version of the rule you want to retrieve (e.g. `2025-04-04T06:12:59.482478Z`). The `version` value is the same as the STIX objects `modified` time. You can see all of the versions of a rule using the version endpoint.",),
+        parameters=arangodb_helpers.ArangoDBHelper.get_schema_operation_parameters()
+        + [
+            OpenApiParameter(
+                "version",
+                description="The version of the rule you want to retrieve (e.g. `2025-04-04T06:12:59.482478Z`). The `version` value is the same as the STIX objects `modified` time. You can see all of the versions of a rule using the version endpoint.",
+            ),
             OpenApiParameter(
                 "types",
                 many=True,
@@ -643,10 +681,13 @@ class RuleView(viewsets.GenericViewSet):
                 description="Filter the results by one or more STIX Object types",
                 enum=OBJECT_TYPES,
             ),
-            OpenApiParameter('ignore_embedded_sro', type=bool, description="If set to `true` all embedded SROs are removed from the response."),
+            OpenApiParameter(
+                "ignore_embedded_sro",
+                type=bool,
+                description="If set to `true` all embedded SROs are removed from the response.",
+            ),
         ],
     ),
-
     modify_base_rule_from_prompt=extend_schema(
         summary="Use AI to modify a Base Rule by ID",
         description=textwrap.dedent(
@@ -710,17 +751,25 @@ class BaseRuleView(RuleView):
             choices=[(c, c) for c in ["file.file", "file.prompt", "file.sigma"]],
             help_text="Filter results by ingestion method",
         )
+
     @extend_schema(
         request=DRFDetection.drf_serializer,
         responses={200: serializers.RuleSerializer, 400: DEFAULT_400_ERROR},
     )
-    @decorators.action(methods=["POST"], detail=True, parser_classes=[SigmaRuleParser], url_path="modify/yml")
+    @decorators.action(
+        methods=["POST"],
+        detail=True,
+        parser_classes=[SigmaRuleParser],
+        url_path="modify/yml",
+    )
     def modify_base_rule_manual(self, request, *args, indicator_id=None, **kwargs):
         report, indicator, all_objs = arangodb_helpers.get_objects_by_id(indicator_id)
 
         if not report:
-            raise ParseError(f"cannot find report associated with rule `{indicator_id}`")
-        
+            raise ParseError(
+                f"cannot find report associated with rule `{indicator_id}`"
+            )
+
         old_detection = yaml_to_detection(
             indicator["pattern"], indicator.get("indicator_types", [])
         )
@@ -731,24 +780,24 @@ class BaseRuleView(RuleView):
         DRFDetection.is_valid(s, request.data)
         detection = old_detection.model_copy(update=s.data)
 
-
         job_instance = models.Job.objects.create(
             type=models.JobType.BASE_MODIFY,
-            data=dict(
-                modification_method='sigma',
-                indicator_id=indicator_id,
-                **s.data
-            )
+            data=dict(modification_method="sigma", indicator_id=indicator_id, **s.data),
         )
         job_s = JobSerializer(job_instance)
-        tasks.new_modify_rule_task(job_instance, indicator, detection.model_dump(mode='json', by_alias=True), report=report)
+        tasks.new_modify_rule_task(
+            job_instance,
+            indicator,
+            detection.model_dump(mode="json", by_alias=True),
+            report=report,
+        )
         return Response(job_s.data, status=status.HTTP_201_CREATED)
-    
+
     @extend_schema(
         request=serializers.AIModifySerializer,
         responses={201: serializers.JobSerializer, 400: DEFAULT_400_ERROR},
     )
-    @decorators.action(methods=['POST'], detail=True, url_path="modify/prompt")
+    @decorators.action(methods=["POST"], detail=True, url_path="modify/prompt")
     def modify_base_rule_from_prompt(self, request, *args, indicator_id=None, **kwargs):
         report, indicator, all_objs = arangodb_helpers.get_objects_by_id(indicator_id)
         s = serializers.AIModifySerializer(data=request.data)
@@ -757,17 +806,15 @@ class BaseRuleView(RuleView):
         job_instance = models.Job.objects.create(
             type=models.JobType.BASE_MODIFY,
             data=dict(
-                modification_method='prompt',
-                indicator_id=indicator_id,
-                **s.data
-            )
+                modification_method="prompt", indicator_id=indicator_id, **s.data
+            ),
         )
         job_s = JobSerializer(job_instance)
         tasks.new_modify_rule_task(job_instance, indicator, None, report=report)
         return Response(job_s.data, status=status.HTTP_201_CREATED)
 
-@extend_schema_view(
 
+@extend_schema_view(
     list=extend_schema(
         summary="[CORRELATION] Search and retrieve created Rules",
         description=textwrap.dedent(
@@ -884,8 +931,12 @@ class BaseRuleView(RuleView):
             """
         ),
         responses=arangodb_helpers.ArangoDBHelper.get_paginated_response_schema(),
-        parameters=arangodb_helpers.ArangoDBHelper.get_schema_operation_parameters() + [
-            OpenApiParameter('version', description="The version of the rule you want to retrieve (e.g. `2025-04-04T06:12:59.482478Z`). The `version` value is the same as the STIX objects `modified` time. You can see all of the versions of a rule using the version endpoint.",),
+        parameters=arangodb_helpers.ArangoDBHelper.get_schema_operation_parameters()
+        + [
+            OpenApiParameter(
+                "version",
+                description="The version of the rule you want to retrieve (e.g. `2025-04-04T06:12:59.482478Z`). The `version` value is the same as the STIX objects `modified` time. You can see all of the versions of a rule using the version endpoint.",
+            ),
             OpenApiParameter(
                 "types",
                 many=True,
@@ -893,10 +944,13 @@ class BaseRuleView(RuleView):
                 description="Filter the results by one or more STIX Object types",
                 enum=OBJECT_TYPES,
             ),
-            OpenApiParameter('ignore_embedded_sro', type=bool, description="If set to `true` all embedded SROs are removed from the response."),
+            OpenApiParameter(
+                "ignore_embedded_sro",
+                type=bool,
+                description="If set to `true` all embedded SROs are removed from the response.",
+            ),
         ],
     ),
-
     modify_correlation_manual=extend_schema(
         summary="Manually edit a Correlation Rule by ID",
         description=textwrap.dedent(
@@ -954,7 +1008,6 @@ class BaseRuleView(RuleView):
             """
         ),
     ),
-
     create_from_sigma=extend_schema(
         summary="Create a Correlation Rule using YML",
         description=textwrap.dedent(
@@ -1029,48 +1082,57 @@ class BaseRuleView(RuleView):
             """
         ),
     ),
-    
 )
 class CorrelationRuleView(RuleView):
-    openapi_tags = ['Correlation Rules']
+    openapi_tags = ["Correlation Rules"]
     rule_type = "correlation-rule"
 
     class filterset_class(RulesFilterSet):
-        
+
         create_type = ChoiceFilter(
             choices=[(c, c) for c in ["correlation.prompt", "correlation.sigma"]],
             help_text="Filter results by ingestion method",
         )
 
-
     @extend_schema(
         request=correlations.serializers.DRFCorrelationRuleModify.drf_serializer,
         responses={201: serializers.JobSerializer, 400: DEFAULT_400_ERROR},
     )
-    @decorators.action(methods=['POST'], detail=True, url_path="modify/yml", parser_classes=[SigmaRuleParser])
+    @decorators.action(
+        methods=["POST"],
+        detail=True,
+        url_path="modify/yml",
+        parser_classes=[SigmaRuleParser],
+    )
     def modify_correlation_manual(self, request, *args, indicator_id=None, **kwargs):
         _, indicator, _ = arangodb_helpers.get_objects_by_id(indicator_id)
-        old_rule, _ = correlations.correlations.yaml_to_rule(
-            indicator["pattern"]
+        old_rule, _ = correlations.correlations.yaml_to_rule(indicator["pattern"])
+        new_rule = (
+            correlations.serializers.DRFCorrelationRuleModify.serialize_rule_from(
+                old_rule, request.data
+            )
         )
-        new_rule = correlations.serializers.DRFCorrelationRuleModify.serialize_rule_from(old_rule, request.data)
         job_instance = models.Job.objects.create(
             type=models.JobType.CORRELATION_MODIFY,
             data=dict(
-                modification_method='sigma',
+                modification_method="sigma",
                 correlation_id=indicator_id,
-            )
+            ),
         )
         job_s = CorrelationJobSerializer(job_instance)
-        tasks.new_modify_rule_task(job_instance, indicator, new_rule.model_dump(mode='json', by_alias=True))
+        tasks.new_modify_rule_task(
+            job_instance, indicator, new_rule.model_dump(mode="json", by_alias=True)
+        )
         return Response(job_s.data, status=status.HTTP_201_CREATED)
-    
+
     @extend_schema(
         request=serializers.AIModifySerializer,
         responses={201: serializers.CorrelationJobSerializer, 400: DEFAULT_400_ERROR},
     )
-    @decorators.action(methods=['POST'], detail=True, url_path="modify/prompt")
-    def modify_correlation_from_prompt(self, request, *args, indicator_id=None, **kwargs):
+    @decorators.action(methods=["POST"], detail=True, url_path="modify/prompt")
+    def modify_correlation_from_prompt(
+        self, request, *args, indicator_id=None, **kwargs
+    ):
         _, indicator, _ = arangodb_helpers.get_objects_by_id(indicator_id)
         s = serializers.AIModifySerializer(data=request.data)
         s.is_valid(raise_exception=True)
@@ -1078,15 +1140,12 @@ class CorrelationRuleView(RuleView):
         job_instance = models.Job.objects.create(
             type=models.JobType.CORRELATION_MODIFY,
             data=dict(
-                modification_method='prompt',
-                correlation_id=indicator_id,
-                **s.data
-            )
+                modification_method="prompt", correlation_id=indicator_id, **s.data
+            ),
         )
         job_s = CorrelationJobSerializer(job_instance)
         tasks.new_modify_rule_task(job_instance, indicator, None)
         return Response(job_s.data, status=status.HTTP_201_CREATED)
-
 
     def get_parsers(self):
         return super().get_parsers()
@@ -1098,10 +1157,7 @@ class CorrelationRuleView(RuleView):
         indicator_ids = ["indicator--" + rule_id for rule_id in rule_ids]
         r.query_params.update(indicator_id=",".join(indicator_ids))
         indicators = arangodb_helpers.get_rules(r, paginate=False, nokeep=False)
-        rules = {
-            indicator["id"].replace("indicator--", "")
-            for indicator in indicators
-        }
+        rules = {indicator["id"].replace("indicator--", "") for indicator in indicators}
         if non_existent_rules := set(rule_ids).difference(rules):
             raise validators.ValidationError(
                 f"non existent rules in correlation {non_existent_rules}"
@@ -1112,7 +1168,13 @@ class CorrelationRuleView(RuleView):
         request=DRFCorrelationRule.drf_serializer,
         responses={200: serializers.CorrelationJobSerializer, 400: DEFAULT_400_ERROR},
     )
-    @decorators.action(methods=['POST'], detail=False, serializer_class=serializers.CorrelationJobSerializer, url_path="create/yml", parser_classes=[SigmaRuleParser])
+    @decorators.action(
+        methods=["POST"],
+        detail=False,
+        serializer_class=serializers.CorrelationJobSerializer,
+        url_path="create/yml",
+        parser_classes=[SigmaRuleParser],
+    )
     def create_from_sigma(self, request, *args, **kwargs):
         rule_s = DRFCorrelationRule.drf_serializer(data=request.data)
         rule_s.is_valid(raise_exception=True)
@@ -1122,43 +1184,55 @@ class CorrelationRuleView(RuleView):
         if rule.correlation.rules:
             related_indicators = self.get_rules(rule.correlation.rules)
 
-        job_instance = models.Job.objects.create(type=models.JobType.CORRELATION_SIGMA, data=dict(input_form='sigma', correlation_id=str(uuid.uuid4())))
+        job_instance = models.Job.objects.create(
+            type=models.JobType.CORRELATION_SIGMA,
+            data=dict(input_form="sigma", correlation_id=str(uuid.uuid4())),
+        )
         job_s = CorrelationJobSerializer(job_instance)
 
         tasks.new_correlation_task(job_instance, rule, related_indicators, {})
         return Response(job_s.data)
-    
 
     @extend_schema(
         request=CorrelationRuleSerializer,
         responses={200: serializers.CorrelationJobSerializer, 400: DEFAULT_400_ERROR},
     )
-    @decorators.action(methods=['POST'], detail=False, serializer_class=CorrelationJobSerializer, url_path="create/prompt")
+    @decorators.action(
+        methods=["POST"],
+        detail=False,
+        serializer_class=CorrelationJobSerializer,
+        url_path="create/prompt",
+    )
     def create_from_prompt(self, request, *args, **kwargs):
         s = CorrelationRuleSerializer(data=request.data)
         s.is_valid(raise_exception=True)
         related_indicators = []
-        if s.validated_data['rules']:
-            related_indicators = self.get_rules(s.validated_data['rules'])
+        if s.validated_data["rules"]:
+            related_indicators = self.get_rules(s.validated_data["rules"])
 
-        job_instance = models.Job.objects.create(type=models.JobType.CORRELATION_PROMPT, data=dict(input_form='ai_prompt', **s.data, correlation_id=str(uuid.uuid4())))
+        job_instance = models.Job.objects.create(
+            type=models.JobType.CORRELATION_PROMPT,
+            data=dict(
+                input_form="ai_prompt", **s.data, correlation_id=str(uuid.uuid4())
+            ),
+        )
         job_s = CorrelationJobSerializer(job_instance)
-        tasks.new_correlation_task(job_instance, s.validated_data, related_indicators, s.validated_data)
+        tasks.new_correlation_task(
+            job_instance, s.validated_data, related_indicators, s.validated_data
+        )
         return Response(job_s.data)
 
 
-
-
 @extend_schema(
-    responses={204:{}},
+    responses={204: {}},
     tags=["Server Status"],
     summary="Check if the service is running",
     description=textwrap.dedent(
         """
         If this endpoint returns a 204, the service is running as expected.
         """
-        ),
-    )
+    ),
+)
 @decorators.api_view(["GET"])
 def health_check(request):
-   return Response(status=status.HTTP_204_NO_CONTENT)
+    return Response(status=status.HTTP_204_NO_CONTENT)

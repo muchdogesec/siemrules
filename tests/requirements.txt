@@ -1,3 +1,5 @@
 pytest
 pytest-django
 pytest-subtests
+pytest-cov
+schemathesis==4.0.12
