@@ -137,6 +137,19 @@ def test_get_single_rule():
         assert isinstance(request, Request)
         assert request.query_params.get("indicator_id") == indicator_id
 
+
+
+def test_get_single_rule__with_kwargs():
+    indicator_id = "indicator--a4d70b75-6f4a-5d19-9137-da863edd33d7"
+    with patch("siemrules.siemrules.arangodb_helpers.get_rules") as mock_get_rules:
+        get_single_rule(indicator_id, rule_type="myrule")
+        mock_get_rules.assert_called_once()
+        request = mock_get_rules.mock_calls[0].args[0]
+        mock_get_rules.assert_called_once_with(request, paginate=False, nokeep=True)
+        assert isinstance(request, Request)
+        assert request.query_params.get("indicator_id") == indicator_id
+        assert request.query_params['rule_type'] == "myrule"
+
 def test_get_single_rule_404():
     indicator_id = "indicator--a4d70b75-6f4a-5d19-9137-da863edd33d7"
     with pytest.raises(NotFound), patch("siemrules.siemrules.arangodb_helpers.get_rules") as mock_get_rules:

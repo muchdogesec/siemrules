@@ -124,7 +124,7 @@ class TestBaseRuleView:
         with patch("siemrules.siemrules.arangodb_helpers.get_single_rule") as mock_get:
             mock_get.return_value = Response()
             response = client.get(f"{self.url}{self.rule_id}/")
-            mock_get.assert_called_once()
+            mock_get.assert_called_once_with(self.rule_id, rule_type="base-rule", version=None)
 
     @pytest.mark.parametrize(
         ["format", "expected_content_type"],

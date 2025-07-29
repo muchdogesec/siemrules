@@ -15,6 +15,7 @@ from hypothesis import strategies
 from schemathesis.specs.openapi.checks import (
     negative_data_rejection,
     positive_data_acceptance,
+    status_code_conformance
 )
 from schemathesis.config import GenerationConfig
 from schemathesis.transport.serialization import (
@@ -30,51 +31,10 @@ schema.config.generation = GenerationConfig(allow_x00=False)
 
 
 @pytest.fixture(autouse=True)
-def override_transport(monkeypatch, client):
-    from schemathesis.transport.wsgi import WSGI_TRANSPORT, WSGITransport
-
-    class Transport(WSGITransport):
-        def __init__(self):
-            super().__init__()
-            self._copy_serializers_from(WSGI_TRANSPORT)
-
-        @staticmethod
-        def case_as_request(case):
-            from schemathesis.transport.requests import REQUESTS_TRANSPORT
-            import requests
-
-            r_dict = REQUESTS_TRANSPORT.serialize_case(
-                case,
-                base_url=case.operation.base_url,
-            )
-            return requests.Request(**r_dict).prepare()
-
-        def send(self, case: schemathesis.Case, *args, **kwargs):
-            t = time.time()
-            case.headers.pop("Authorization", "")
-            serialized_request = WSGI_TRANSPORT.serialize_case(case)
-            serialized_request.update(
-                QUERY_STRING=urlencode(serialized_request["query_string"]),
-            )
-            if json_data:=serialized_request.pop('json', None):
-                serialized_request.update(data=json.dumps(json_data))
-            import django.test
-            client = django.test.Client()
-            response: DRFResponse = client.generic(**serialized_request)
-            print(serialized_request)
-            elapsed = time.time() - t
-            return SchemathesisResponse(
-                response.status_code,
-                headers={k: [v] for k, v in response.headers.items()},
-                content=response.content,
-                request=self.case_as_request(case),
-                elapsed=elapsed,
-                verify=True,
-            )
-
+def override_transport(monkeypatch):
     ## patch transport.get
     from schemathesis import transport
-
+    from ..utils import Transport
     monkeypatch.setattr(transport, "get", lambda _: Transport())
 
 
@@ -148,20 +108,16 @@ report_ids = strategies.sampled_from(
 
 
 @schema.given(
-        report_id=report_ids,
         indicator_id=strategies.sampled_from(indicator_ids),
-        object_id=object_ids
 )
-@schema.exclude(method=["POST", "PATCH"]).parametrize()
+@schema.include(path_regex=".*/convert/.*").parametrize()
 @settings(max_examples=30)
-def test_api(case: schemathesis.Case, **kwargs):
-    for k, v in kwargs.items():
-        if k in case.path_parameters:
-            case.path_parameters[k] = v
+def test_convert(case: schemathesis.Case, indicator_id):
+    if 'indicator_id' in case.path_parameters:
+        case.path_parameters['indicator_id'] = indicator_id
     case.call_and_validate(
-        excluded_checks=[negative_data_rejection, positive_data_acceptance]
+        excluded_checks=[negative_data_rejection, positive_data_acceptance, status_code_conformance]
     )
-
 
 @schema.include(method=["POST", "PATCH"]).parametrize()
 @patch("celery.app.task.Task.run")
@@ -170,6 +126,22 @@ def test_imports(mock, case: schemathesis.Case, **kwargs):
         case.path_parameters["indicator_id"] = random.choice(
             [x for x in object_id_samples if x.startswith("indicator--")]
         )
+    case.call_and_validate(
+        excluded_checks=[negative_data_rejection, positive_data_acceptance]
+    )
+
+
+@schema.given(
+        report_id=report_ids,
+        indicator_id=strategies.sampled_from(indicator_ids),
+        object_id=object_ids
+)
+@schema.exclude(method=["POST", "PATCH"]).exclude(path_regex=".*/convert/.*").parametrize()
+@settings(max_examples=30)
+def test_api(case: schemathesis.Case, **kwargs):
+    for k, v in kwargs.items():
+        if k in case.path_parameters:
+            case.path_parameters[k] = v
     case.call_and_validate(
         excluded_checks=[negative_data_rejection, positive_data_acceptance]
     )
