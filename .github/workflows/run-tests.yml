@@ -37,15 +37,6 @@ jobs:
             --env-file tests/tests.env
             -p siemrules-action
 
-      - name: Get IP addresses
-        id: get_ip
-        run: |
-              IP_ADDRESS=$(docker network inspect -f '{{range.IPAM.Config}}{{.Gateway}}{{end}}' stixify-action_default)
-              echo "ip_address=$IP_ADDRESS" >> "$GITHUB_OUTPUT"
-              echo "IP_ADDRESS=$IP_ADDRESS" >> "$GITHUB_OUTPUT"
-              echo "SERVICE_BASE_URL=http://$IP_ADDRESS:18529/" >> "$GITHUB_OUTPUT"
-              cat "$GITHUB_OUTPUT"
-
       - name: Setup environment
         id: setup_environment
         run: |
@@ -57,7 +48,6 @@ jobs:
             export DJANGO_WWW_PATH=$PWD/django_www_path/
             echo DJANGO_WWW_PATH="$DJANGO_WWW_PATH" >> tests/tests.env
             mkdir -p $DJANGO_WWW_PATH
-
             pip install -r tests/requirements.txt -r requirements.txt
   
       - name: Unit tests
