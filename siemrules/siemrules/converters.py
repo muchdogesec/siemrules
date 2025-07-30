@@ -87,6 +87,7 @@ splunk_formats = ["default", "savedsearches"]
     ),
 )
 class ConvertRuleView(viewsets.GenericViewSet):
+    rule_type = "base-rule"
     openapi_tags = ["Base Rules"]
     lookup_url_kwarg = "indicator_id"
     renderer_classes = [PlaintextRenderer]
@@ -94,7 +95,6 @@ class ConvertRuleView(viewsets.GenericViewSet):
     lookup_value_regex = (
         r"indicator--[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
     )
-    rule_type = None
 
     openapi_path_params = [
         OpenApiParameter(
@@ -108,6 +108,7 @@ class ConvertRuleView(viewsets.GenericViewSet):
         rule = arangodb_helpers.get_single_rule(
             indicator_id,
             version=self.request.query_params.get("version"),
+            rule_type=self.rule_type,
         )
         return rule.data["pattern"]
 

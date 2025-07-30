@@ -1,4 +1,3 @@
-from datetime import UTC, datetime
 import uuid
 from rest_framework import (
     viewsets,
@@ -9,8 +8,6 @@ from rest_framework import (
     status,
     validators,
 )
-from txt2detection.models import SigmaRuleDetection
-from txt2detection.utils import parse_model
 from siemrules.siemrules import correlations, models, reports
 from siemrules.siemrules import serializers
 from siemrules.siemrules.correlations.serializers import (
@@ -20,12 +17,11 @@ from siemrules.siemrules.correlations.serializers import (
 from siemrules.siemrules.modifier import (
     DRFDetection,
     DRFSigmaRule,
-    get_modification,
-    modify_indicator,
     yaml_to_detection,
 )
 from siemrules.siemrules.serializers import (
     CorrelationJobSerializer,
+    FileDocumentSerializer,
     FileSerializer,
     ImageSerializer,
     JobSerializer,
@@ -34,7 +30,7 @@ from rest_framework.exceptions import ParseError
 from dogesec_commons.objects.helpers import OBJECT_TYPES
 
 from rest_framework import request
-from django.http import HttpRequest, HttpResponse
+from django.http import HttpRequest
 from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter
 import textwrap
 import typing
@@ -53,9 +49,6 @@ from django_filters.rest_framework import (
 )
 
 from siemrules.siemrules.autoschema import DEFAULT_400_ERROR, DEFAULT_404_ERROR
-
-if typing.TYPE_CHECKING:
-    from siemrules import settings
 from django.http import FileResponse, HttpResponseNotFound
 from siemrules.siemrules import arangodb_helpers
 
@@ -280,7 +273,7 @@ class FileView(
     )
     @decorators.action(methods=["POST"], detail=False, url_path="intel")
     def create_from_intel(self, request, *args, **kwargs):
-        serializer = FileSerializer(data=request.data)
+        serializer = FileDocumentSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         temp_file = request.FILES["file"]
         file_instance = serializer.save(mimetype=temp_file.content_type)
@@ -480,6 +473,7 @@ class RuleView(viewsets.GenericViewSet):
         return arangodb_helpers.get_single_rule(
             indicator_id,
             version=request.query_params.get("version"),
+            rule_type=self.rule_type
         )
 
     @extend_schema(
@@ -514,7 +508,7 @@ class RuleView(viewsets.GenericViewSet):
         )
         return self.retrieve(request, indicator_id=indicator_id)
 
-    @extend_schema(request=serializers.RuleCloneSerializer)
+    @extend_schema(request=serializers.RuleCloneSerializer, responses={201: JobSerializer, 400: DEFAULT_400_ERROR})
     @decorators.action(methods=["POST"], detail=True)
     def clone(self, request, *args, indicator_id=None, **kwargs):
         original_indicator = self.retrieve(request, indicator_id=indicator_id)
@@ -604,6 +598,7 @@ class RuleView(viewsets.GenericViewSet):
             If you wish to delete the `report` object and all `indicators` (rules) connected to it, use the Delete Reports endpoint.
             """
         ),
+        responses={204: None, 400: DEFAULT_400_ERROR},
     ),
     revert=extend_schema(
         summary="[BASE] Revert a Rule to older version",
@@ -867,6 +862,7 @@ class BaseRuleView(RuleView):
             If you wish to delete the `report` object and all `indicators` (rules) connected to it, use the Delete Reports endpoint.
             """
         ),
+        responses={204: None, 400: DEFAULT_400_ERROR},
     ),
     revert=extend_schema(
         summary="[CORRELATION] Revert a Rule to older version",
@@ -1105,7 +1101,7 @@ class CorrelationRuleView(RuleView):
         parser_classes=[SigmaRuleParser],
     )
     def modify_correlation_manual(self, request, *args, indicator_id=None, **kwargs):
-        _, indicator, _ = arangodb_helpers.get_objects_by_id(indicator_id)
+        indicator = self.retrieve(request, indicator_id=indicator_id).data
         old_rule, _ = correlations.correlations.yaml_to_rule(indicator["pattern"])
         new_rule = (
             correlations.serializers.DRFCorrelationRuleModify.serialize_rule_from(

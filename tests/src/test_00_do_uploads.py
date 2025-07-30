@@ -1,3 +1,4 @@
+from datetime import UTC, datetime
 from functools import lru_cache
 import time
 import django
@@ -25,11 +26,6 @@ from siemrules.worker import tasks
 from tests.src import data as test_data
 
 
-@lru_cache
-def upload_identities():
-    tasks.upload_objects(MagicMock(), dict(objects=test_data.identities, type='bundle', id='bundle--identities'), {})
-    time.sleep(5)
-
 
 @pytest.mark.parametrize(
     ["rule_id", "sigma_yaml"],
@@ -41,8 +37,6 @@ def upload_identities():
 )
 @pytest.mark.django_db
 def test_make_uploads(client, celery_eager, rule_id, sigma_yaml):
-    upload_identities()
-
     save_model = FileSigmaYamlSerializer.save
     with patch(
         "txt2detection.bundler.Bundler.get_attack_objects", side_effect=lambda attack_ids: [v for k,v in test_data.objects_lookup.items() if k in attack_ids]
@@ -66,6 +60,7 @@ def test_make_uploads(client, celery_eager, rule_id, sigma_yaml):
 def test_modify_base_rule_manual(
     celery_eager, client: django.test.Client, modification
 ):
+    base_time = datetime.now(UTC)
     indicator_id = modification["rule_id"]
     with patch(
         "txt2detection.bundler.Bundler.get_attack_objects", side_effect=lambda attack_ids: [v for k,v in test_data.objects_lookup.items() if k in attack_ids]
@@ -82,6 +77,12 @@ def test_modify_base_rule_manual(
         job_resp = client.get(f"/api/v1/jobs/{resp.data['id']}/")
         assert job_resp.status_code == 200
         assert job_resp.data['state'] == 'completed'
+
+    resp = client.get(
+        f"/api/v1/base-rules/{indicator_id}/",
+    )
+    assert resp.status_code == 200
+    assert resp.data['modified'] > base_time.isoformat()
 
 correlation_url = "/api/v1/correlation-rules/"
 @pytest.mark.parametrize("rule", [test_data.CORRELATION_RULE_1, test_data.CORRELATION_RULE_2])

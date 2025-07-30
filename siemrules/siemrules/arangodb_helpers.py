@@ -1,14 +1,10 @@
 import contextlib
 from datetime import UTC, datetime
 import json
-from pathlib import Path
 import uuid
-import arango.exceptions
-from pytz import utc
 from rest_framework import request
-from django.http import HttpRequest, HttpResponse
-# from django.conf import settings
-from siemrules import settings
+from django.http import HttpRequest
+from django.conf import settings
 import typing
 from stix2.serialization import serialize as stix2_serialize
 from dogesec_commons.objects.helpers import OBJECT_TYPES
@@ -20,9 +16,6 @@ from siemrules.siemrules.utils import TLP_LEVEL_STIX_ID_MAPPING, TLP_Levels
 
 from txt2detection.models import TLP_LEVEL as T2D_TLP_LEVEL, SigmaRuleDetection
 from siemrules.siemrules.correlations.models import RuleModel, set_tlp_level_in_tags
-
-if typing.TYPE_CHECKING:
-    from siemrules import settings
 
 from dogesec_commons.objects.helpers import ArangoDBHelper
 
@@ -175,8 +168,8 @@ def request_from_queries(**queries):
     r.query_params.update(queries)
     return r
 
-def get_single_rule(indicator_id, version=None, nokeep=True):
-    r = request_from_queries(indicator_id=indicator_id, version=version)
+def get_single_rule(indicator_id, version=None, nokeep=True, **kwargs):
+    r = request_from_queries(indicator_id=indicator_id, version=version, **kwargs)
     rules = get_rules(r, paginate=False, nokeep=nokeep)
     if not rules:
         raise NotFound(f"no rule with id `{indicator_id}`")

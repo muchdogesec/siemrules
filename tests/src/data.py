@@ -29,7 +29,7 @@ tags:
 - txt2detection.pypotr
 - txt2detection.python
 confidence: 85
-author: identity--a4d70b75-6f4a-5d19-9137-da863edd33d7
+author: '{"type": "identity", "spec_version": "2.1", "id": "identity--a4d70b75-6f4a-5d19-9137-da863edd33d7", "created_by_ref": "identity--9779a2db-f98c-5f4b-8d08-8ee04e02dbb5", "created": "2020-01-01T00:00:00.000Z", "modified": "2020-01-01T00:00:00.000Z", "name": "txt2detection", "description": "https://github.com/muchdogesec/txt2detection", "identity_class": "system", "sectors": ["technology"], "contact_information": "https://www.dogesec.com/contact/", "object_marking_refs": ["marking-definition--94868c89-83c2-464b-929b-a1a8aa3c8487", "marking-definition--97ba4e8b-04f6-57e8-8f6e-3a0f0a7dc0fb"]}'
 status: experimental
 date: 2024-05-01
 """,
@@ -292,60 +292,6 @@ objects_lookup = {
         },
     },
 }
-
-identities = [
-    {
-        "type": "identity",
-        "spec_version": "2.1",
-        "id": "identity--a4d70b75-6f4a-5d19-9137-da863edd33d7",
-        "created_by_ref": "identity--9779a2db-f98c-5f4b-8d08-8ee04e02dbb5",
-        "created": "2020-01-01T00:00:00.000Z",
-        "modified": "2020-01-01T00:00:00.000Z",
-        "name": "txt2detection",
-        "description": "https://github.com/muchdogesec/txt2detection",
-        "identity_class": "system",
-        "sectors": ["technology"],
-        "contact_information": "https://www.dogesec.com/contact/",
-        "object_marking_refs": [
-            "marking-definition--94868c89-83c2-464b-929b-a1a8aa3c8487",
-            "marking-definition--97ba4e8b-04f6-57e8-8f6e-3a0f0a7dc0fb",
-        ],
-    },
-    {
-        "type": "identity",
-        "spec_version": "2.1",
-        "id": "identity--a4d70b75-6f4a-5d19-9137-da863edd33d7",
-        "created_by_ref": "identity--9779a2db-f98c-5f4b-8d08-8ee04e02dbb5",
-        "created": "2020-01-01T00:00:00.000Z",
-        "modified": "2020-01-01T00:00:00.000Z",
-        "name": "txt2detection",
-        "description": "https://github.com/muchdogesec/txt2detection",
-        "identity_class": "system",
-        "sectors": ["technology"],
-        "contact_information": "https://www.dogesec.com/contact/",
-        "object_marking_refs": [
-            "marking-definition--94868c89-83c2-464b-929b-a1a8aa3c8487",
-            "marking-definition--97ba4e8b-04f6-57e8-8f6e-3a0f0a7dc0fb",
-        ],
-    },
-    {
-        "type": "identity",
-        "spec_version": "2.1",
-        "id": "identity--a4d70b75-6f4a-5d19-9137-da863edd33d7",
-        "created_by_ref": "identity--9779a2db-f98c-5f4b-8d08-8ee04e02dbb5",
-        "created": "2020-01-01T00:00:00.000Z",
-        "modified": "2020-01-01T00:00:00.000Z",
-        "name": "txt2detection",
-        "description": "https://github.com/muchdogesec/txt2detection",
-        "identity_class": "system",
-        "sectors": ["technology"],
-        "contact_information": "https://www.dogesec.com/contact/",
-        "object_marking_refs": [
-            "marking-definition--94868c89-83c2-464b-929b-a1a8aa3c8487",
-            "marking-definition--97ba4e8b-04f6-57e8-8f6e-3a0f0a7dc0fb",
-        ],
-    },
-]
 
 MODIFY_1 = {
     "rule_id": "indicator--2683daab-aa64-52ff-a001-3ea5aee9dd72",

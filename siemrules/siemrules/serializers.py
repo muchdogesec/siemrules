@@ -1,3 +1,4 @@
+from collections.abc import Mapping
 from django.core.files.uploadedfile import SimpleUploadedFile
 from rest_framework import serializers, validators
 from siemrules.siemrules.models import File, Job, FileImage, TLP_Levels
@@ -84,6 +85,8 @@ class CharacterSeparatedField(serializers.ListField):
         super().__init__(*args, **kwargs)
 
     def to_internal_value(self, data):
+        if isinstance(data, (str, Mapping)) or not hasattr(data, '__iter__'):
+            self.fail('not_a_list', input_type=type(data).__name__)
         retval = []
         if hasattr(self.parent, "skip_csv"):
             retval = data
@@ -97,7 +100,6 @@ class CharacterSeparatedField(serializers.ListField):
 
 
 class FileSerializer(serializers.ModelSerializer):
-    type_label = "siemrules.file"
 
     job_id = serializers.UUIDField(source="job.id", read_only=True)
     mimetype = serializers.CharField(read_only=True)
@@ -155,11 +157,6 @@ class FileSerializer(serializers.ModelSerializer):
         default=True,
         help_text="Whether to defang the observables in the text. e.g. turns `1.1.1[.]1` to `1.1.1.1` for extraction. This is a file2txt setting.",
     )
-    ai_provider = serializers.CharField(
-        required=True,
-        validators=[validate_model],
-        help_text="An AI provider and model to be used for rule generation in format `provider:model` e.g. `openai:gpt-4o`. This is a txt2detection setting.",
-    )
     extract_text_from_image = serializers.BooleanField(
         required=False,
         default=True,
@@ -183,11 +180,16 @@ class FileSerializer(serializers.ModelSerializer):
         exclude = ["markdown_file", "status", "level"]
         read_only_fields = ["id"]
 
-    def create(self, validated_data):
-        return super().create(validated_data)
+class FileDocumentSerializer(FileSerializer):
+    type_label = "siemrules.file"
+    ai_provider = serializers.CharField(
+        required=True,
+        validators=[validate_model],
+        help_text="An AI provider and model to be used for rule generation in format `provider:model` e.g. `openai:gpt-4o`. This is a txt2detection setting.",
+    )
 
 
-class FilePromptSerializer(FileSerializer):
+class FilePromptSerializer(FileDocumentSerializer):
     type_label = "siemrules.text"
 
     file = serializers.HiddenField(default="")
