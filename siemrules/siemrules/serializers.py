@@ -1,4 +1,5 @@
 from collections.abc import Mapping
+from enum import StrEnum, auto
 from django.core.files.uploadedfile import SimpleUploadedFile
 from rest_framework import serializers, validators
 from siemrules.siemrules.models import File, Job, FileImage, TLP_Levels
@@ -302,3 +303,31 @@ class RuleCloneSerializer(serializers.Serializer):
     )
     title = serializers.CharField(required=False)
     description = serializers.CharField(required=False)
+
+
+
+
+class HealthCheckChoices(StrEnum):
+    AUTHORIZED = auto()
+    UNAUTHORIZED = auto()
+    UNSUPPORTED = auto()
+    NOT_CONFIGURED = "not-configured"
+    UNKNOWN = auto()
+    OFFLINE = auto()
+
+class HealthCheckChoiceField(serializers.ChoiceField):
+    def __init__(self, **kwargs):
+        choices = [m.value for m in HealthCheckChoices]
+        super().__init__(choices, **kwargs)
+        
+class HealthCheckLLMs(serializers.Serializer):
+    openai = HealthCheckChoiceField()
+    deepseek = HealthCheckChoiceField()
+    anthropic = HealthCheckChoiceField()
+    gemini = HealthCheckChoiceField()
+    openrouter = HealthCheckChoiceField()
+
+class HealthCheckSerializer(serializers.Serializer):
+    ctibutler = HealthCheckChoiceField()
+    vulmatch = HealthCheckChoiceField()
+    llms = HealthCheckLLMs()

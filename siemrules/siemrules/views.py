@@ -1219,16 +1219,34 @@ class CorrelationRuleView(RuleView):
         return Response(job_s.data)
 
 
-@extend_schema(
-    responses={204: {}},
-    tags=["Server Status"],
-    summary="Check if the service is running",
-    description=textwrap.dedent(
-        """
+
+@extend_schema_view(
+    list=extend_schema(
+        responses={204: {}},
+        summary="Check if the service is running",
+        description=textwrap.dedent(
+            """
         If this endpoint returns a 204, the service is running as expected.
         """
+        ),
+    ),
+    service=extend_schema(
+        responses={200: serializers.HealthCheckSerializer},
+        summary="Check the status of all external dependencies",
+        description="Check the status of all external dependencies",
     ),
 )
-@decorators.api_view(["GET"])
-def health_check(request):
-    return Response(status=status.HTTP_204_NO_CONTENT)
+class HealthCheckView(viewsets.ViewSet):
+    openapi_tags = ["Server Status"]
+
+    def list(self, request, *args, **kwargs):
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @decorators.action(detail=False)
+    def service(self, request, *args, **kwargs):
+        return Response(status=200, data=self.check_status())
+
+    @staticmethod
+    def check_status():
+        from txt2detection.credential_checker import check_statuses
+        return check_statuses(test_llms=True)

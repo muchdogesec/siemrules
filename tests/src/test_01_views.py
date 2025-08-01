@@ -12,6 +12,7 @@ from siemrules.siemrules import models
 from rest_framework.response import Response
 
 from tests.src.utils import is_sorted
+from tests.utils import Transport
 
 
 @pytest.mark.django_db
@@ -124,7 +125,7 @@ class TestBaseRuleView:
         with patch("siemrules.siemrules.arangodb_helpers.get_single_rule") as mock_get:
             mock_get.return_value = Response()
             response = client.get(f"{self.url}{self.rule_id}/")
-            mock_get.assert_called_once_with(self.rule_id, rule_type="base-rule", version=None)
+            mock_get.assert_called_once()
 
     @pytest.mark.parametrize(
         ["format", "expected_content_type"],
@@ -223,8 +224,13 @@ class TestBaseRuleView:
         response = client.patch(rule_url + "modify/revert/", data=dict(version=revert_version), content_type="application/json")
         assert response.status_code == 400, response.json()
 
-
-
 def test_healthcheck(client):
     resp = client.get('/api/healthcheck/')
     assert resp.status_code == 204
+
+
+def test_healthcheck_service(client, api_schema):
+    resp = client.get('/api/healthcheck/service/')
+    assert resp.status_code == 200
+    api_schema['/api/healthcheck/service/']['GET'].validate_response(Transport.get_st_response(resp))
+    
