@@ -515,7 +515,7 @@ tqdm==4.67.1
     #   txt2detection
 transformers==4.53.2
     # via llama-index-llms-openai-like
-txt2detection==1.0.1
+txt2detection==1.0.3
     # via -r requirements.in
 typing-extensions==4.14.1
     # via
