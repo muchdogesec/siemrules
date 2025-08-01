@@ -50,8 +50,11 @@ router.register('objects/sros', arango_views.SROView, "object-view-sro")
 router.register('objects/sdos', arango_views.SDOView, "object-view-sdo")
 router.register("objects", arango_views.ObjectsWithReportsView, "object-view-orig")
 
+healthcheck = routers.SimpleRouter(use_regex_path=False)
+healthcheck.register('', views.HealthCheckView, "service-status-view")
+
 urlpatterns = [
-    path(f'api/healthcheck/', views.health_check),
+    path(f'api/healthcheck/', include(healthcheck.urls)),
     path('admin/', admin.site.urls),
     path('api/v1/', include(router.urls))
 ]
