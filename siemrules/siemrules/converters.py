@@ -46,35 +46,53 @@ elastic_backends: dict[
 splunk_formats = ["default", "savedsearches"]
 @extend_schema_view(
     convert_kusto=extend_schema(
-        summary="convert using kusto backend",
-        description="convert using kusto backend",
+        summary="Convert a Base Rule to a KQL query",
+        description=textwrap.dedent(
+            """
+            This endpoint will turn a Base Rule into KQL queries.
+
+            We use [pySigma](https://github.com/SigmaHQ/pySigma) to perform these conversions, using [this Kusto backend](https://github.com/AttackIQ/pySigma-backend-kusto).
+            """
+        ),
         parameters=[
             OpenApiParameter(
-                "pipeline", enum=list(kusto_pipelines), description="pipeline to use"
+                "pipeline", enum=list(kusto_pipelines), description="Select the pipeline to use. [Read more about available pipelines here](https://github.com/AttackIQ/pySigma-backend-kusto?tab=readme-ov-file#-processing-pipelines)."
             ),
         ],
     ),
     convert_elasticsearch=extend_schema(
-        summary="convert using elasticsearch backend",
-        description="convert using elasticsearch backend, backend is a required query parameter",
+        summary="Convert a Base Rule to an Elastic query",
+        description=textwrap.dedent(
+            """
+            This endpoint will turn a Base Rule into Elasticsearch queries.
+
+            We use [pySigma](https://github.com/SigmaHQ/pySigma) to perform these conversions, using [this Elasticsearch backend](https://github.com/SigmaHQ/pySigma-backend-elasticsearch).
+            """
+        ),
         parameters=[
             OpenApiParameter(
-                "pipeline", enum=list(elastic_pipelines), description="pipeline to use"
+                "pipeline", enum=list(kusto_pipelines), description="Select the pipeline to use. [Read more about available pipelines here](https://github.com/SigmaHQ/pySigma-backend-elasticsearch?tab=readme-ov-file#pysigma-elasticsearch-backend)."
             ),
             OpenApiParameter(
                 "backend",
                 enum=list(elastic_backends),
-                description="backend to use",
+                description="Select the backend to use. [Read more about available backends here](https://github.com/SigmaHQ/pySigma-backend-elasticsearch?tab=readme-ov-file#pysigma-elasticsearch-backend).",
                 required=True,
             ),
         ],
     ),
     convert_splunk=extend_schema(
-        summary="convert using splunk backend",
-        description="convert using splunk backend",
+        summary="Convert a Base Rule to a Splunk query",
+        description=textwrap.dedent(
+            """
+            This endpoint will turn a Base Rule into Splunk queries.
+
+            We use [pySigma](https://github.com/SigmaHQ/pySigma) to perform these conversions, using [this Splunk backend](https://github.com/SigmaHQ/pySigma-backend-splunk).
+            """
+        ),
         parameters=[
             OpenApiParameter(
-                "pipeline", enum=list(splunk_pipelines), description="pipeline to use"
+                "pipeline", enum=list(splunk_pipelines), description="Select the pipeline to use. [Read more about available pipelines here](https://github.com/SigmaHQ/pySigma-backend-splunk?tab=readme-ov-file#pysigma-splunk-backend)."
             ),
             OpenApiParameter(
                 "output_format",
@@ -100,7 +118,7 @@ class ConvertRuleView(viewsets.GenericViewSet):
         OpenApiParameter(
             lookup_url_kwarg,
             location=OpenApiParameter.PATH,
-            description="The `id` of the Indicator. e.g. `indicator--3fa85f64-5717-4562-b3fc-2c963f66afa6`. Note the UUID part of the STIX `id` used here will match the `id` in the Rule.",
+            description="The `id` of the Indicator representing the Base Rule. e.g. `indicator--3fa85f64-5717-4562-b3fc-2c963f66afa6`. Note the UUID part of the STIX `id` used here will match the `id` in the Rule.",
         )
     ]
 
