@@ -117,7 +117,7 @@ def test_clone(subtests, celery_eager, client: django.test.Client, indicator_id,
         assert identity["id"] == cloned_indicator["created_by_ref"]
         assert identity["id"] in cloned_detection.author  # author is a json string
 
-    assert cloned_detection.date == orig_detection.date, "rule.date should be the same"
+    assert cloned_detection.date == parse_date(cloned_indicator["created"]).date(), "rule.date match indicator.created"
     assert (
         not cloned_detection.modified
         or cloned_detection.modified == parse_date(cloned_indicator["modified"]).date()
@@ -125,6 +125,8 @@ def test_clone(subtests, celery_eager, client: django.test.Client, indicator_id,
     assert (
         cloned_indicator["created"] != orig_indicator["created"]
     ), "indicator.created must not be the same"
+    assert cloned_indicator['created'] == cloned_indicator['modified'], "created and modified must be same"
+    assert cloned_indicator['created'] == cloned_indicator['valid_from'], "created and valid_from must be same"
     assert cloned_indicator["id"] != orig_indicator["id"], "stix id should change"
 
 def test_make_clone_baserule_links_report(celery_eager, client: django.test.Client):

@@ -472,6 +472,7 @@ def make_clone(indicator_id: str, new_uuid: str, data: dict):
     set_tlp_level_in_tags(new_pattern.tags, tlp_level.name)
     new_pattern.related = new_pattern.related or []
     new_pattern.related.append(dict(id=old_uuid, type='derived'))
+    new_pattern.date = now.date()
     new_pattern.modified = now.date()
 
     ##############
@@ -559,6 +560,7 @@ def make_clone(indicator_id: str, new_uuid: str, data: dict):
     ext_refs: list[dict] = [ref for ref in rule.get('external_references', []) if ref['source_name'] != 'siemrules-cloned-from']
     ext_refs.append(dict(source_name='siemrules-cloned-from', external_id=old_uuid))
     rule['external_references'] = ext_refs
+    rule['valid_from'] = now_str
 
     objects += [identity]
 
