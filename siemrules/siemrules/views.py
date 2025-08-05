@@ -902,13 +902,6 @@ class BaseRuleView(RuleView):
                 description="The version of the Correlation Rule you want to retrieve (e.g. `2025-04-04T06:12:59.482478Z`). The `version` value is the same as the STIX objects `modified` time. You can see all of the versions of a rule using the version endpoint.",
             ),
             OpenApiParameter(
-                "types",
-                many=True,
-                explode=False,
-                description="Filter the results by one or more STIX Object types",
-                enum=OBJECT_TYPES,
-            ),
-            OpenApiParameter(
                 "ignore_embedded_sro",
                 type=bool,
                 description="If set to `true` all embedded SROs are removed from the response.",

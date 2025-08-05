@@ -1,4 +1,5 @@
 import time
+from unittest import mock
 import django
 from django.conf import settings
 import pytest
@@ -10,6 +11,7 @@ from siemrules.siemrules.utils import TLP_LEVEL_STIX_ID_MAPPING, TLP_Levels
 
 from siemrules.siemrules.arangodb_helpers import (
     indicator_to_rule,
+    make_clone,
 )
 
 
@@ -115,7 +117,7 @@ def test_clone(subtests, celery_eager, client: django.test.Client, indicator_id,
         assert identity["id"] == cloned_indicator["created_by_ref"]
         assert identity["id"] in cloned_detection.author  # author is a json string
 
-    assert cloned_detection.date == orig_detection.date, "rule.date should be the same"
+    assert cloned_detection.date == parse_date(cloned_indicator["created"]).date(), "rule.date match indicator.created"
     assert (
         not cloned_detection.modified
         or cloned_detection.modified == parse_date(cloned_indicator["modified"]).date()
@@ -123,7 +125,27 @@ def test_clone(subtests, celery_eager, client: django.test.Client, indicator_id,
     assert (
         cloned_indicator["created"] != orig_indicator["created"]
     ), "indicator.created must not be the same"
+    assert cloned_indicator['created'] == cloned_indicator['modified'], "created and modified must be same"
+    assert cloned_indicator['created'] == cloned_indicator['valid_from'], "created and valid_from must be same"
     assert cloned_indicator["id"] != orig_indicator["id"], "stix id should change"
+
+def test_make_clone_baserule_links_report(celery_eager, client: django.test.Client):
+    indicator_id = "indicator--9e2536b0-988b-598d-8cc3-407f9f13fc61"
+    new_rule_id = "indicator--c705ac41-8bc7-4c2e-bad4-2529711eb828"
+    expected_relationship_id = 'relationship--3ca6a2be-427f-56eb-9a17-03e4ef6af72b'
+    report_id = 'report--9e2536b0-988b-598d-8cc3-407f9f13fc61'
+    with mock.patch('siemrules.siemrules.arangodb_helpers.make_upload') as mock_make_upload:
+        output_id = make_clone(indicator_id, new_rule_id, dict(title='New Rule Title'))
+        assert output_id == new_rule_id
+        bundle = mock_make_upload.call_args[0][1]
+        mock_make_upload.assert_called_once_with('', bundle)
+        objects = {obj['id']: obj for obj in bundle['objects']}
+        assert expected_relationship_id in objects
+        rel_obj = objects[expected_relationship_id]
+        assert rel_obj['target_ref'] == report_id
+        assert rel_obj['source_ref'] == new_rule_id
+        assert report_id in rel_obj['_to']
+        assert rel_obj['description'] == 'New Rule Title was derived from report Detection of Malicious Code in xz Tarballs'
 
 
 def rule_to_detection(indicator):
