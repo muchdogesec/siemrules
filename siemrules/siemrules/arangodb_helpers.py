@@ -243,14 +243,15 @@ def make_upload(report_id, bundle, s2a_kwargs=None):
         file=None,
         database=settings.ARANGODB_DATABASE,
         collection=settings.ARANGODB_COLLECTION,
-        stix2arango_note=f"siemrules-file--{file_id}",
+        stix2arango_note=f"siemrules-file--{file_id}" if file_id else '',
         host_url=settings.ARANGODB_HOST_URL,
         username=settings.ARANGODB_USERNAME,
         password=settings.ARANGODB_PASSWORD,
         ignore_embedded_relationships=False,
         **s2a_kwargs
         )
-    s2a.arangodb_extra_data = dict(_stixify_report_id=report_id)
+    if report_id:
+        s2a.arangodb_extra_data = dict(_stixify_report_id=report_id)
     s2a.run(data=bundle)
 
 
@@ -436,7 +437,8 @@ def indicator_to_rule(indicator: dict) -> SigmaRuleDetection|tuple[RuleModel, li
     else:
         raise ParseError("unable to determine rule type")
 
-def make_clone(indicator_id, new_uuid, data):
+def make_clone(indicator_id: str, new_uuid: str, data: dict):
+    _, _, new_uuid = new_uuid.rpartition('--')
     r = request_from_queries(indicator_id=indicator_id)
     helper = ArangoDBHelper(settings.VIEW_NAME, r)
     now = datetime.now(UTC)
@@ -470,15 +472,18 @@ def make_clone(indicator_id, new_uuid, data):
     set_tlp_level_in_tags(new_pattern.tags, tlp_level.name)
     new_pattern.related = new_pattern.related or []
     new_pattern.related.append(dict(id=old_uuid, type='derived'))
+    new_pattern.date = now.date()
     new_pattern.modified = now.date()
 
     ##############
+    report = None
     if isinstance(new_pattern, RuleModel):
         rule['pattern'] = correlations.make_rule(new_pattern, other_documents, new_uuid)
     else:
         new_pattern.id = new_pattern.detection_id = new_uuid
         new_pattern.related = new_pattern.related or []
         rule['pattern'] = new_pattern.make_rule(None)
+        report = helper.execute_query('FOR report IN siemrules_vertex_collection FILTER report.id == @report_id RETURN report', bind_vars=dict(report_id=rule['_stixify_report_id']), paginate=False)[0]
 
     rels : list[dict] = helper.execute_query('''
             FOR d in siemrules_edge_collection
@@ -501,13 +506,29 @@ def make_clone(indicator_id, new_uuid, data):
             "created": now_str,
             "modified": now_str,
             "_to": old_arango_id,
-            "relationship_type": "derived",
-            "description": f"{new_pattern.title} was derived from {old_pattern.title}",
+            "relationship_type": "related-to",
+            "description": f"{new_pattern.title} was derived from report {old_pattern.title}",
             "source_ref": f"indicator--{new_uuid}",
             "target_ref": f"indicator--{old_uuid}",
             "object_marking_refs": new_marking_refs
         }
     )
+    if report:
+        objects.append(
+            {
+                "type": "relationship",
+                "spec_version": "2.1",
+                "created_by_ref": author_ref,
+                "created": now_str,
+                "modified": now_str,
+                "_to": report['_id'],
+                "relationship_type": "related-to",
+                "description": f"{new_pattern.title} was derived from report {report['name']}",
+                "source_ref": f"indicator--{new_uuid}",
+                "target_ref": report['id'],
+                "object_marking_refs": new_marking_refs
+            }
+        )
     
     for obj in objects:
         for k, v in [
@@ -539,10 +560,11 @@ def make_clone(indicator_id, new_uuid, data):
     ext_refs: list[dict] = [ref for ref in rule.get('external_references', []) if ref['source_name'] != 'siemrules-cloned-from']
     ext_refs.append(dict(source_name='siemrules-cloned-from', external_id=old_uuid))
     rule['external_references'] = ext_refs
+    rule['valid_from'] = now_str
 
     objects += [identity]
 
-    make_upload(rule.get('_stixify_report_id', ''), make_bundle(objects), s2a_kwargs=dict(always_latest=True))
+    make_upload(rule.get('_stixify_report_id', ''), make_bundle(objects))
     return rule['id']
             
 
