@@ -120,15 +120,18 @@ class ReportView(viewsets.ViewSet):
     @extend_schema()
     def retrieve(self, request, *args, **kwargs):
         report_id = kwargs.get(self.lookup_url_kwarg)
+        return self.get_object(report_id)
+    
+    def get_object(self, report_id):
         report_uuid = self.path_param_as_uuid(report_id)
-        reports: Response = ArangoDBHelper(settings.VIEW_NAME, request).get_objects_by_id(
+        report: Response = ArangoDBHelper(settings.VIEW_NAME, self.request).get_objects_by_id(
             self.path_param_as_report_id(report_id)
         )
-        if not reports.data:
+        if not report.data:
             raise exceptions.NotFound(
                 detail=f"report object with id `{report_id}` - not found"
             )
-        return reports
+        return report
 
     @extend_schema(
         responses=ArangoDBHelper.get_paginated_response_schema(),
@@ -158,6 +161,7 @@ class ReportView(viewsets.ViewSet):
                 description="Filter the results by one or more STIX Object types",
                 enum=OBJECT_TYPES,
             ),
+            OpenApiParameter('visible_to', description="Only show reports that are visible to the Identity id passed. e.g. passing `identity--b1ae1a15-6f4b-431e-b990-1b9678f35e15` would only show reports created by that identity (with any TLP level) or reports created by another identity ID but only if they are marked with `TLP:CLEAR` or `TLP:GREEN`."),
             OpenApiParameter('ignore_embedded_sro', type=bool, description="If set to `true` all embedded SROs are removed from the response."),
         ],
     )
@@ -260,6 +264,12 @@ class ReportView(viewsets.ViewSet):
 
         if q := helper.query_as_bool('ignore_embedded_sro', default=False):
             filters.append('FILTER doc._is_ref != TRUE')
+
+                
+        if q := helper.query.get('visible_to'):
+            bind_vars['visible_to'] = q
+            bind_vars['marking_visible_to_all'] = TLP_LEVEL_STIX_ID_MAPPING[TLP_Levels.GREEN], TLP_LEVEL_STIX_ID_MAPPING[TLP_Levels.CLEAR]
+            filters.append('FILTER doc.created_by_ref == @visible_to OR @marking_visible_to_all ANY IN doc.object_marking_refs')
 
         query = """
             FOR doc in @@collection
