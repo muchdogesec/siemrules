@@ -12,7 +12,6 @@ env:
 jobs:
   build-and-push-image:
     runs-on: ubuntu-latest
-    environment: siemrules_web_staging
     permissions:
       contents: read
       packages: write
@@ -45,15 +44,6 @@ jobs:
             DJANGO_DEBUG=True
             R2_ACCESS_KEY=a934db14238d5303d37c15927f35789d
             R2_BUCKET_NAME=siemrules-web-core-staging
-            DJANGO_SECRET=${{ secrets.DJANGO_SECRET }}
-            POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}
-            ARANGODB_PASSWORD=${{ secrets.ARANGODB_PASSWORD }}
-            OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
-            GOOGLE_VISION_API_KEY=${{ secrets.GOOGLE_VISION_API_KEY }}
-            R2_SECRET_KEY=${{ secrets.R2_SECRET_KEY }}
-            CTIBUTLER_API_KEY=${{ secrets.CTIBUTLER_API_KEY }}
-            VULMATCH_API_KEY=${{ secrets.VULMATCH_API_KEY }}
-            MARKER_API_KEY=${{ secrets.MARKER_API_KEY }}
       - name: Generate artifact attestation
         uses: actions/attest-build-provenance@v1
         with:
