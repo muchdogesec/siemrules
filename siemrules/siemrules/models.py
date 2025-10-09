@@ -59,6 +59,7 @@ class File(models.Model):
     extract_text_from_image = models.BooleanField(default=True)
     ai_provider = models.CharField(max_length=256, null=True)
     markdown_file = models.FileField(max_length=512, upload_to=upload_to_func, null=True)
+    pdf_file = models.FileField(max_length=1024, upload_to=upload_to_func, null=True)
 
     created = models.DateTimeField(default=timezone.now, null=True)
 
@@ -87,6 +88,13 @@ class File(models.Model):
     
     def __str__(self) -> str:
         return f"File(id={self.id})"
+    
+        
+    @property
+    def archived_pdf(self):
+        if self.mode == 'pdf':
+            return self.file
+        return self.pdf_file
 
 @receiver(post_delete, sender=File)
 def remove_reports_on_delete(sender, instance: File, **kwargs):

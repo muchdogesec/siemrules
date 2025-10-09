@@ -160,8 +160,10 @@ def test_run_file2txt(job):
         mock_parser_class.return_value = MagicMock(return_value=mock_parser_instance)
 
         run_file2txt(job.file)
+        job.file.refresh_from_db()
 
         mock_parser_instance.convert.assert_called_once()
+        assert tuple(job.file.archived_pdf.read(4)) == (0x25,0x50,0x44,0x46)
         mock_create_image.assert_called_once()
 
 @pytest.mark.django_db

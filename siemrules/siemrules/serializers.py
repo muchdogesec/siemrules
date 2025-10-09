@@ -110,7 +110,7 @@ class FileSerializer(serializers.ModelSerializer):
         help_text="Full path to the file to be converted. The mimetype of the file uploaded must match that expected by the `mode` selected. This is a file2txt setting.",
     )
     mode = serializers.ChoiceField(
-        choices=list(f2t_core.BaseParser.PARSERS.keys()),
+        choices=list(['txt', 'html', 'html_article', 'word', 'pdf', 'md']),
         help_text="How the File should be processed. This is a file2txt setting.",
     )
     report_id = ReportIDField(

@@ -22,6 +22,7 @@ from django.conf import settings
 import typing
 
 from siemrules.siemrules.modifier import get_modification, yaml_to_detection
+from siemrules.worker import pdf_converter
 if typing.TYPE_CHECKING:
     from siemrules import settings
 from rest_framework import validators
@@ -207,13 +208,20 @@ def run_txt2detection(file: models.File):
     return bundler.bundle_dict
 
 def run_file2txt(file: models.File):
-    with tempfile.NamedTemporaryFile('rb+') as f:
-        f.write(file.file.read())
-        f.flush()
-        f.seek(0)
+    with tempfile.TemporaryDirectory(prefix='siemrules_') as tmp_dir:
+        tmp_dir = Path(tmp_dir)
+        file_name = Path(file.file.name).name
+        input_file = tmp_dir/file_name
+        input_file.write_bytes(file.file.read())
+
+        converted_file_path = tmp_dir/'converted_pdf.pdf'
+        if pdf_converter.make_conversion(input_file, converted_file_path):
+            file.pdf_file.save(converted_file_path.name, open(converted_file_path, mode='rb'))
+            file.save(update_fields=['pdf_file'])
+
 
         parser_class = get_parser_class(file.mode, file.file.name)
-        converter: BaseParser = parser_class(f.name, file.mode, file.extract_text_from_image, settings.GOOGLE_VISION_API_KEY)
+        converter: BaseParser = parser_class(str(input_file), file.mode, file.extract_text_from_image, settings.GOOGLE_VISION_API_KEY)
         output = converter.convert()
         if file.defang:
             output = Fanger(output).defang()

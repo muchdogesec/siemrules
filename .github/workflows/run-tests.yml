@@ -48,13 +48,16 @@ jobs:
             export DJANGO_WWW_PATH=$PWD/django_www_path/
             echo DJANGO_WWW_PATH="$DJANGO_WWW_PATH" >> tests/tests.env
             mkdir -p $DJANGO_WWW_PATH
+            
             pip install -r tests/requirements.txt -r requirements.txt
+            bash ./install_deps.sh
+            
   
       - name: Unit tests
         id: unit_tests
         run: |
           set -a; source tests/tests.env; set +a
-          pytest --cov --cov-branch --cov-report=xml --junitxml=unittest.junit.xml -o junit_family=legacy tests/ --ignore=tests/st/
+          pytest --cov --cov-branch --cov-report=xml --cov-report=term --junitxml=unittest.junit.xml -o junit_family=legacy tests/ --ignore=tests/st/
 
       - name: Schema tests
         id: schema_tests
