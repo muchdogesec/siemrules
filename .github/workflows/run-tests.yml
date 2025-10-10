@@ -50,7 +50,7 @@ jobs:
             mkdir -p $DJANGO_WWW_PATH
             
             pip install -r tests/requirements.txt -r requirements.txt
-            bash ./install_deps.sh
+            sudo bash ./install_deps.sh
             
   
       - name: Unit tests
