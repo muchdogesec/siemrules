@@ -30,7 +30,7 @@ from siemrules.siemrules.serializers import (
 from rest_framework.exceptions import ParseError
 from dogesec_commons.objects.helpers import OBJECT_TYPES
 
-from rest_framework import request
+from rest_framework import request, exceptions
 from django.http import HttpRequest, HttpResponse
 from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter
 import textwrap
@@ -373,7 +373,7 @@ class FileView(
         summary="Get the archived PDF copy of the File",
         description=textwrap.dedent(
             """
-            Whan a file is uploaded, it is converted to pdf and saved.
+            When a file is uploaded, it is converted to pdf and saved.
             
             This endpoint is useful for loading the file in a generic pdf viewer (vs. trying to work with different filetypes of the original input).
             """
@@ -388,6 +388,48 @@ class FileView(
         response = HttpResponse(obj.archived_pdf.open(), content_type="application/pdf")
         response["Content-Disposition"] = f'attachment; filename="{name}"'
         return response
+    
+    @extend_schema(
+        responses={
+            (200, "application/json"): dict,
+            (404, "application/json"): DEFAULT_404_ERROR,
+        },
+        summary="Get data.json",
+        description=textwrap.dedent(
+            """
+            Whan a file is uploaded, it is converted to pdf and saved.
+            
+            This endpoint is useful for loading the file in a generic pdf viewer (vs. trying to work with different filetypes of the original input).
+            """
+        ),
+    )
+    @decorators.action(detail=True, methods=['GET'], url_path='processing-log')
+    def processing_log(self, request, *args, file_id=None, **kwargs):
+        obj = self.get_object()
+        return Response(obj.txt2detection_data)
+    
+        
+    @extend_schema(
+        responses={
+            (200, "application/json"): serializers.AttackNavigatorDomainSerializer,
+            (404, "application/json"): DEFAULT_404_ERROR,
+        },
+        summary="Get the generated attack navigator",
+        description=textwrap.dedent(
+            """
+            Whan a file is uploaded, it is converted to pdf and saved.
+            
+            This endpoint is useful for loading the file in a generic pdf viewer (vs. trying to work with different filetypes of the original input).
+            """
+        ),
+    )
+    @decorators.action(detail=True, methods=['GET'], url_path='attack-navigator')
+    def nav_layer(self, request, *args, file_id=None, **kwargs):
+        obj = self.get_object()
+        nav = obj.txt2detection_data and obj.txt2detection_data.get('navigator_layer')
+        if not nav:
+            raise exceptions.NotFound("navigator layer not created for file")
+        return Response(nav[0])
 
 
 @extend_schema_view(

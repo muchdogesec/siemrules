@@ -198,6 +198,7 @@ def run_txt2detection(file: models.File):
         status=file.status,
         **kwargs,
     )
+    file.txt2detection_data = bundler.data.model_dump(mode='json')
     file.name = bundler.report.name
     file.labels = bundler.report.get('labels', [])
     file.tlp_level = bundler.tlp_level.name

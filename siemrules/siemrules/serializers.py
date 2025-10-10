@@ -9,6 +9,7 @@ from txt2detection.utils import parse_model as parse_ai_model, valid_licenses
 from django.template.defaultfilters import slugify
 import stix2, json
 from txt2detection.models import TAG_PATTERN
+from dogesec_commons.utils.serializers import JSONSchemaSerializer
 
 
 def validate_model(model):
@@ -86,8 +87,8 @@ class CharacterSeparatedField(serializers.ListField):
         super().__init__(*args, **kwargs)
 
     def to_internal_value(self, data):
-        if isinstance(data, (str, Mapping)) or not hasattr(data, '__iter__'):
-            self.fail('not_a_list', input_type=type(data).__name__)
+        if isinstance(data, (str, Mapping)) or not hasattr(data, "__iter__"):
+            self.fail("not_a_list", input_type=type(data).__name__)
         retval = []
         if hasattr(self.parent, "skip_csv"):
             retval = data
@@ -110,7 +111,7 @@ class FileSerializer(serializers.ModelSerializer):
         help_text="Full path to the file to be converted. The mimetype of the file uploaded must match that expected by the `mode` selected. This is a file2txt setting.",
     )
     mode = serializers.ChoiceField(
-        choices=list(['txt', 'html', 'html_article', 'word', 'pdf', 'md']),
+        choices=list(["txt", "html", "html_article", "word", "pdf", "md"]),
         help_text="How the File should be processed. This is a file2txt setting.",
     )
     report_id = ReportIDField(
@@ -180,6 +181,7 @@ class FileSerializer(serializers.ModelSerializer):
         model = File
         exclude = ["markdown_file", "status", "level"]
         read_only_fields = ["id"]
+
 
 class FileDocumentSerializer(FileSerializer):
     type_label = "siemrules.file"
@@ -305,8 +307,6 @@ class RuleCloneSerializer(serializers.Serializer):
     description = serializers.CharField(required=False)
 
 
-
-
 class HealthCheckChoices(StrEnum):
     AUTHORIZED = auto()
     UNAUTHORIZED = auto()
@@ -315,11 +315,13 @@ class HealthCheckChoices(StrEnum):
     UNKNOWN = auto()
     OFFLINE = auto()
 
+
 class HealthCheckChoiceField(serializers.ChoiceField):
     def __init__(self, **kwargs):
         choices = [m.value for m in HealthCheckChoices]
         super().__init__(choices, **kwargs)
-        
+
+
 class HealthCheckLLMs(serializers.Serializer):
     openai = HealthCheckChoiceField()
     deepseek = HealthCheckChoiceField()
@@ -327,7 +329,95 @@ class HealthCheckLLMs(serializers.Serializer):
     gemini = HealthCheckChoiceField()
     openrouter = HealthCheckChoiceField()
 
+
 class HealthCheckSerializer(serializers.Serializer):
     ctibutler = HealthCheckChoiceField()
     vulmatch = HealthCheckChoiceField()
     llms = HealthCheckLLMs()
+
+
+class AttackNavigatorDomainSerializer(JSONSchemaSerializer):
+    json_schema = {
+        "$schema": "http://json-schema.org/draft-07/schema#",
+        "title": "MITRE ATT&CK Navigator Layer v4.5",
+        "type": "object",
+        "required": ["versions", "name", "domain", "techniques"],
+        "properties": {
+            "versions": {
+                "type": "object",
+                "properties": {
+                    "layer": {"type": "string", "example": "4.5"},
+                    "attack": {"type": "string", "example": "17.0"},
+                    "navigator": {"type": "string", "example": "5.1.0"},
+                },
+                "required": ["layer", "attack", "navigator"],
+                "additionalProperties": False,
+            },
+            "name": {"type": "string"},
+            "domain": {
+                "type": "string",
+                "enum": ["enterprise-attack", "mobile-attack", "ics-attack"],
+            },
+            "description": {"type": "string"},
+            "gradient": {
+                "type": "object",
+                "required": ["colors", "minValue", "maxValue"],
+                "properties": {
+                    "colors": {
+                        "type": "array",
+                        "items": {"type": "string", "pattern": "^#[0-9A-Fa-f]{6}$"},
+                    },
+                    "minValue": {"type": "number"},
+                    "maxValue": {"type": "number"},
+                },
+            },
+            "legendItems": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "label": {"type": "string"},
+                        "color": {"type": "string", "pattern": "^#[0-9A-Fa-f]{6}$"},
+                        "value": {"type": "number"},
+                    },
+                },
+            },
+            "showTacticsRowBackground": {"type": "boolean"},
+            "techniques": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "required": ["techniqueID"],
+                    "properties": {
+                        "techniqueID": {"type": "string"},
+                        "tactic": {"type": "string"},
+                        "score": {"type": ["number", "null"]},
+                        "color": {"type": "string", "pattern": "^#[0-9A-Fa-f]{6}$"},
+                        "comment": {"type": "string"},
+                        "enabled": {"type": "boolean"},
+                        "links": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "href": {"type": "string", "format": "uri"},
+                                    "text": {"type": "string"},
+                                },
+                                "required": ["href", "text"],
+                            },
+                        },
+                    },
+                    "additionalProperties": True,
+                },
+            },
+            "tacticUseIds": {"type": "array", "items": {"type": "string"}},
+            "filters": {
+                "type": "object",
+                "properties": {
+                    "includeSubtechniques": {"type": "boolean"},
+                    "showOnlyVisibleTechniques": {"type": "boolean"},
+                },
+            },
+        },
+        "additionalProperties": True,
+    }

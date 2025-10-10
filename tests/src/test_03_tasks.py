@@ -7,20 +7,29 @@ import pytest
 from siemrules.siemrules import models
 from siemrules.siemrules.models import File
 from siemrules.worker.tasks import (
-    job_failed, new_correlation_task, new_task, process_report, run_txt2detection, run_file2txt, upload_to_arango, job_completed, upload_objects
+    job_failed,
+    new_correlation_task,
+    new_task,
+    process_report,
+    run_txt2detection,
+    run_file2txt,
+    upload_to_arango,
+    job_completed,
+    upload_objects,
 )
 from siemrules.worker import tasks
 import stix2
-
+from django.core.files.uploadedfile import SimpleUploadedFile
 
 
 @pytest.mark.django_db
 def test_new_task(job):
     file = job.file
 
-    with patch("siemrules.worker.tasks.process_report.s") as mock_process_report, \
-         patch("siemrules.worker.tasks.job_completed.si") as mock_error_task:
-        
+    with patch("siemrules.worker.tasks.process_report.s") as mock_process_report, patch(
+        "siemrules.worker.tasks.job_completed.si"
+    ) as mock_error_task:
+
         new_task(job)
 
         mock_process_report.assert_called_once_with(file.file.name, job.id)
@@ -37,52 +46,92 @@ def test_new_correlation_task(job: models.Job, job_type):
     data = mock.Mock()
     correlation = mock.Mock()
     job.type = job_type
-    with patch("siemrules.worker.tasks.process_correlation.s") as mock_process_correlation, \
-        patch("siemrules.worker.tasks.process_correlation_ai.s") as mock_process_correlation_ai, \
-         patch("siemrules.worker.tasks.job_completed.si") as mock_error_task:
+    with patch(
+        "siemrules.worker.tasks.process_correlation.s"
+    ) as mock_process_correlation, patch(
+        "siemrules.worker.tasks.process_correlation_ai.s"
+    ) as mock_process_correlation_ai, patch(
+        "siemrules.worker.tasks.job_completed.si"
+    ) as mock_error_task:
         new_correlation_task(job, correlation, related_indicators, data)
         if job.type == models.JobType.CORRELATION_PROMPT:
-            mock_process_correlation_ai.assert_called_once_with(job.id, data, related_indicators)
+            mock_process_correlation_ai.assert_called_once_with(
+                job.id, data, related_indicators
+            )
         if job.type == models.JobType.CORRELATION_SIGMA:
-            mock_process_correlation.assert_called_once_with(job.id, correlation.model_dump(), related_indicators)
+            mock_process_correlation.assert_called_once_with(
+                job.id, correlation.model_dump(), related_indicators
+            )
         mock_error_task.assert_called_once_with(job.id)
+
 
 @pytest.mark.django_db
 def test_process_correlation(job):
     correlation = mock.Mock()
     related_indicators = mock.Mock()
-    with patch("siemrules.siemrules.correlations.models.RuleModel.model_validate") as mock_model_validate, \
-        patch("siemrules.worker.tasks.upload_correlation") as mock_upload_correlation:
+    with patch(
+        "siemrules.siemrules.correlations.models.RuleModel.model_validate"
+    ) as mock_model_validate, patch(
+        "siemrules.worker.tasks.upload_correlation"
+    ) as mock_upload_correlation:
 
         tasks.process_correlation(job.id, correlation, related_indicators)
         mock_model_validate.assert_called_once_with(correlation)
-        mock_upload_correlation.assert_called_once_with(mock_model_validate.return_value, related_indicators, job)
-    
+        mock_upload_correlation.assert_called_once_with(
+            mock_model_validate.return_value, related_indicators, job
+        )
+
+
 @pytest.mark.django_db
 def test_upload_correlation(job):
     correlation = mock.Mock()
     related_indicators = mock.Mock()
-    with patch("siemrules.siemrules.correlations.correlations.add_rule_indicator") as mock_add_rule_indicator, \
-        patch("siemrules.worker.tasks.upload_objects") as mock_upload_objects:
+    with patch(
+        "siemrules.siemrules.correlations.correlations.add_rule_indicator"
+    ) as mock_add_rule_indicator, patch(
+        "siemrules.worker.tasks.upload_objects"
+    ) as mock_upload_objects:
         mock_add_rule_indicator.return_value = []
         tasks.upload_correlation(correlation, related_indicators, job)
-        mock_add_rule_indicator.assert_called_once_with(correlation, related_indicators, job.type, job.data)
+        mock_add_rule_indicator.assert_called_once_with(
+            correlation, related_indicators, job.type, job.data
+        )
         mock_upload_objects.assert_called_once()
-        mock_upload_objects.assert_called_once_with(job, mock_upload_objects.call_args[0][1], None, stix2arango_note=f"siemrules-correlation")
+        mock_upload_objects.assert_called_once_with(
+            job,
+            mock_upload_objects.call_args[0][1],
+            None,
+            stix2arango_note=f"siemrules-correlation",
+        )
+
 
 @pytest.mark.django_db
 def test_process_correlation_ai(job):
-    data = dict(author="some author", created="rule.date", modified="rule.modified", tlp_level="green", ai_provider="openai", prompt="some prompt")
+    data = dict(
+        author="some author",
+        created="rule.date",
+        modified="rule.modified",
+        tlp_level="green",
+        ai_provider="openai",
+        prompt="some prompt",
+    )
     related_indicators = mock.Mock()
-    with patch("siemrules.siemrules.correlations.models.RuleModel.model_validate") as mock_model_validate, \
-        patch("siemrules.siemrules.correlations.correlations.generate_correlation_with_ai") as mock_generate_with_ai, \
-        patch("siemrules.worker.tasks.parse_ai_model") as mock_parse_ai_model, \
-        patch("siemrules.worker.tasks.upload_correlation") as mock_upload_correlation:
+    with patch(
+        "siemrules.siemrules.correlations.models.RuleModel.model_validate"
+    ) as mock_model_validate, patch(
+        "siemrules.siemrules.correlations.correlations.generate_correlation_with_ai"
+    ) as mock_generate_with_ai, patch(
+        "siemrules.worker.tasks.parse_ai_model"
+    ) as mock_parse_ai_model, patch(
+        "siemrules.worker.tasks.upload_correlation"
+    ) as mock_upload_correlation:
         mdump = mock_generate_with_ai.return_value.model_dump
         mdump.return_value = {}
 
         tasks.process_correlation_ai(job.id, data, related_indicators)
-        mock_generate_with_ai.assert_called_once_with(mock_parse_ai_model.return_value, data['prompt'], related_indicators)
+        mock_generate_with_ai.assert_called_once_with(
+            mock_parse_ai_model.return_value, data["prompt"], related_indicators
+        )
         mock_model_validate.assert_called_once_with(
             dict(
                 **mdump.return_value,
@@ -91,38 +140,101 @@ def test_process_correlation_ai(job):
                 tags=["tlp.green"],
             )
         )
-        mock_upload_correlation.assert_called_once_with(mock_model_validate.return_value, related_indicators, job)
+        mock_upload_correlation.assert_called_once_with(
+            mock_model_validate.return_value, related_indicators, job
+        )
+
+
+@pytest.fixture
+def report():
+    from stix2 import Report
+
+    return Report(
+        **{
+            "created": "2025-09-25T00:00:00.000Z",
+            "created_by_ref": "identity--cff761ac-d777-51c6-a54d-377ef60249a9",
+            "description": "Detects PowerShell process executions that contain base64-encoded commands, invocation of Invoke-Expression, or suspicious download-and-execute patterns. These behaviors are commonly used by attackers to hide payloads or execute one-liners from memory.",
+            "external_references": [
+                {
+                    "source_name": "description_md5_hash",
+                    "external_id": "6532ad7e15543e41f6f24042a82f6140",
+                },
+                {"source_name": "siemrules-created-type", "external_id": "file.sigma"},
+                {
+                    "source_name": "txt2detection",
+                    "description": "txt2detection-reference",
+                    "url": "https://github.com/Neo23x0/sigma",
+                },
+                {
+                    "source_name": "txt2detection",
+                    "description": "txt2detection-reference",
+                    "url": "https://docs.microsoft.com/en-us/powershell/scripting/security/overview-of-execution-policies",
+                },
+            ],
+            "id": "report--416c6486-f391-40d1-b53b-bd208e7884f4",
+            "modified": "2025-09-25T00:00:00.000Z",
+            "name": "Detect PowerShell Base64 or Obfuscated Command Execution",
+            "object_marking_refs": [
+                "marking-definition--94868c89-83c2-464b-929b-a1a8aa3c8487",
+                "marking-definition--a4d70b75-6f4a-5d19-9137-da863edd33d7",
+            ],
+            "object_refs": ["indicator--416c6486-f391-40d1-b53b-bd208e7884f4"],
+            "published": "2025-09-25T00:00:00Z",
+            "spec_version": "2.1",
+            "type": "report",
+        }
+    )
+
 
 @pytest.mark.django_db
-def test_run_txt2detection():
-    mock_file = mock.Mock(spec=File)
-    mock_file.name = "test_file"
-    mock_file.identity = {"type": "identity", "id": "identity--"+str(uuid.uuid4()), "name": "random identity", "identity_class": "organization"}
-    mock_file.tlp_level = "TLP:WHITE"
-    mock_file.id = "12345"
-    mock_file.markdown_file.read.return_value = b"Test input text"
-    mock_file.ai_provider = 'openai'
-    mock_file.labels = []
-    mock_file.references = mock_file.license = 'random'
-    mock_file.level = "level"
-    mock_file.status = "status"
-    mock_file.created = "2022-11-13T12:43:41.613Z"
-    mock_file.job = mock.Mock(spec=models.Job)
+def test_run_txt2detection(job, report):
+    mock_file = File.objects.create(
+        name="test_file",
+        identity={
+            "type": "identity",
+            "id": "identity--" + str(uuid.uuid4()),
+            "name": "random identity",
+            "identity_class": "organization",
+        },
+        tlp_level="TLP:WHITE",
+        id="2724bc7d-db7d-49a0-9583-469d2cf2e8fa",
+        markdown_file=SimpleUploadedFile(
+            "test.txt", b"Test input text", content_type="text/plain"
+        ),
+        ai_provider="openai",
+        labels=[],
+        references=["random"],
+        license="random",
+        level="level",
+        status="status",
+        created="2022-11-13T12:43:41.613Z",
+    )
+    job.file = mock_file
+    job.save()
     mock_file_copy = copy.copy(mock_file)
 
     # Mock dependencies
-    with mock.patch("siemrules.worker.tasks.parse_ai_model") as mock_parse_ai_model, \
-         mock.patch("siemrules.worker.tasks.parse_stix") as mock_parse_stix, \
-         mock.patch("txt2detection.run_txt2detection") as mock_run_txt2detection:
-        
+    with mock.patch(
+        "siemrules.worker.tasks.parse_ai_model"
+    ) as mock_parse_ai_model, mock.patch(
+        "siemrules.worker.tasks.parse_stix"
+    ) as mock_parse_stix, mock.patch(
+        "txt2detection.run_txt2detection"
+    ) as mock_run_txt2detection:
+
         mock_ai_provider = mock.Mock()
         mock_parse_ai_model.return_value = mock_ai_provider
-        
+
         mock_stix_identity = stix2.Identity(**mock_file.identity)
         mock_parse_stix.return_value = mock_stix_identity
 
         mock_bundler = mock.Mock()
+        mock_bundler.report = report
+        mock_bundler.data.model_dump.return_value = {"bundle": "processing-logs"}
         mock_bundler.bundle_dict = {"mocked": "detection_output"}
+        mock_bundler.tlp_level.name = 'red'
+        mock_bundler.reference_urls = ['red']
+        mock_bundler.license = '0BSD'
         mock_run_txt2detection.return_value = mock_bundler
 
         # Run the function
@@ -142,17 +254,26 @@ def test_run_txt2detection():
             license=mock_file.license,
             level=mock_file.level,
             status=mock_file.status,
-            external_refs=[{'source_name': 'siemrules-created-type', 'external_id': mock_file.job.type}],
+            external_refs=[
+                {
+                    "source_name": "siemrules-created-type",
+                    "external_id": mock_file.job.type,
+                }
+            ],
             created=mock_file.created,
         )
-
+        mock_file.refresh_from_db()
+        assert mock_file.txt2detection_data == {"bundle": "processing-logs"}
         assert result == {"mocked": "detection_output"}
+
 
 @pytest.mark.django_db
 def test_run_file2txt(job):
-    with patch("tempfile.NamedTemporaryFile") as mock_tempfile, \
-         patch("siemrules.worker.tasks.get_parser_class") as mock_parser_class, \
-         patch("siemrules.worker.tasks.models.FileImage.objects.create") as mock_create_image:
+    with patch("tempfile.NamedTemporaryFile") as mock_tempfile, patch(
+        "siemrules.worker.tasks.get_parser_class"
+    ) as mock_parser_class, patch(
+        "siemrules.worker.tasks.models.FileImage.objects.create"
+    ) as mock_create_image:
 
         mock_parser_instance = MagicMock()
         mock_parser_instance.convert.return_value = "Extracted text"
@@ -163,16 +284,18 @@ def test_run_file2txt(job):
         job.file.refresh_from_db()
 
         mock_parser_instance.convert.assert_called_once()
-        assert tuple(job.file.archived_pdf.read(4)) == (0x25,0x50,0x44,0x46)
+        assert tuple(job.file.archived_pdf.read(4)) == (0x25, 0x50, 0x44, 0x46)
         mock_create_image.assert_called_once()
+
 
 @pytest.mark.django_db
 def test_upload_to_arango(job):
     bundle = {"objects": []}
     from django.conf import settings
 
-    with patch("siemrules.worker.tasks.Stix2Arango") as mock_s2a, \
-         patch("siemrules.worker.tasks.db_view_creator.link_one_collection") as mock_db_view:
+    with patch("siemrules.worker.tasks.Stix2Arango") as mock_s2a, patch(
+        "siemrules.worker.tasks.db_view_creator.link_one_collection"
+    ) as mock_db_view:
 
         mock_s2a_instance = MagicMock()
         mock_s2a.return_value = mock_s2a_instance
@@ -194,11 +317,13 @@ def test_upload_to_arango(job):
         mock_s2a_instance.run.assert_called_once()
         mock_db_view.assert_called()
 
+
 @pytest.mark.django_db
 def test_upload_objects(job):
     bundle = {"objects": []}
     from django.conf import settings
-    mock_extra_data = {'key_x': 'value_y'}
+
+    mock_extra_data = {"key_x": "value_y"}
 
     with patch("siemrules.worker.tasks.Stix2Arango") as mock_s2a:
 
@@ -214,17 +339,18 @@ def test_upload_objects(job):
             host_url=settings.ARANGODB_HOST_URL,
             username=settings.ARANGODB_USERNAME,
             password=settings.ARANGODB_PASSWORD,
-            bad_kwargs=None
+            bad_kwargs=None,
         )
-        assert 'key_x' in mock_s2a_instance.arangodb_extra_data
+        assert "key_x" in mock_s2a_instance.arangodb_extra_data
         mock_s2a_instance.run.assert_called_once()
+
 
 @pytest.mark.django_db
 def test_job_completed(job):
-    job.state=models.JobState.PENDING
+    job.state = models.JobState.PENDING
     job.save()
 
-    with mock.patch('siemrules.siemrules.models.Job.objects.get', return_value=job):
+    with mock.patch("siemrules.siemrules.models.Job.objects.get", return_value=job):
         job_completed(job.id)
 
     job.refresh_from_db()
@@ -234,16 +360,21 @@ def test_job_completed(job):
 
 @pytest.mark.django_db
 def test_job_failure(job):
-    with mock.patch('siemrules.siemrules.models.Job.objects.get', return_value=job):
+    with mock.patch("siemrules.siemrules.models.Job.objects.get", return_value=job):
         job_failed(SimpleNamespace(id=uuid.uuid4()), None, None, job.id)
         assert job.state == models.JobState.FAILED
+
 
 @pytest.mark.django_db
 def test_process_report_success(job):
 
-    with mock.patch("siemrules.worker.tasks.run_file2txt", return_value=None) as mock_run_file2txt, \
-        mock.patch("siemrules.worker.tasks.run_txt2detection", return_value="detection_bundle") as mock_run_txt2detection, \
-        mock.patch("siemrules.worker.tasks.upload_to_arango", return_value=None) as mock_upload_to_arango:
+    with mock.patch(
+        "siemrules.worker.tasks.run_file2txt", return_value=None
+    ) as mock_run_file2txt, mock.patch(
+        "siemrules.worker.tasks.run_txt2detection", return_value="detection_bundle"
+    ) as mock_run_txt2detection, mock.patch(
+        "siemrules.worker.tasks.upload_to_arango", return_value=None
+    ) as mock_upload_to_arango:
 
         process_report(job.file.name, job.id)
 
@@ -258,11 +389,14 @@ def test_process_report_success(job):
 @pytest.mark.django_db
 def test_process_report_fail(job):
 
-    with mock.patch("siemrules.worker.tasks.run_file2txt", return_value=None, side_effect=ValueError("unexpected")) as mock_run_file2txt:
+    with mock.patch(
+        "siemrules.worker.tasks.run_file2txt",
+        return_value=None,
+        side_effect=ValueError("unexpected"),
+    ) as mock_run_file2txt:
         with pytest.raises(ValueError):
             process_report(job.file.name, job.id)
 
         # Assertions
         job.refresh_from_db()
         mock_run_file2txt.assert_called_once_with(job.file)
-

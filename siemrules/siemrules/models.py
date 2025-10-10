@@ -60,6 +60,7 @@ class File(models.Model):
     ai_provider = models.CharField(max_length=256, null=True)
     markdown_file = models.FileField(max_length=512, upload_to=upload_to_func, null=True)
     pdf_file = models.FileField(max_length=1024, upload_to=upload_to_func, null=True)
+    txt2detection_data = models.JSONField(default=None, null=True)
 
     created = models.DateTimeField(default=timezone.now, null=True)
 
