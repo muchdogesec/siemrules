@@ -43,3 +43,13 @@ class SigmaRuleParser(parsers.BaseParser):
             return yaml.safe_load(stream)
         except Exception as e:
             raise ParseError(f"parse yaml error: {e}") from e
+
+
+class PDFRenderer(renderers.BaseRenderer):
+    media_type = 'application/pdf'
+    format = 'pdf'
+    charset = None
+    render_style = 'binary'
+
+    def render(self, data, media_type=None, renderer_context=None):
+        return data  # You must return raw bytes here (PDF content)
