@@ -30,7 +30,7 @@ llama-index-llms-deepseek
 
 ## dogesec
 
-txt2detection
+txt2detection[llms]
 stix2arango
 file2txt
 dogesec_commons
