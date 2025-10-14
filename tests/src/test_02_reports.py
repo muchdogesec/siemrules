@@ -229,6 +229,7 @@ class TestReportsView:
                     "indicator--8af82832-2abd-5765-903c-01d414dae1e9",
                     "x-mitre-tactic--ffd5bcee-6e16-4dd2-8eca-7b3beedf33ca",
                     "relationship--f5e45557-ced2-5ec6-9af1-699163f5b9a9",
+                    "data-source--34ad2f90-179a-567e-8867-e527f5a3219b",
                 ],
             ),
             (
@@ -245,6 +246,7 @@ class TestReportsView:
                     "relationship--cc49ffa3-34d1-5136-bbc9-f85a94137d7e",
                     "vulnerability--cf670f2c-81ff-5d1d-a3d6-abb4d6f25d15",
                     "relationship--fd32d711-a8f0-5f42-9856-79ecf345c451",
+                    "data-source--512ead3c-b0fb-5235-8605-2da7c9b35ac2",
                 ],
             ),
             (
@@ -259,6 +261,7 @@ class TestReportsView:
                     "relationship--5fc94cc8-425c-539c-8b4c-e54e1e722a3f",
                     "vulnerability--a99faefb-377e-585b-9890-70f73d75ffee",
                     "relationship--e8cafeee-8786-5960-9dcc-667fdaeb0a9e",
+                    "data-source--ab14f1cd-18db-5805-9c75-8d6002e41d9a",
                 ],
             ),
         ],
