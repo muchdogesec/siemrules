@@ -14,6 +14,7 @@ from siemrules.siemrules.correlations.serializers import (
     CorrelationRuleSerializer,
     DRFCorrelationRule,
 )
+from drf_spectacular.types import OpenApiTypes
 from siemrules.siemrules.modifier import (
     DRFDetection,
     DRFSigmaRule,
@@ -29,14 +30,14 @@ from siemrules.siemrules.serializers import (
 from rest_framework.exceptions import ParseError
 from dogesec_commons.objects.helpers import OBJECT_TYPES
 
-from rest_framework import request
-from django.http import HttpRequest
+from rest_framework import request, exceptions
+from django.http import HttpRequest, HttpResponse
 from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter
 import textwrap
 import typing
 from dogesec_commons.utils import Pagination, Ordering
 from siemrules.siemrules.md_helper import MarkdownImageReplacer, mistune
-from siemrules.siemrules.utils import SigmaRuleParser, SigmaRuleRenderer
+from siemrules.siemrules.utils import PDFRenderer, SigmaRuleParser, SigmaRuleRenderer
 from siemrules.worker import tasks
 from rest_framework.response import Response
 from django_filters.rest_framework import (
@@ -361,6 +362,75 @@ class FileView(
         reports.can_remove_report(reports.ReportView.path_param_as_report_id(file_id))
         return super().destroy(request, *args, **kwargs)
 
+    def get_object(self) -> models.File:
+        return super().get_object()
+
+    @extend_schema(
+        responses={
+            (200, "application/pdf"): OpenApiTypes.BINARY,
+            (404, "application/json"): DEFAULT_404_ERROR,
+        },
+        summary="Get the archived PDF copy of the File",
+        description=textwrap.dedent(
+            """
+            When a file is uploaded, it is converted to pdf and saved.
+            
+            This endpoint is useful for loading the file in a generic pdf viewer (vs. trying to work with different filetypes of the original input).
+            """
+        ),
+    )
+    @decorators.action(detail=True, methods=["GET"], renderer_classes=[PDFRenderer])
+    def pdf(self, request, *args, file_id=None, **kwargs):
+        obj = self.get_object()
+        if not obj.archived_pdf:
+            return HttpResponseNotFound("No pdf file")
+        _, _, name = obj.archived_pdf.name.rpartition("/")
+        response = HttpResponse(obj.archived_pdf.open(), content_type="application/pdf")
+        response["Content-Disposition"] = f'attachment; filename="{name}"'
+        return response
+    
+    @extend_schema(
+        responses={
+            (200, "application/json"): dict,
+            (404, "application/json"): DEFAULT_404_ERROR,
+        },
+        summary="Get data.json",
+        description=textwrap.dedent(
+            """
+            Whan a file is uploaded, it is converted to pdf and saved.
+            
+            This endpoint is useful for loading the file in a generic pdf viewer (vs. trying to work with different filetypes of the original input).
+            """
+        ),
+    )
+    @decorators.action(detail=True, methods=['GET'], url_path='processing-log')
+    def processing_log(self, request, *args, file_id=None, **kwargs):
+        obj = self.get_object()
+        return Response(obj.txt2detection_data)
+    
+        
+    @extend_schema(
+        responses={
+            (200, "application/json"): serializers.AttackNavigatorDomainSerializer,
+            (404, "application/json"): DEFAULT_404_ERROR,
+        },
+        summary="Get the generated attack navigator",
+        description=textwrap.dedent(
+            """
+            Whan a file is uploaded, it is converted to pdf and saved.
+            
+            This endpoint is useful for loading the file in a generic pdf viewer (vs. trying to work with different filetypes of the original input).
+            """
+        ),
+    )
+    @decorators.action(detail=True, methods=['GET'], url_path='attack-navigator')
+    def nav_layer(self, request, *args, file_id=None, **kwargs):
+        obj = self.get_object()
+        nav = obj.txt2detection_data and obj.txt2detection_data.get('navigator_layer')
+        if not nav:
+            raise exceptions.NotFound("navigator layer not created for file")
+        return Response(nav[0])
+
 
 @extend_schema_view(
     list=extend_schema(
@@ -473,7 +543,7 @@ class RuleView(viewsets.GenericViewSet):
         return arangodb_helpers.get_single_rule(
             indicator_id,
             version=request.query_params.get("version"),
-            rule_type=self.rule_type
+            rule_type=self.rule_type,
         )
 
     @extend_schema(
@@ -508,7 +578,10 @@ class RuleView(viewsets.GenericViewSet):
         )
         return self.retrieve(request, indicator_id=indicator_id)
 
-    @extend_schema(request=serializers.RuleCloneSerializer, responses={201: JobSerializer, 400: DEFAULT_400_ERROR})
+    @extend_schema(
+        request=serializers.RuleCloneSerializer,
+        responses={201: JobSerializer, 400: DEFAULT_400_ERROR},
+    )
     @decorators.action(methods=["POST"], detail=True)
     def clone(self, request, *args, indicator_id=None, **kwargs):
         original_indicator = self.retrieve(request, indicator_id=indicator_id)
@@ -1183,7 +1256,6 @@ class CorrelationRuleView(RuleView):
         return Response(job_s.data)
 
 
-
 @extend_schema_view(
     list=extend_schema(
         responses={204: {}},
@@ -1213,4 +1285,5 @@ class HealthCheckView(viewsets.ViewSet):
     @staticmethod
     def check_status():
         from txt2detection.credential_checker import check_statuses
+
         return check_statuses(test_llms=True)

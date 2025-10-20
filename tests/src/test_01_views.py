@@ -84,6 +84,25 @@ class TestFileView:
             mock_delete.assert_called_once()
 
 
+    def test_processing_log(self, client, job, api_schema):
+        job.file.txt2detection_data = {"some_new": "data"}
+        job.file.save()
+        response = client.get(f"{self.url}{job.file.id}/processing-log/")
+        assert response.json() == {"some_new": "data"}
+        assert response.status_code == 200
+        api_schema['/api/v1/files/{file_id}/processing-log/']['GET'].validate_response(Transport.get_st_response(response))
+
+
+    def test_nav_layer(self, client, job, fake_txt2stix_extractions, api_schema):
+        job.file.txt2detection_data = fake_txt2stix_extractions
+        job.file.save()
+        response = client.get(f"{self.url}{job.file.id}/attack-navigator/")
+        assert response.status_code == 200
+        assert response.json()['name'] == "fake python vulnerability report"
+        api_schema['/api/v1/files/{file_id}/attack-navigator/']['GET'].validate_response(Transport.get_st_response(response))
+
+
+
 @pytest.mark.django_db
 class TestJobView:
     @pytest.fixture(autouse=True)
