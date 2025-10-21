@@ -26,6 +26,7 @@ from siemrules.siemrules.serializers import (
     FileSerializer,
     ImageSerializer,
     JobSerializer,
+    ProfileSerializer,
 )
 from rest_framework.exceptions import ParseError
 from dogesec_commons.objects.helpers import OBJECT_TYPES
@@ -1254,6 +1255,78 @@ class CorrelationRuleView(RuleView):
             job_instance, s.validated_data, related_indicators, s.validated_data
         )
         return Response(job_s.data)
+
+
+@extend_schema_view(
+    list=extend_schema(
+        summary="Search profiles",
+        description=textwrap.dedent(
+            """
+            Profiles determine how txt2stix processes the text in each File. A profile consists of extractors. You can search for existing profiles here.
+            """
+        ),
+        responses={400: DEFAULT_400_ERROR, 200: ProfileSerializer},
+    ),
+    retrieve=extend_schema(
+        summary="Get a profile",
+        description=textwrap.dedent(
+            """
+            View the configuration of an existing profile. Note, existing profiles cannot be modified.
+            """
+        ),
+        responses={
+            400: DEFAULT_400_ERROR,
+            404: DEFAULT_404_ERROR,
+            200: ProfileSerializer,
+        },
+    ),
+    create=extend_schema(
+        summary="Create a new profile",
+        description=textwrap.dedent(
+            """
+            """
+        ),
+        responses={400: DEFAULT_400_ERROR, 201: ProfileSerializer},
+    ),
+    destroy=extend_schema(
+        summary="Delete a profile",
+        description=textwrap.dedent(
+            """
+            Delete an existing profile.
+
+            Note: it is not currently possible to delete a profile that is referenced in an existing object. You must delete the objects linked to the profile first.
+            """
+        ),
+        responses={404: DEFAULT_404_ERROR, 204: None},
+    ),
+)
+class ProfileView(viewsets.ModelViewSet):
+    openapi_tags = ["Profiles"]
+    serializer_class = ProfileSerializer
+    http_method_names = ["get", "post", "delete"]
+    pagination_class = Pagination("profiles")
+    lookup_url_kwarg = "profile_id"
+    openapi_path_params = [
+        OpenApiParameter(
+            lookup_url_kwarg,
+            location=OpenApiParameter.PATH,
+            type=OpenApiTypes.UUID,
+            description="The `id` of the Profile.",
+        )
+    ]
+
+    ordering_fields = ["name", "created"]
+    ordering = "created_descending"
+    filter_backends = [DjangoFilterBackend, Ordering]
+
+    class filterset_class(FilterSet):
+        name = Filter(
+            help_text="Searches Profiles by their `name`. Search is wildcard. For example, `ip` will return Profiles with names `ip-extractions`, `ips`, etc.",
+            lookup_expr="icontains",
+        )
+
+    def get_queryset(self):
+        return models.Profile.objects
 
 
 @extend_schema_view(

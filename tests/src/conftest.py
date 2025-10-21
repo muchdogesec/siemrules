@@ -1,8 +1,9 @@
+import uuid
 import pytest
 
 
 from django.core.files.uploadedfile import SimpleUploadedFile
-from siemrules.siemrules.models import Job, File
+from siemrules.siemrules.models import Job, File, Profile
 
 
 @pytest.fixture
@@ -15,15 +16,22 @@ def celery_eager():
 
 
 @pytest.fixture
-def job():
+def job(profile):
     file = File.objects.create(
         name="test.txt",
         file=SimpleUploadedFile(
             "test.txt", b"dummy content", content_type="text/plain"
         ),
+        profile=profile,
     )
     return Job.objects.create(file=file)
 
+@pytest.fixture
+def profile():
+    return Profile.objects.create(
+        id=uuid.UUID('08de23ca-9d66-4bef-b62b-382d577da2ef'),
+        name='test-profile',
+    )
 
 @pytest.fixture(scope="session")
 def api_schema():

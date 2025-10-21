@@ -6,7 +6,6 @@ COPY install_deps.sh .
 RUN --mount=type=cache,target=/var/cache/apt/archives/ \
     bash install_deps.sh
 
-sudo bash ./install_deps.sh
 COPY requirements.txt ./
 RUN --mount=type=cache,target=/root/.cache \
     pip install -r requirements.txt

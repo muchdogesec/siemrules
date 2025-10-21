@@ -1,8 +1,9 @@
 from collections.abc import Mapping
 from enum import StrEnum, auto
+import uuid
 from django.core.files.uploadedfile import SimpleUploadedFile
 from rest_framework import serializers, validators
-from siemrules.siemrules.models import File, Job, FileImage, TLP_Levels
+from siemrules.siemrules.models import File, Job, FileImage, Profile, TLP_Levels
 from drf_spectacular.utils import extend_schema_field
 import file2txt.parsers.core as f2t_core
 from txt2detection.utils import parse_model as parse_ai_model, valid_licenses
@@ -10,6 +11,13 @@ from django.template.defaultfilters import slugify
 import stix2, json
 from txt2detection.models import TAG_PATTERN
 from dogesec_commons.utils.serializers import JSONSchemaSerializer
+from django.utils.translation import gettext_lazy
+
+
+def validate_ref(value: str):
+    if not (value.endswith("_ref") or value.endswith("_refs")):
+        raise validators.ValidationError("value must end with _ref or _refs")
+    return value
 
 
 def validate_model(model):
@@ -101,6 +109,31 @@ class CharacterSeparatedField(serializers.ListField):
         return super().to_internal_value(retval)
 
 
+class ProfileIDField(serializers.PrimaryKeyRelatedField):
+    def __init__(self, **kwargs):
+        super().__init__(
+            queryset=Profile.objects,
+            error_messages={
+                "required": gettext_lazy("This field is required."),
+                "does_not_exist": gettext_lazy(
+                    'Invalid profile with id "{pk_value}" - object does not exist.'
+                ),
+                "incorrect_type": gettext_lazy(
+                    "Incorrect type. Expected profile id (uuid), received {data_type}."
+                ),
+            },
+            **kwargs,
+        )
+
+    def to_internal_value(self, data):
+        return super().to_internal_value(data).pk
+
+    def to_representation(self, value):
+        if isinstance(value, uuid.UUID):
+            return value
+        return super().to_representation(value)
+
+
 class FileSerializer(serializers.ModelSerializer):
 
     job_id = serializers.UUIDField(source="job.id", read_only=True)
@@ -125,6 +158,7 @@ class FileSerializer(serializers.ModelSerializer):
         ],
         required=False,
     )
+    profile_id = ProfileIDField(help_text="profile id to use", required=True)
     created = serializers.DateTimeField(
         default=None,
         help_text="By default the `data` and `modified` values in the rule will be used. If no values exist for these, the default behaviour is to use script run time. You can pass  `created` time here which will overwrite `date` and `modified` date in the rule. Pass as `YYYY-MM-DDThh:mm:ssZ` (e.g. `2020-01-01T00:00:00`)",
@@ -155,41 +189,98 @@ class FileSerializer(serializers.ModelSerializer):
         allow_null=True,
         help_text="[License of the rule according the SPDX ID specification](https://spdx.org/licenses/) (e.g. `MIT`). Will be added to the Sigma rule. This is a txt2detection setting.",
     )
-    defang = serializers.BooleanField(
-        default=True,
-        help_text="Whether to defang the observables in the text. e.g. turns `1.1.1[.]1` to `1.1.1.1` for extraction. This is a file2txt setting.",
-    )
-    extract_text_from_image = serializers.BooleanField(
-        required=False,
-        default=True,
-        help_text="Whether to convert the images found in a the file to text. Requires a Google Vision key to be set. This is a file2txt setting",
-    )
-    ignore_embedded_relationships = serializers.BooleanField(
-        default=False,
-        help_text="Default is `false`. Setting this to `true` will stop stix2arango creating relationship objects for the embedded relationships found in objects created by txt2detection.",
-    )
-    ignore_embedded_relationships_sro = serializers.BooleanField(
-        default=False,
-        help_text="Default is `false`. If `true` passed, will stop any embedded relationships from being generated from SRO objects (type = `relationship`).",
-    )
-    ignore_embedded_relationships_smo = serializers.BooleanField(
-        default=False,
-        help_text="Default is `false`. if true passed, will stop any embedded relationships from being generated from SMO objects (type = `marking-definition`, `extension-definition`, `language-content`).",
-    )
+    # defang = serializers.BooleanField(
+    #     default=True,
+    #     help_text="Whether to defang the observables in the text. e.g. turns `1.1.1[.]1` to `1.1.1.1` for extraction. This is a file2txt setting.",
+    # )
+    # extract_text_from_image = serializers.BooleanField(
+    #     required=False,
+    #     default=True,
+    #     help_text="Whether to convert the images found in a the file to text. Requires a Google Vision key to be set. This is a file2txt setting",
+    # )
+    # ignore_embedded_relationships = serializers.BooleanField(
+    #     default=False,
+    #     help_text="Default is `false`. Setting this to `true` will stop stix2arango creating relationship objects for the embedded relationships found in objects created by txt2detection.",
+    # )
+    # ignore_embedded_relationships_sro = serializers.BooleanField(
+    #     default=False,
+    #     help_text="Default is `false`. If `true` passed, will stop any embedded relationships from being generated from SRO objects (type = `relationship`).",
+    # )
+    # ignore_embedded_relationships_smo = serializers.BooleanField(
+    #     default=False,
+    #     help_text="Default is `false`. if true passed, will stop any embedded relationships from being generated from SMO objects (type = `marking-definition`, `extension-definition`, `language-content`).",
+    # )
 
     class Meta:
         model = File
-        exclude = ["markdown_file", "status", "level"]
+        exclude = ["markdown_file", "status", "level", "profile", "txt2detection_data", "pdf_file"]
         read_only_fields = ["id"]
+
+
+class ProfileSerializer(serializers.ModelSerializer):
+    ai_provider = serializers.CharField(
+        required=True,
+        validators=[validate_model],
+        help_text="An AI provider and model to be used for rule generation in format `provider:model` e.g. `openai:gpt-4o`.",
+    )
+    ai_create_attack_flow = serializers.BooleanField(
+        required=False,
+        help_text="should create attack-flow (default is `false`)",
+        default=False,
+    )
+    ai_create_attack_navigator_layer = serializers.BooleanField(
+        required=False,
+        help_text="should create attack navigator layer (default is `false`)",
+        default=False,
+    )
+    defang = serializers.BooleanField(
+        help_text="If the text should be defanged before processing"
+    )
+
+    ignore_embedded_relationships = serializers.BooleanField(
+        required=False, help_text="applies to SDO and SCO types (default is `false`)"
+    )
+    ignore_embedded_relationships_sro = serializers.BooleanField(
+        required=False,
+        help_text="sets wether to ignore embedded refs on `relationship` object types (default is `true`)",
+    )
+    ignore_embedded_relationships_smo = serializers.BooleanField(
+        required=False,
+        help_text="sets wether to ignore embedded refs on SMO object types (`marking-definition`, `extension-definition`, `language-content`) (default is `true`)",
+    )
+    include_embedded_relationships_attributes = serializers.ListField(
+        required=False,
+        child=serializers.CharField(
+            max_length=128,
+            validators=[validate_ref],
+        ),
+        help_text="Only create embedded relationships for STIX attributes that match items in this list",
+    )
+    generate_pdf = serializers.BooleanField(
+        required=False,
+        help_text="Whether or not to generate pdf file for input, applies to both stixify and obstracts (default is `false`)",
+    )
+
+    class Meta:
+        model = Profile
+        fields = "__all__"
+        read_only_fields = ["id", "created"]
+
+    def validate(self, attrs):
+        if not attrs.get("ai_provider"):
+            if attrs.get("ai_create_attack_flow"):
+                raise validators.ValidationError(
+                    "`ai_provider` is required when `ai_create_attack_flow == true`"
+                )
+            if attrs.get("ai_create_attack_navigator_layer"):
+                raise validators.ValidationError(
+                    "`ai_provider` is required when `ai_create_attack_navigator_layer == true`"
+                )
+        return super().validate(attrs)
 
 
 class FileDocumentSerializer(FileSerializer):
     type_label = "siemrules.file"
-    ai_provider = serializers.CharField(
-        required=True,
-        validators=[validate_model],
-        help_text="An AI provider and model to be used for rule generation in format `provider:model` e.g. `openai:gpt-4o`. This is a txt2detection setting.",
-    )
 
 
 class FilePromptSerializer(FileDocumentSerializer):
@@ -198,7 +289,7 @@ class FilePromptSerializer(FileDocumentSerializer):
     file = serializers.HiddenField(default="")
     text_input = serializers.CharField(write_only=True)
     mode = serializers.HiddenField(default="txt")
-    extract_text_from_image = serializers.HiddenField(default=False)
+    # extract_text_from_image = serializers.HiddenField(default=False)
 
     def create(self, validated_data):
         validated_data["file"] = SimpleUploadedFile(
@@ -212,7 +303,7 @@ class FilePromptSerializer(FileDocumentSerializer):
 class FileSigmaYamlSerializer(serializers.ModelSerializer):
     type_label = "siemrules.sigma"
     mode = serializers.HiddenField(default="sigma")
-    ai_provider = serializers.HiddenField(default=None)
+    # ai_provider = serializers.HiddenField(default=None)
     tlp_level = serializers.CharField(required=True)
     sigma_file = serializers.FileField(source="file", write_only=True)
     name = serializers.CharField(required=False)
@@ -223,8 +314,6 @@ class FileSigmaYamlSerializer(serializers.ModelSerializer):
         model = File
         exclude = [
             "file",
-            "defang",
-            "extract_text_from_image",
             "markdown_file",
             "mimetype",
         ]

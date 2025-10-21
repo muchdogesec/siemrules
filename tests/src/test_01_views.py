@@ -18,9 +18,9 @@ from tests.utils import Transport
 @pytest.mark.django_db
 class TestFileView:
     @pytest.fixture(autouse=True)
-    def setup(self):
+    def setup(self, profile):
         self.file = models.File.objects.create(
-            name="test_file.txt", mimetype="text/plain"
+            name="test_file.txt", mimetype="text/plain", profile=profile
         )
         self.url = "/api/v1/files/"
 
@@ -30,15 +30,15 @@ class TestFileView:
         assert isinstance(response.data["files"], list)
         assert len(response.data["files"]) == 1
 
-    def test_file_create__upload(self, client):
+    def test_file_create__upload(self, client, profile):
         mock_file_content = b"dummy content"
         file_data = dict(
             file=SimpleUploadedFile(
                 "test.txt", b"dummy content", content_type="text/plain"
             ),
             mode="txt",
-            ai_provider="openai",
             name="dummy name",
+            profile_id=profile.id
         )
         with patch("siemrules.worker.tasks.new_task") as mock_task:
             response = client.post(
@@ -51,12 +51,12 @@ class TestFileView:
             assert job.file.file.read() == mock_file_content
             assert job.file.mode == file_data["mode"]
             assert job.file.name == file_data["name"]
-            assert job.file.ai_provider == file_data["ai_provider"]
+            assert job.profile == profile
 
-    def test_file_create__text(self, client: django.test.Client):
+    def test_file_create__text(self, client: django.test.Client, profile):
         mock_file_content = b"dummy content"
         file_data = dict(
-            text_input=mock_file_content.decode(), ai_provider="openai", name="dummy name"
+            text_input=mock_file_content.decode(), ai_provider="openai", name="dummy name", profile_id=profile.id
         )
         with patch("siemrules.worker.tasks.new_task") as mock_task:
             response = client.post(
@@ -70,7 +70,7 @@ class TestFileView:
             assert file.file.read() == mock_file_content
             assert file.mode == "txt"
             assert file.name == file_data["name"]
-            assert file.ai_provider == file_data["ai_provider"]
+            assert file.profile == profile
 
     def test_retrieve_file(self, client):
         response = client.get(f"{self.url}{self.file.id}/")
