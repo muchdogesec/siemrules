@@ -158,7 +158,7 @@ class FileSerializer(serializers.ModelSerializer):
         ],
         required=False,
     )
-    profile_id = ProfileIDField(help_text="profile id to use", required=True)
+    profile_id = ProfileIDField(help_text="profile id to use", required=False, allow_null=True)
     created = serializers.DateTimeField(
         default=None,
         help_text="By default the `data` and `modified` values in the rule will be used. If no values exist for these, the default behaviour is to use script run time. You can pass  `created` time here which will overwrite `date` and `modified` date in the rule. Pass as `YYYY-MM-DDThh:mm:ssZ` (e.g. `2020-01-01T00:00:00`)",
@@ -189,27 +189,6 @@ class FileSerializer(serializers.ModelSerializer):
         allow_null=True,
         help_text="[License of the rule according the SPDX ID specification](https://spdx.org/licenses/) (e.g. `MIT`). Will be added to the Sigma rule. This is a txt2detection setting.",
     )
-    # defang = serializers.BooleanField(
-    #     default=True,
-    #     help_text="Whether to defang the observables in the text. e.g. turns `1.1.1[.]1` to `1.1.1.1` for extraction. This is a file2txt setting.",
-    # )
-    # extract_text_from_image = serializers.BooleanField(
-    #     required=False,
-    #     default=True,
-    #     help_text="Whether to convert the images found in a the file to text. Requires a Google Vision key to be set. This is a file2txt setting",
-    # )
-    # ignore_embedded_relationships = serializers.BooleanField(
-    #     default=False,
-    #     help_text="Default is `false`. Setting this to `true` will stop stix2arango creating relationship objects for the embedded relationships found in objects created by txt2detection.",
-    # )
-    # ignore_embedded_relationships_sro = serializers.BooleanField(
-    #     default=False,
-    #     help_text="Default is `false`. If `true` passed, will stop any embedded relationships from being generated from SRO objects (type = `relationship`).",
-    # )
-    # ignore_embedded_relationships_smo = serializers.BooleanField(
-    #     default=False,
-    #     help_text="Default is `false`. if true passed, will stop any embedded relationships from being generated from SMO objects (type = `marking-definition`, `extension-definition`, `language-content`).",
-    # )
 
     class Meta:
         model = File
@@ -281,6 +260,8 @@ class ProfileSerializer(serializers.ModelSerializer):
 
 class FileDocumentSerializer(FileSerializer):
     type_label = "siemrules.file"
+    profile_id = ProfileIDField(help_text="profile id to use", required=True, allow_null=False)
+
 
 
 class FilePromptSerializer(FileDocumentSerializer):
