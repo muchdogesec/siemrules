@@ -33,7 +33,13 @@ from dogesec_commons.objects.helpers import OBJECT_TYPES
 
 from rest_framework import request, exceptions
 from django.http import HttpRequest, HttpResponse
-from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter
+from drf_spectacular.utils import (
+    extend_schema,
+    extend_schema_view,
+    OpenApiParameter,
+    OpenApiExample,
+    OpenApiResponse,
+)
 import textwrap
 import typing
 from dogesec_commons.utils import Pagination, Ordering
@@ -389,7 +395,7 @@ class FileView(
         response = HttpResponse(obj.archived_pdf.open(), content_type="application/pdf")
         response["Content-Disposition"] = f'attachment; filename="{name}"'
         return response
-    
+
     @extend_schema(
         responses={
             (200, "application/json"): dict,
@@ -404,12 +410,11 @@ class FileView(
             """
         ),
     )
-    @decorators.action(detail=True, methods=['GET'], url_path='processing-log')
+    @decorators.action(detail=True, methods=["GET"], url_path="processing-log")
     def processing_log(self, request, *args, file_id=None, **kwargs):
         obj = self.get_object()
         return Response(obj.txt2detection_data)
-    
-        
+
     @extend_schema(
         responses={
             (200, "application/json"): serializers.AttackNavigatorDomainSerializer,
@@ -424,10 +429,10 @@ class FileView(
             """
         ),
     )
-    @decorators.action(detail=True, methods=['GET'], url_path='attack-navigator')
+    @decorators.action(detail=True, methods=["GET"], url_path="attack-navigator")
     def nav_layer(self, request, *args, file_id=None, **kwargs):
         obj = self.get_object()
-        nav = obj.txt2detection_data and obj.txt2detection_data.get('navigator_layer')
+        nav = obj.txt2detection_data and obj.txt2detection_data.get("navigator_layer")
         if not nav:
             raise exceptions.NotFound("navigator layer not created for file")
         return Response(nav[0])
@@ -1299,6 +1304,31 @@ class CorrelationRuleView(RuleView):
         ),
         responses={404: DEFAULT_404_ERROR, 204: None},
     ),
+    extractors=extend_schema(
+        summary="Show all observable types that can be extracted by all profiles",
+        description="Show all observable types that can be extracted by all profiles",
+        responses={
+            200: OpenApiResponse(
+                list[str],
+                examples=[
+                    OpenApiExample(
+                        "sample",
+                        [
+                            "ipv4-addr",
+                            "ipv6-addr",
+                            "email-addr",
+                            "file.hashes.MD5",
+                            "file.hashes.SHA-256",
+                            "file.hashes.SSDEEP",
+                            "mac-addr",
+                            "x509-certificate",
+                        ],
+                        response_only=True,
+                    )
+                ],
+            )
+        },
+    ),
 )
 class ProfileView(viewsets.ModelViewSet):
     openapi_tags = ["Profiles"]
@@ -1327,6 +1357,11 @@ class ProfileView(viewsets.ModelViewSet):
 
     def get_queryset(self):
         return models.Profile.objects
+
+    @decorators.action(methods=["GET"], detail=False)
+    def extractors(self, request, *args, **kwargs):
+        from txt2detection.observables import STIX_PATTERNS_KEYS
+        return Response(list(STIX_PATTERNS_KEYS))
 
 
 @extend_schema_view(

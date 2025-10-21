@@ -243,6 +243,23 @@ class TestBaseRuleView:
         response = client.patch(rule_url + "modify/revert/", data=dict(version=revert_version), content_type="application/json")
         assert response.status_code == 400, response.json()
 
+@pytest.mark.django_db
+def test_retrieve_profile(profile, client):
+    resp = client.get(f'/api/v1/profiles/{profile.id}/')
+    assert resp.status_code == 200
+    assert resp.json()['id'] == str(profile.id)
+
+@pytest.mark.django_db
+def test_list_profile(profile, client):
+    resp = client.get(f'/api/v1/profiles/')
+    assert resp.status_code == 200
+    assert resp.json()['profiles'][0]['id'] == str(profile.id)
+
+def test_profile_extractors(client):
+    resp = client.get(f'/api/v1/profiles/extractors/')
+    assert resp.status_code == 200
+    assert set(resp.json()).issuperset(['ipv4-addr', 'ipv6-addr'])
+
 def test_healthcheck(client):
     resp = client.get('/api/healthcheck/')
     assert resp.status_code == 204
