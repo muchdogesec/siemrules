@@ -565,7 +565,7 @@ class RuleView(viewsets.GenericViewSet):
 
     @extend_schema(
         request=serializers.RuleRevertSerializer,
-        responses={200: serializers.RuleSerializer, 400: DEFAULT_400_ERROR},
+        responses={200: serializers.JobSerializer, 400: DEFAULT_400_ERROR},
     )
     @decorators.action(methods=["PATCH"], detail=True, url_path="modify/revert")
     def revert(self, request, *args, indicator_id=None, **kwargs):
@@ -579,10 +579,38 @@ class RuleView(viewsets.GenericViewSet):
             raise validators.ValidationError(
                 "You cannot revert to the latest version of the rule"
             )
-        rev = arangodb_helpers.delete_rule(
-            indicator_id, rule_date=selected_version, delete=False
-        )
-        return self.retrieve(request, indicator_id=indicator_id)
+        report, indicator, all_objs = arangodb_helpers.get_objects_by_id(indicator_id)
+        target_indicator = arangodb_helpers.get_single_rule(
+            indicator_id, version=selected_version
+        ).data
+        new_rule, _ = arangodb_helpers.indicator_to_rule(target_indicator)
+        if isinstance(self, BaseRuleView):
+            job_instance = models.Job.objects.create(
+                type=models.JobType.BASE_MODIFY,
+                data=dict(
+                    modification_method="revert", indicator_id=indicator_id, base_version=selected_version
+                ),
+            )
+            job_s = JobSerializer(job_instance)
+            tasks.new_modify_rule_task(
+                job_instance,
+                indicator,
+                new_rule.model_dump(mode="json", by_alias=True),
+                report=report,
+            )
+            return Response(job_s.data, status=status.HTTP_201_CREATED)
+        elif isinstance(self, CorrelationRuleView):
+            job_instance = models.Job.objects.create(
+                type=models.JobType.CORRELATION_MODIFY,
+                data=dict(
+                    modification_method="revert", correlation_id=indicator_id, base_version=selected_version
+                ),
+            )
+            job_s = CorrelationJobSerializer(job_instance)
+            tasks.new_modify_rule_task(
+                job_instance, indicator, new_rule.model_dump(mode="json", by_alias=True)
+            )
+            return Response(job_s.data, status=status.HTTP_201_CREATED)
 
     @extend_schema(
         request=serializers.RuleCloneSerializer,
@@ -594,9 +622,6 @@ class RuleView(viewsets.GenericViewSet):
         s = serializers.RuleCloneSerializer(data=request.data)
         s.is_valid(raise_exception=True)
         new_rule_indicator_id = "indicator--" + str(uuid.uuid4())
-        # arangodb_helpers.make_clone(indicator_id, new_rule_indicator_id, s.validated_data)
-        # return self.retrieve(request, indicator_id=new_rule_indicator_id)
-
         job_instance = models.Job.objects.create(
             type=models.JobType.DUPLICATE_RULE,
             data=dict(
@@ -866,7 +891,7 @@ class BaseRuleView(RuleView):
         job_instance = models.Job.objects.create(
             type=models.JobType.BASE_MODIFY,
             data=dict(
-                modification_method="prompt", indicator_id=indicator_id, **s.data
+                modification_method="prompt", indicator_id=indicator_id, payload=s.data
             ),
         )
         job_s = JobSerializer(job_instance)
@@ -1361,6 +1386,7 @@ class ProfileView(viewsets.ModelViewSet):
     @decorators.action(methods=["GET"], detail=False)
     def extractors(self, request, *args, **kwargs):
         from txt2detection.observables import STIX_PATTERNS_KEYS
+
         return Response(list(STIX_PATTERNS_KEYS))
 
 

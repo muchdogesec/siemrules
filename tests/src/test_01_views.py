@@ -195,7 +195,7 @@ class TestBaseRuleView:
                 assert rule_resp.data["modified"] == version or response.data[0]
 
 
-    def test_revert_rule(self, client: django.test.Client):
+    def test_revert_rule(self, client: django.test.Client, celery_eager):
         rule_id = "indicator--2683daab-aa64-52ff-a001-3ea5aee9dd72"
         rule_url = f"{self.url}{rule_id}/"
 
@@ -206,8 +206,8 @@ class TestBaseRuleView:
         object_before_revert = client.get(rule_url, query_params=dict(version=revert_version)).json()
 
         response = client.patch(rule_url + "modify/revert/", data=dict(version=revert_version), content_type="application/json")
-        assert response.status_code == 200, response.json()
-        object_after_revert = response.json()
+        assert response.status_code == 201, response.json()
+        object_after_revert = client.get(rule_url).json()
         assert object_after_revert['modified'] > max(versions_before_revert), "object_after_revert must be newer than all previously existing objects"
 
         

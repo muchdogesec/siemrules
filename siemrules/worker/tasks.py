@@ -112,7 +112,7 @@ def modify_correlation(job_id, indicator, new_rule_data):
                 old_detection,
                 job.data["prompt"],
             )
-        case 'sigma':
+        case 'sigma'|'revert':
             new_rule = RuleModel.model_validate(new_rule_data)
         case _:
             raise ValueError(f'unknown type `{modify_type}`')
@@ -127,6 +127,8 @@ def modify_correlation(job_id, indicator, new_rule_data):
         new_objects[0]["modified"],
         new_objects,
     )
+    job.data['resultant_version'] = new_objects[0]["modified"]
+    job.save(update_fields=['data'])
 
 def get_rule_type(indicator):
     rule_type = "base.modify"
@@ -151,7 +153,7 @@ def modify_base_rule(job_id, indicator, report, new_rule_data):
                 old_detection,
                 job.data["prompt"],
             )
-        case 'sigma':
+        case 'sigma'|'revert':
             new_rule = txt2detection.models.SigmaRuleDetection.model_validate(new_rule_data)
         case _:
             raise ValueError(f'unknown type `{modify_type}`')
@@ -164,6 +166,8 @@ def modify_base_rule(job_id, indicator, report, new_rule_data):
         new_objects[0]["modified"],
         new_objects,
     )
+    job.data['resultant_version'] = new_objects[0]["modified"]
+    job.save(update_fields=['data'])
 
 
 def run_txt2detection(file: models.File):

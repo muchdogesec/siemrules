@@ -1,3 +1,3 @@
 from siemrules.settings import *
 
-ARANGODB_DATABASE = 'siemrules_test'
+ARANGODB_DATABASE = 'siemrules_10221_test'
