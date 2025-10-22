@@ -20,6 +20,7 @@ from file2txt.converter import Fanger, get_parser_class
 from file2txt.parsers.core import BaseParser
 from django.conf import settings
 import typing
+from stix2.utils import format_datetime as stix2_format_date
 
 from siemrules.siemrules.modifier import get_modification, yaml_to_detection
 from siemrules.worker import pdf_converter
@@ -41,6 +42,11 @@ from stix2arango.stix2arango import Stix2Arango
 
 POLL_INTERVAL = 1
 
+def format_datetime(s: str|datetime) -> str:
+    if isinstance(s, str):
+        return s
+    return stix2_format_date(s)
+    
 
 def new_task(job: Job):
     task: Task = process_report.s(job.file.file.name, job.id)
@@ -127,7 +133,7 @@ def modify_correlation(job_id, indicator, new_rule_data):
         new_objects[0]["modified"],
         new_objects,
     )
-    job.data['resultant_version'] = new_objects[0]["modified"]
+    job.data['resultant_version'] = format_datetime(new_objects[0]["modified"])
     job.save(update_fields=['data'])
 
 def get_rule_type(indicator):
@@ -166,7 +172,7 @@ def modify_base_rule(job_id, indicator, report, new_rule_data):
         new_objects[0]["modified"],
         new_objects,
     )
-    job.data['resultant_version'] = new_objects[0]["modified"]
+    job.data['resultant_version'] = format_datetime(new_objects[0]["modified"])
     job.save(update_fields=['data'])
 
 

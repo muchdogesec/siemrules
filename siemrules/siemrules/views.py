@@ -336,7 +336,7 @@ class FileView(
 
     @decorators.action(detail=True, methods=["GET"])
     def markdown(self, request, *args, file_id=None, **kwargs):
-        obj: File = self.get_object()
+        obj: models.File = self.get_object()
         if not obj.markdown_file:
             return HttpResponseNotFound("No markdown file")
         modify_links = mistune.create_markdown(

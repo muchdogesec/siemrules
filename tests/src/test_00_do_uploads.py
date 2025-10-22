@@ -83,6 +83,7 @@ def test_modify_base_rule_manual(
     )
     assert resp.status_code == 200
     assert resp.data['modified'] > base_time.isoformat()
+    assert resp.data['modified'] == job_resp.data['extra']['resultant_version']
 
 correlation_url = "/api/v1/correlation-rules/"
 @pytest.mark.parametrize("rule", [test_data.CORRELATION_RULE_1, test_data.CORRELATION_RULE_2])
@@ -132,6 +133,7 @@ def test_modify_correlation_manual(celery_eager, client, rule_id, modification):
     if expected_name := modification.get('title'):
         assert indicator['name'] == expected_name
 
+    assert indicator['modified'] == job_resp.data['extra']['resultant_version']
 
 @pytest.mark.django_db
 @pytest.mark.parametrize(
@@ -175,3 +177,6 @@ def test_modify_correlation_rule_from_prompt(celery_eager, client, rule_id, modi
         assert indicator['name'] == ai_modification.title
         if expected_tags := modification.get('tags'):
             assert set(expected_tags).issubset(rule.tags)
+
+    assert indicator['modified'] == job_resp.data['extra']['resultant_version']
+        

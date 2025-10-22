@@ -56,6 +56,8 @@ class StixIdField(serializers.CharField):
         return serializers.UUIDField().to_internal_value(data)
 
     def to_representation(self, value):
+        if '--' in str(value):
+            return value
         return self.stix_type + "--" + serializers.UUIDField().to_representation(value)
 
 
@@ -316,10 +318,8 @@ class ImageSerializer(serializers.ModelSerializer):
             return request.build_absolute_uri(photo_url)
         return None
 
-
-class JobSerializer(serializers.ModelSerializer):
-    report_id = ReportIDField(source="file_id", required=False, allow_null=True)
-    file_id = serializers.UUIDField(required=False, allow_null=True)
+class CorrelationJobSerializer(serializers.ModelSerializer):
+    correlation_id = IndicatorIDField(source="data.correlation_id")
     extra = serializers.DictField(source="data", required=False, allow_null=True)
 
     class Meta:
@@ -327,12 +327,10 @@ class JobSerializer(serializers.ModelSerializer):
         exclude = ["data", "file"]
 
 
-class CorrelationJobSerializer(serializers.ModelSerializer):
-    correlation_id = IndicatorIDField(source="data.correlation_id")
-
-    class Meta:
-        model = Job
-        exclude = ["file"]
+class JobSerializer(CorrelationJobSerializer):
+    correlation_id = None
+    report_id = ReportIDField(source="file_id", required=False, allow_null=True)
+    file_id = serializers.UUIDField(required=False, allow_null=True)
 
 
 class RuleSerializer(serializers.Serializer):
