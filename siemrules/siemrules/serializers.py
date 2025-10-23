@@ -331,6 +331,7 @@ class JobSerializer(CorrelationJobSerializer):
     correlation_id = None
     report_id = ReportIDField(source="file_id", required=False, allow_null=True)
     file_id = serializers.UUIDField(required=False, allow_null=True)
+    profile_id = serializers.UUIDField(source='file.profile_id', required=False, allow_null=True)
 
 
 class RuleSerializer(serializers.Serializer):

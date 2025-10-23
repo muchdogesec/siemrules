@@ -13,6 +13,7 @@ from django.core.files.uploadedfile import InMemoryUploadedFile
 import stix2
 from siemrules.siemrules.utils import TLP_Levels, TLP_LEVEL_STIX_ID_MAPPING
 from file2txt.parsers.core import BaseParser
+from django.db import models, transaction
 
 # Create your models here.
 
@@ -61,12 +62,39 @@ class Profile(models.Model):
     include_embedded_relationships_attributes = ArrayField(base_field=models.CharField(max_length=256), default=list)
     extract_text_from_image = models.BooleanField(default=False)
     generate_pdf = models.BooleanField(default=True)
+    is_default = models.BooleanField(default=False)
 
-    def save(self, *args, **kwargs) -> None:
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['is_default'],
+                condition=models.Q(is_default=True),
+                name="unique_default_profile",
+            )
+        ]
+
+    def save(self, *args, **kwargs):
         if not self.id:
             name = self.name
             self.id = uuid.uuid5(settings.STIX_NAMESPACE, name)
-        return super().save(*args, **kwargs)
+
+        with transaction.atomic():
+            existing_profiles = Profile.objects.select_for_update()
+            if self.is_default:
+                existing_profiles.filter(is_default=True).exclude(pk=self.pk).update(
+                    is_default=False
+                )
+            elif not existing_profiles.filter(is_default=True).exists():
+                self.is_default = True
+
+            super().save(*args, **kwargs)
+    
+    @classmethod
+    def default_profile(cls):
+        try:
+            return cls.objects.get(is_default=True)
+        except Exception as e:
+            raise ValidationError("default profile not set") from e
 
 
 class File(models.Model):
@@ -109,6 +137,11 @@ class File(models.Model):
     def __str__(self) -> str:
         return f"File(id={self.id})"
     
+
+    def save(self, *args, **kwargs):
+        self.profile = self.profile or Profile.default_profile()
+        return super().save(*args, **kwargs)
+    
         
     @property
     def archived_pdf(self):
@@ -126,7 +159,6 @@ class FileImage(models.Model):
     report = models.ForeignKey(File, related_name='images', on_delete=models.CASCADE)
     image = models.ImageField(upload_to=upload_to_func, max_length=256)
     name = models.CharField(max_length=256)
-
 
 
 class JobState(models.TextChoices):
@@ -157,13 +189,14 @@ class Job(models.Model):
     data = models.JSONField(default=None, null=True)
 
     def save(self, *args, **kwargs) -> None:
+        assert self.profile != None
         if not self.completion_time and self.state == JobState.COMPLETED:
             self.completion_time = datetime.now(UTC)
         return super().save(*args, **kwargs)
     
     @property
     def profile(self):
-        return self.file.profile or Profile()
+        return (self.file and self.file.profile) or Profile.default_profile()
 
 
 @receiver(post_save, sender=Job)

@@ -1355,10 +1355,9 @@ class CorrelationRuleView(RuleView):
         },
     ),
 )
-class ProfileView(viewsets.ModelViewSet):
+class ProfileView(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.DestroyModelMixin, viewsets.GenericViewSet):
     openapi_tags = ["Profiles"]
     serializer_class = ProfileSerializer
-    http_method_names = ["get", "post", "delete"]
     pagination_class = Pagination("profiles")
     lookup_url_kwarg = "profile_id"
     openapi_path_params = [
@@ -1379,6 +1378,15 @@ class ProfileView(viewsets.ModelViewSet):
             help_text="Searches Profiles by their `name`. Search is wildcard. For example, `ip` will return Profiles with names `ip-extractions`, `ips`, etc.",
             lookup_expr="icontains",
         )
+
+    @extend_schema(request=None)
+    @decorators.action(detail=True, methods=['PATCH'])
+    def make_default(self, request, *args, profile_id=None, **kwargs):
+        profile = self.get_object()
+        profile.is_default = True
+        profile.save()
+        profile.refresh_from_db()
+        return self.retrieve(request, profile_id=profile_id)
 
     def get_queryset(self):
         return models.Profile.objects
