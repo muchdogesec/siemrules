@@ -20,6 +20,7 @@ from file2txt.converter import Fanger, get_parser_class
 from file2txt.parsers.core import BaseParser
 from django.conf import settings
 import typing
+from stix2.utils import format_datetime as stix2_format_date
 
 from siemrules.siemrules.modifier import get_modification, yaml_to_detection
 from siemrules.worker import pdf_converter
@@ -41,6 +42,11 @@ from stix2arango.stix2arango import Stix2Arango
 
 POLL_INTERVAL = 1
 
+def format_datetime(s: str|datetime) -> str:
+    if isinstance(s, str):
+        return s
+    return stix2_format_date(s)
+    
 
 def new_task(job: Job):
     task: Task = process_report.s(job.file.file.name, job.id)
@@ -112,7 +118,7 @@ def modify_correlation(job_id, indicator, new_rule_data):
                 old_detection,
                 job.data["prompt"],
             )
-        case 'sigma':
+        case 'sigma'|'revert':
             new_rule = RuleModel.model_validate(new_rule_data)
         case _:
             raise ValueError(f'unknown type `{modify_type}`')
@@ -127,6 +133,8 @@ def modify_correlation(job_id, indicator, new_rule_data):
         new_objects[0]["modified"],
         new_objects,
     )
+    job.data['resultant_version'] = format_datetime(new_objects[0]["modified"])
+    job.save(update_fields=['data'])
 
 def get_rule_type(indicator):
     rule_type = "base.modify"
@@ -151,7 +159,7 @@ def modify_base_rule(job_id, indicator, report, new_rule_data):
                 old_detection,
                 job.data["prompt"],
             )
-        case 'sigma':
+        case 'sigma'|'revert':
             new_rule = txt2detection.models.SigmaRuleDetection.model_validate(new_rule_data)
         case _:
             raise ValueError(f'unknown type `{modify_type}`')
@@ -164,6 +172,8 @@ def modify_base_rule(job_id, indicator, report, new_rule_data):
         new_objects[0]["modified"],
         new_objects,
     )
+    job.data['resultant_version'] = format_datetime(new_objects[0]["modified"])
+    job.save(update_fields=['data'])
 
 
 def run_txt2detection(file: models.File):
@@ -174,7 +184,7 @@ def run_txt2detection(file: models.File):
         kwargs['sigma_file'] = file.file.read().decode()
     else:
         input_str = file.markdown_file.read().decode()
-        provider = parse_ai_model(file.ai_provider)
+        provider = parse_ai_model(file.profile.ai_provider)
 
     job: Job = file.job
     kwargs.update(
@@ -216,15 +226,15 @@ def run_file2txt(file: models.File):
         input_file.write_bytes(file.file.read())
 
         converted_file_path = tmp_dir/'converted_pdf.pdf'
-        if pdf_converter.make_conversion(input_file, converted_file_path):
+        if file.profile.generate_pdf and pdf_converter.make_conversion(input_file, converted_file_path):
             file.pdf_file.save(converted_file_path.name, open(converted_file_path, mode='rb'))
             file.save(update_fields=['pdf_file'])
 
 
         parser_class = get_parser_class(file.mode, file.file.name)
-        converter: BaseParser = parser_class(str(input_file), file.mode, file.extract_text_from_image, settings.GOOGLE_VISION_API_KEY)
+        converter: BaseParser = parser_class(str(input_file), file.mode, file.profile.extract_text_from_image, settings.GOOGLE_VISION_API_KEY)
         output = converter.convert()
-        if file.defang:
+        if file.profile.defang:
             output = Fanger(output).defang()
 
         file.markdown_file.save('markdown.md', io.StringIO(output), save=True)
@@ -243,9 +253,10 @@ def upload_to_arango(job: models.Job, bundle: dict, link_collection=True):
     upload_objects(
             job, bundle, 
             extra_data=dict(_stixify_report_id=job.file.report_id, _siemrules_job_id=str(job.id)),
-            ignore_embedded_relationships=job.file.ignore_embedded_relationships,
-            ignore_embedded_relationships_sro=job.file.ignore_embedded_relationships_sro,
-            ignore_embedded_relationships_smo=job.file.ignore_embedded_relationships_smo,
+            ignore_embedded_relationships=job.profile.ignore_embedded_relationships,
+            ignore_embedded_relationships_sro=job.profile.ignore_embedded_relationships_sro,
+            ignore_embedded_relationships_smo=job.profile.ignore_embedded_relationships_smo,
+            include_embedded_relationships_attributes=job.profile.include_embedded_relationships_attributes,
             stix2arango_note=f"siemrules-file--{job.file.id}",
             link_collection=link_collection,
     )

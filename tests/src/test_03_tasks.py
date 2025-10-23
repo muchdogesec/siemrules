@@ -187,7 +187,7 @@ def report():
 
 
 @pytest.mark.django_db
-def test_run_txt2detection(job, report):
+def test_run_txt2detection(job, report, profile):
     mock_file = File.objects.create(
         name="test_file",
         identity={
@@ -201,7 +201,7 @@ def test_run_txt2detection(job, report):
         markdown_file=SimpleUploadedFile(
             "test.txt", b"Test input text", content_type="text/plain"
         ),
-        ai_provider="openai",
+        profile=profile,
         labels=[],
         references=["random"],
         license="random",
@@ -211,6 +211,7 @@ def test_run_txt2detection(job, report):
     )
     job.file = mock_file
     job.save()
+    assert job.profile == profile
     mock_file_copy = copy.copy(mock_file)
 
     # Mock dependencies
@@ -240,7 +241,7 @@ def test_run_txt2detection(job, report):
         # Run the function
         result = run_txt2detection(mock_file_copy)
         ##########
-        mock_parse_ai_model.assert_called_once_with(mock_file_copy.ai_provider)
+        mock_parse_ai_model.assert_called_once_with(profile.ai_provider)
         mock_parse_stix.assert_called_once_with(mock_file_copy.identity)
         mock_run_txt2detection.assert_called_once_with(
             name=mock_file.name,
@@ -310,9 +311,10 @@ def test_upload_to_arango(job):
             host_url=settings.ARANGODB_HOST_URL,
             username=settings.ARANGODB_USERNAME,
             password=settings.ARANGODB_PASSWORD,
-            ignore_embedded_relationships=job.file.ignore_embedded_relationships,
-            ignore_embedded_relationships_sro=job.file.ignore_embedded_relationships_sro,
-            ignore_embedded_relationships_smo=job.file.ignore_embedded_relationships_smo,
+            ignore_embedded_relationships=job.profile.ignore_embedded_relationships,
+            ignore_embedded_relationships_sro=job.profile.ignore_embedded_relationships_sro,
+            ignore_embedded_relationships_smo=job.profile.ignore_embedded_relationships_smo,
+            include_embedded_relationships_attributes=job.profile.include_embedded_relationships_attributes,
         )
         mock_s2a_instance.run.assert_called_once()
         mock_db_view.assert_called()

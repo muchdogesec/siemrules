@@ -57,7 +57,10 @@ def modify_indicator(report, indicator: dict, detection: BaseDetection):
     bundler.bundle_detections(container)
     retval = []
     for obj in bundler.bundle_dict['objects']:
-        retval.append(obj)
+        if obj['type'] == 'indicator':
+            retval.insert(0, obj)
+        else:
+            retval.append(obj)
     return retval
 
 

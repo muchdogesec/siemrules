@@ -26,13 +26,20 @@ from siemrules.siemrules.serializers import (
     FileSerializer,
     ImageSerializer,
     JobSerializer,
+    ProfileSerializer,
 )
 from rest_framework.exceptions import ParseError
 from dogesec_commons.objects.helpers import OBJECT_TYPES
 
 from rest_framework import request, exceptions
 from django.http import HttpRequest, HttpResponse
-from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter
+from drf_spectacular.utils import (
+    extend_schema,
+    extend_schema_view,
+    OpenApiParameter,
+    OpenApiExample,
+    OpenApiResponse,
+)
 import textwrap
 import typing
 from dogesec_commons.utils import Pagination, Ordering
@@ -329,7 +336,7 @@ class FileView(
 
     @decorators.action(detail=True, methods=["GET"])
     def markdown(self, request, *args, file_id=None, **kwargs):
-        obj: File = self.get_object()
+        obj: models.File = self.get_object()
         if not obj.markdown_file:
             return HttpResponseNotFound("No markdown file")
         modify_links = mistune.create_markdown(
@@ -388,7 +395,7 @@ class FileView(
         response = HttpResponse(obj.archived_pdf.open(), content_type="application/pdf")
         response["Content-Disposition"] = f'attachment; filename="{name}"'
         return response
-    
+
     @extend_schema(
         responses={
             (200, "application/json"): dict,
@@ -403,12 +410,11 @@ class FileView(
             """
         ),
     )
-    @decorators.action(detail=True, methods=['GET'], url_path='processing-log')
+    @decorators.action(detail=True, methods=["GET"], url_path="processing-log")
     def processing_log(self, request, *args, file_id=None, **kwargs):
         obj = self.get_object()
         return Response(obj.txt2detection_data)
-    
-        
+
     @extend_schema(
         responses={
             (200, "application/json"): serializers.AttackNavigatorDomainSerializer,
@@ -423,10 +429,10 @@ class FileView(
             """
         ),
     )
-    @decorators.action(detail=True, methods=['GET'], url_path='attack-navigator')
+    @decorators.action(detail=True, methods=["GET"], url_path="attack-navigator")
     def nav_layer(self, request, *args, file_id=None, **kwargs):
         obj = self.get_object()
-        nav = obj.txt2detection_data and obj.txt2detection_data.get('navigator_layer')
+        nav = obj.txt2detection_data and obj.txt2detection_data.get("navigator_layer")
         if not nav:
             raise exceptions.NotFound("navigator layer not created for file")
         return Response(nav[0])
@@ -559,7 +565,7 @@ class RuleView(viewsets.GenericViewSet):
 
     @extend_schema(
         request=serializers.RuleRevertSerializer,
-        responses={200: serializers.RuleSerializer, 400: DEFAULT_400_ERROR},
+        responses={200: serializers.JobSerializer, 400: DEFAULT_400_ERROR},
     )
     @decorators.action(methods=["PATCH"], detail=True, url_path="modify/revert")
     def revert(self, request, *args, indicator_id=None, **kwargs):
@@ -573,10 +579,38 @@ class RuleView(viewsets.GenericViewSet):
             raise validators.ValidationError(
                 "You cannot revert to the latest version of the rule"
             )
-        rev = arangodb_helpers.delete_rule(
-            indicator_id, rule_date=selected_version, delete=False
-        )
-        return self.retrieve(request, indicator_id=indicator_id)
+        report, indicator, all_objs = arangodb_helpers.get_objects_by_id(indicator_id)
+        target_indicator = arangodb_helpers.get_single_rule(
+            indicator_id, version=selected_version
+        ).data
+        new_rule, _ = arangodb_helpers.indicator_to_rule(target_indicator)
+        if isinstance(self, BaseRuleView):
+            job_instance = models.Job.objects.create(
+                type=models.JobType.BASE_MODIFY,
+                data=dict(
+                    modification_method="revert", indicator_id=indicator_id, base_version=selected_version
+                ),
+            )
+            job_s = JobSerializer(job_instance)
+            tasks.new_modify_rule_task(
+                job_instance,
+                indicator,
+                new_rule.model_dump(mode="json", by_alias=True),
+                report=report,
+            )
+            return Response(job_s.data, status=status.HTTP_201_CREATED)
+        elif isinstance(self, CorrelationRuleView):
+            job_instance = models.Job.objects.create(
+                type=models.JobType.CORRELATION_MODIFY,
+                data=dict(
+                    modification_method="revert", correlation_id=indicator_id, base_version=selected_version
+                ),
+            )
+            job_s = CorrelationJobSerializer(job_instance)
+            tasks.new_modify_rule_task(
+                job_instance, indicator, new_rule.model_dump(mode="json", by_alias=True)
+            )
+            return Response(job_s.data, status=status.HTTP_201_CREATED)
 
     @extend_schema(
         request=serializers.RuleCloneSerializer,
@@ -588,9 +622,6 @@ class RuleView(viewsets.GenericViewSet):
         s = serializers.RuleCloneSerializer(data=request.data)
         s.is_valid(raise_exception=True)
         new_rule_indicator_id = "indicator--" + str(uuid.uuid4())
-        # arangodb_helpers.make_clone(indicator_id, new_rule_indicator_id, s.validated_data)
-        # return self.retrieve(request, indicator_id=new_rule_indicator_id)
-
         job_instance = models.Job.objects.create(
             type=models.JobType.DUPLICATE_RULE,
             data=dict(
@@ -615,6 +646,7 @@ class RuleView(viewsets.GenericViewSet):
             indicator_id,
             request,
             version=request.query_params.get("version"),
+            rule_type=self.rule_type
         )
 
 
@@ -860,7 +892,7 @@ class BaseRuleView(RuleView):
         job_instance = models.Job.objects.create(
             type=models.JobType.BASE_MODIFY,
             data=dict(
-                modification_method="prompt", indicator_id=indicator_id, **s.data
+                modification_method="prompt", indicator_id=indicator_id, payload=s.data
             ),
         )
         job_s = JobSerializer(job_instance)
@@ -978,6 +1010,14 @@ class BaseRuleView(RuleView):
                 "ignore_embedded_sro",
                 type=bool,
                 description="If set to `true` all embedded SROs are removed from the response.",
+            ),
+
+            OpenApiParameter(
+                "types",
+                many=True,
+                explode=False,
+                description="Filter the results by one or more STIX Object types",
+                enum=OBJECT_TYPES,
             ),
         ],
     ),
@@ -1254,6 +1294,117 @@ class CorrelationRuleView(RuleView):
             job_instance, s.validated_data, related_indicators, s.validated_data
         )
         return Response(job_s.data)
+
+
+@extend_schema_view(
+    list=extend_schema(
+        summary="Search profiles",
+        description=textwrap.dedent(
+            """
+            Profiles determine how txt2stix processes the text in each File. A profile consists of extractors. You can search for existing profiles here.
+            """
+        ),
+        responses={400: DEFAULT_400_ERROR, 200: ProfileSerializer},
+    ),
+    retrieve=extend_schema(
+        summary="Get a profile",
+        description=textwrap.dedent(
+            """
+            View the configuration of an existing profile. Note, existing profiles cannot be modified.
+            """
+        ),
+        responses={
+            400: DEFAULT_400_ERROR,
+            404: DEFAULT_404_ERROR,
+            200: ProfileSerializer,
+        },
+    ),
+    create=extend_schema(
+        summary="Create a new profile",
+        description=textwrap.dedent(
+            """
+            """
+        ),
+        responses={400: DEFAULT_400_ERROR, 201: ProfileSerializer},
+    ),
+    destroy=extend_schema(
+        summary="Delete a profile",
+        description=textwrap.dedent(
+            """
+            Delete an existing profile.
+
+            Note: it is not currently possible to delete a profile that is referenced in an existing object. You must delete the objects linked to the profile first.
+            """
+        ),
+        responses={404: DEFAULT_404_ERROR, 204: None},
+    ),
+    extractors=extend_schema(
+        summary="Show all observable types that can be extracted by all profiles",
+        description="Show all observable types that can be extracted by all profiles",
+        responses={
+            200: OpenApiResponse(
+                list[str],
+                examples=[
+                    OpenApiExample(
+                        "sample",
+                        [
+                            "ipv4-addr",
+                            "ipv6-addr",
+                            "email-addr",
+                            "file.hashes.MD5",
+                            "file.hashes.SHA-256",
+                            "file.hashes.SSDEEP",
+                            "mac-addr",
+                            "x509-certificate",
+                        ],
+                        response_only=True,
+                    )
+                ],
+            )
+        },
+    ),
+)
+class ProfileView(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.DestroyModelMixin, viewsets.GenericViewSet):
+    openapi_tags = ["Profiles"]
+    serializer_class = ProfileSerializer
+    pagination_class = Pagination("profiles")
+    lookup_url_kwarg = "profile_id"
+    openapi_path_params = [
+        OpenApiParameter(
+            lookup_url_kwarg,
+            location=OpenApiParameter.PATH,
+            type=OpenApiTypes.UUID,
+            description="The `id` of the Profile.",
+        )
+    ]
+
+    ordering_fields = ["name", "created"]
+    ordering = "created_descending"
+    filter_backends = [DjangoFilterBackend, Ordering]
+
+    class filterset_class(FilterSet):
+        name = Filter(
+            help_text="Searches Profiles by their `name`. Search is wildcard. For example, `ip` will return Profiles with names `ip-extractions`, `ips`, etc.",
+            lookup_expr="icontains",
+        )
+
+    @extend_schema(request=None)
+    @decorators.action(detail=True, methods=['PATCH'])
+    def make_default(self, request, *args, profile_id=None, **kwargs):
+        profile = self.get_object()
+        profile.is_default = True
+        profile.save()
+        profile.refresh_from_db()
+        return self.retrieve(request, profile_id=profile_id)
+
+    def get_queryset(self):
+        return models.Profile.objects
+
+    @decorators.action(methods=["GET"], detail=False)
+    def extractors(self, request, *args, **kwargs):
+        from txt2detection.observables import STIX_PATTERNS_KEYS
+
+        return Response(list(STIX_PATTERNS_KEYS))
 
 
 @extend_schema_view(

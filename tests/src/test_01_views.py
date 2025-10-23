@@ -18,9 +18,9 @@ from tests.utils import Transport
 @pytest.mark.django_db
 class TestFileView:
     @pytest.fixture(autouse=True)
-    def setup(self):
+    def setup(self, profile):
         self.file = models.File.objects.create(
-            name="test_file.txt", mimetype="text/plain"
+            name="test_file.txt", mimetype="text/plain", profile=profile
         )
         self.url = "/api/v1/files/"
 
@@ -30,15 +30,15 @@ class TestFileView:
         assert isinstance(response.data["files"], list)
         assert len(response.data["files"]) == 1
 
-    def test_file_create__upload(self, client):
+    def test_file_create__upload(self, client, profile):
         mock_file_content = b"dummy content"
         file_data = dict(
             file=SimpleUploadedFile(
                 "test.txt", b"dummy content", content_type="text/plain"
             ),
             mode="txt",
-            ai_provider="openai",
             name="dummy name",
+            profile_id=profile.id
         )
         with patch("siemrules.worker.tasks.new_task") as mock_task:
             response = client.post(
@@ -51,12 +51,12 @@ class TestFileView:
             assert job.file.file.read() == mock_file_content
             assert job.file.mode == file_data["mode"]
             assert job.file.name == file_data["name"]
-            assert job.file.ai_provider == file_data["ai_provider"]
+            assert job.profile == profile
 
-    def test_file_create__text(self, client: django.test.Client):
+    def test_file_create__text(self, client: django.test.Client, profile):
         mock_file_content = b"dummy content"
         file_data = dict(
-            text_input=mock_file_content.decode(), ai_provider="openai", name="dummy name"
+            text_input=mock_file_content.decode(), ai_provider="openai", name="dummy name", profile_id=profile.id
         )
         with patch("siemrules.worker.tasks.new_task") as mock_task:
             response = client.post(
@@ -70,7 +70,7 @@ class TestFileView:
             assert file.file.read() == mock_file_content
             assert file.mode == "txt"
             assert file.name == file_data["name"]
-            assert file.ai_provider == file_data["ai_provider"]
+            assert file.profile == profile
 
     def test_retrieve_file(self, client):
         response = client.get(f"{self.url}{self.file.id}/")
@@ -195,7 +195,7 @@ class TestBaseRuleView:
                 assert rule_resp.data["modified"] == version or response.data[0]
 
 
-    def test_revert_rule(self, client: django.test.Client):
+    def test_revert_rule(self, client: django.test.Client, celery_eager):
         rule_id = "indicator--2683daab-aa64-52ff-a001-3ea5aee9dd72"
         rule_url = f"{self.url}{rule_id}/"
 
@@ -206,8 +206,8 @@ class TestBaseRuleView:
         object_before_revert = client.get(rule_url, query_params=dict(version=revert_version)).json()
 
         response = client.patch(rule_url + "modify/revert/", data=dict(version=revert_version), content_type="application/json")
-        assert response.status_code == 200, response.json()
-        object_after_revert = response.json()
+        assert response.status_code == 201, response.json()
+        object_after_revert = client.get(rule_url).json()
         assert object_after_revert['modified'] > max(versions_before_revert), "object_after_revert must be newer than all previously existing objects"
 
         
@@ -242,6 +242,23 @@ class TestBaseRuleView:
 
         response = client.patch(rule_url + "modify/revert/", data=dict(version=revert_version), content_type="application/json")
         assert response.status_code == 400, response.json()
+
+@pytest.mark.django_db
+def test_retrieve_profile(profile, client):
+    resp = client.get(f'/api/v1/profiles/{profile.id}/')
+    assert resp.status_code == 200
+    assert resp.json()['id'] == str(profile.id)
+
+@pytest.mark.django_db
+def test_list_profile(profile, client):
+    resp = client.get(f'/api/v1/profiles/')
+    assert resp.status_code == 200
+    assert resp.json()['profiles'][0]['id'] == str(profile.id)
+
+def test_profile_extractors(client):
+    resp = client.get(f'/api/v1/profiles/extractors/')
+    assert resp.status_code == 200
+    assert set(resp.json()).issuperset(['ipv4-addr', 'ipv6-addr'])
 
 def test_healthcheck(client):
     resp = client.get('/api/healthcheck/')

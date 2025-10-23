@@ -13,6 +13,7 @@ from django.core.files.uploadedfile import InMemoryUploadedFile
 import stix2
 from siemrules.siemrules.utils import TLP_Levels, TLP_LEVEL_STIX_ID_MAPPING
 from file2txt.parsers.core import BaseParser
+from django.db import models, transaction
 
 # Create your models here.
 
@@ -46,6 +47,56 @@ def validate_file(file: InMemoryUploadedFile, mode: str):
         raise ValidationError(f"Unsupported file extension `{ext}`")
     return True
 
+
+class Profile(models.Model):
+    id = models.UUIDField(default=uuid.uuid4, primary_key=True)
+    name = models.CharField(max_length=256, unique=True)
+    defang = models.BooleanField(default=True)
+    created = models.DateTimeField(default=timezone.now, null=False)
+    ai_provider = models.CharField(max_length=256, null=True, blank=True)
+    ai_create_attack_flow = models.BooleanField(default=False)
+    ai_create_attack_navigator_layer = models.BooleanField(default=False)
+    ignore_embedded_relationships = models.BooleanField(default=False)
+    ignore_embedded_relationships_smo = models.BooleanField(default=False)
+    ignore_embedded_relationships_sro = models.BooleanField(default=False)
+    include_embedded_relationships_attributes = ArrayField(base_field=models.CharField(max_length=256), default=list)
+    extract_text_from_image = models.BooleanField(default=False)
+    generate_pdf = models.BooleanField(default=True)
+    is_default = models.BooleanField(default=False)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['is_default'],
+                condition=models.Q(is_default=True),
+                name="unique_default_profile",
+            )
+        ]
+
+    def save(self, *args, **kwargs):
+        if not self.id:
+            name = self.name
+            self.id = uuid.uuid5(settings.STIX_NAMESPACE, name)
+
+        with transaction.atomic():
+            existing_profiles = Profile.objects.select_for_update()
+            if self.is_default:
+                existing_profiles.filter(is_default=True).exclude(pk=self.pk).update(
+                    is_default=False
+                )
+            elif not existing_profiles.filter(is_default=True).exists():
+                self.is_default = True
+
+            super().save(*args, **kwargs)
+    
+    @classmethod
+    def default_profile(cls):
+        try:
+            return cls.objects.get(is_default=True)
+        except Exception as e:
+            raise ValidationError("default profile not set") from e
+
+
 class File(models.Model):
     id = models.UUIDField(unique=True, max_length=64, primary_key=True, default=uuid.uuid4)
     name = models.CharField(max_length=256, help_text="This will be assigned to the File and Report object created. Note, the names of each detection rule generated will be automatically. Max 256 characters. This is a txt2detection setting.")
@@ -55,9 +106,6 @@ class File(models.Model):
     file = models.FileField(max_length=1024, upload_to=upload_to_func)
     mimetype = models.CharField(max_length=512)
     mode = models.CharField(max_length=256)
-    defang = models.BooleanField(default=True, help_text="Whether to defang the observables in the blog. e.g. turns 1.1.1[.]1 to 1.1.1.1 for extraction. This is a file2txt setting. This is a file2txt setting. Default is `true`.")
-    extract_text_from_image = models.BooleanField(default=True)
-    ai_provider = models.CharField(max_length=256, null=True)
     markdown_file = models.FileField(max_length=512, upload_to=upload_to_func, null=True)
     pdf_file = models.FileField(max_length=1024, upload_to=upload_to_func, null=True)
     txt2detection_data = models.JSONField(default=None, null=True)
@@ -67,9 +115,8 @@ class File(models.Model):
     references = ArrayField(base_field=models.URLField(), default=list, null=True)
     license = models.CharField(max_length=256, null=True, default=None, blank=True)
 
-    ignore_embedded_relationships = models.BooleanField(default=False)
-    ignore_embedded_relationships_sro = models.BooleanField(default=False)
-    ignore_embedded_relationships_smo = models.BooleanField(default=False)
+    profile = models.ForeignKey(Profile, on_delete=models.deletion.PROTECT, default=None, null=True)
+
 
     status = models.CharField(max_length=24, null=True, default=None)
     level = models.CharField(max_length=24, null=True, default=None)
@@ -90,6 +137,11 @@ class File(models.Model):
     def __str__(self) -> str:
         return f"File(id={self.id})"
     
+
+    def save(self, *args, **kwargs):
+        self.profile = self.profile or Profile.default_profile()
+        return super().save(*args, **kwargs)
+    
         
     @property
     def archived_pdf(self):
@@ -107,7 +159,6 @@ class FileImage(models.Model):
     report = models.ForeignKey(File, related_name='images', on_delete=models.CASCADE)
     image = models.ImageField(upload_to=upload_to_func, max_length=256)
     name = models.CharField(max_length=256)
-
 
 
 class JobState(models.TextChoices):
@@ -138,9 +189,14 @@ class Job(models.Model):
     data = models.JSONField(default=None, null=True)
 
     def save(self, *args, **kwargs) -> None:
+        assert self.profile != None
         if not self.completion_time and self.state == JobState.COMPLETED:
             self.completion_time = datetime.now(UTC)
         return super().save(*args, **kwargs)
+    
+    @property
+    def profile(self):
+        return (self.file and self.file.profile) or Profile.default_profile()
 
 
 @receiver(post_save, sender=Job)
