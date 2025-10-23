@@ -646,6 +646,7 @@ class RuleView(viewsets.GenericViewSet):
             indicator_id,
             request,
             version=request.query_params.get("version"),
+            rule_type=self.rule_type
         )
 
 
@@ -1009,6 +1010,14 @@ class BaseRuleView(RuleView):
                 "ignore_embedded_sro",
                 type=bool,
                 description="If set to `true` all embedded SROs are removed from the response.",
+            ),
+
+            OpenApiParameter(
+                "types",
+                many=True,
+                explode=False,
+                description="Filter the results by one or more STIX Object types",
+                enum=OBJECT_TYPES,
             ),
         ],
     ),

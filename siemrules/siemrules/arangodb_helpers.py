@@ -182,7 +182,7 @@ def get_single_rule_versions(indicator_id):
         raise NotFound(f"no rule with id `{indicator_id}`")
     return Response(sorted([rule['modified'] for rule in rules], reverse=True))
 
-def get_objects_for_rule(indicator_id, request, version=None):
+def get_objects_for_rule(indicator_id, request, version=None, rule_type=None):
     rule = get_single_rule(indicator_id, version=version, nokeep=False).data
 
     helper = ArangoDBHelper(settings.VIEW_NAME, request)
@@ -194,17 +194,24 @@ def get_objects_for_rule(indicator_id, request, version=None):
     
     if helper.query_as_bool('ignore_embedded_sro', default=False):
         filters.append('FILTER doc._is_ref != TRUE')
+    
+    if rule_type == 'base-rule':
+        obj_ids_str = 'UNIQUE(FLATTEN([@rule_key, rel_ids], 3))'
+    else:
+        obj_ids_str = 'UNIQUE(FLATTEN([@rule_key, rel_ids, secondary_rel_ids], 3))'
 
     query = '''
-    LET rel_ids = (FOR rel IN siemrules_edge_collection FILTER rel._from == @rule_key OR rel._to == @rule_key RETURN [rel._from, rel._to, rel._id])
-    LET obj_ids = FLATTEN([@rule_key, rel_ids], 3)
+    LET rel_ids = FLATTEN(FOR rel IN siemrules_edge_collection FILTER rel._from == @rule_key OR rel._to == @rule_key RETURN [rel._from, rel._to, rel._id])
+    LET rel_ids_filtered = (FOR f IN rel_ids FILTER CONTAINS(f, 'indicator--') RETURN f)
+    LET secondary_rel_ids = (FOR rel IN siemrules_edge_collection FILTER rel._from IN rel_ids_filtered RETURN [rel._from, rel._to, rel._id])
+    LET obj_ids = #obj_ids_str
     FOR doc IN @@view
     SEARCH doc._id IN obj_ids
     #filters
     LIMIT @offset, @count
     RETURN KEEP(doc, KEYS(doc, TRUE))
     '''
-    query = query.replace('#filters', '\n'.join(filters))
+    query = query.replace('#filters', '\n'.join(filters)).replace('#obj_ids_str', obj_ids_str)
     return helper.execute_query(query, bind_vars=binds)
 
 
