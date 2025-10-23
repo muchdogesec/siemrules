@@ -191,6 +191,11 @@ class FileSerializer(serializers.ModelSerializer):
         allow_null=True,
         help_text="[License of the rule according the SPDX ID specification](https://spdx.org/licenses/) (e.g. `MIT`). Will be added to the Sigma rule. This is a txt2detection setting.",
     )
+    archived_pdf = serializers.FileField(
+        required=False,
+        allow_null=True,
+        read_only=True
+    )
 
     class Meta:
         model = File
@@ -263,7 +268,6 @@ class ProfileSerializer(serializers.ModelSerializer):
 class FileDocumentSerializer(FileSerializer):
     type_label = "siemrules.file"
     profile_id = ProfileIDField(help_text="profile id to use", required=True, allow_null=False)
-
 
 
 class FilePromptSerializer(FileDocumentSerializer):
