@@ -182,7 +182,7 @@ def get_single_rule_versions(indicator_id):
         raise NotFound(f"no rule with id `{indicator_id}`")
     return Response(sorted([rule['modified'] for rule in rules], reverse=True))
 
-def get_objects_for_rule(indicator_id, request, version=None):
+def get_objects_for_rule(indicator_id, request, version=None, rule_type=None):
     rule = get_single_rule(indicator_id, version=version, nokeep=False).data
 
     helper = ArangoDBHelper(settings.VIEW_NAME, request)
@@ -194,17 +194,24 @@ def get_objects_for_rule(indicator_id, request, version=None):
     
     if helper.query_as_bool('ignore_embedded_sro', default=False):
         filters.append('FILTER doc._is_ref != TRUE')
+    
+    if rule_type == 'base-rule':
+        obj_ids_str = 'UNIQUE(FLATTEN([@rule_key, rel_ids], 3))'
+    else:
+        obj_ids_str = 'UNIQUE(FLATTEN([@rule_key, rel_ids, secondary_rel_ids], 3))'
 
     query = '''
-    LET rel_ids = (FOR rel IN siemrules_edge_collection FILTER rel._from == @rule_key OR rel._to == @rule_key RETURN [rel._from, rel._to, rel._id])
-    LET obj_ids = FLATTEN([@rule_key, rel_ids], 3)
+    LET rel_ids = FLATTEN(FOR rel IN siemrules_edge_collection FILTER rel._from == @rule_key OR rel._to == @rule_key RETURN [rel._from, rel._to, rel._id])
+    LET rel_ids_filtered = (FOR f IN rel_ids FILTER CONTAINS(f, 'indicator--') RETURN f)
+    LET secondary_rel_ids = (FOR rel IN siemrules_edge_collection FILTER rel._from IN rel_ids_filtered RETURN [rel._from, rel._to, rel._id])
+    LET obj_ids = #obj_ids_str
     FOR doc IN @@view
     SEARCH doc._id IN obj_ids
     #filters
     LIMIT @offset, @count
     RETURN KEEP(doc, KEYS(doc, TRUE))
     '''
-    query = query.replace('#filters', '\n'.join(filters))
+    query = query.replace('#filters', '\n'.join(filters)).replace('#obj_ids_str', obj_ids_str)
     return helper.execute_query(query, bind_vars=binds)
 
 
@@ -294,7 +301,7 @@ def modify_rule(indicator_id, old_modified, new_modified, new_objects):
         
 
     
-def delete_rule(indicator_id, rule_date='', delete=True):
+def delete_rule(indicator_id):
     helper = ArangoDBHelper(settings.VIEW_NAME, request_from_queries())
     new_modified = format_datetime(datetime.now(UTC))
     objects = helper.execute_query('''
@@ -306,7 +313,6 @@ def delete_rule(indicator_id, rule_date='', delete=True):
 
     report = None
     rules = []
-    revert_key_id = None
     with contextlib.suppress(IndexError):
         for obj in objects:
             if obj['type'] == 'report':
@@ -314,8 +320,6 @@ def delete_rule(indicator_id, rule_date='', delete=True):
                 continue
             if obj['id'] == indicator_id:
                 rules.append(obj)
-                if obj['modified'] == rule_date:
-                    revert_key_id = obj['_id']
 
     if not rules:
         raise NotFound(f"no rules with id `{indicator_id}`")
@@ -328,110 +332,47 @@ def delete_rule(indicator_id, rule_date='', delete=True):
 
 
 
-    if delete:
-        # check that there is no correlation using the rule
-        correlation_rels = related_correlation_rules([indicator_id])
-        if correlation_rels:
-            raise ValidationError(dict(message=f'sorry, you cannot delete this rule because it is linked to {len(correlation_rels)} correlation(s)', correlations=correlation_rels))
+    # check that there is no correlation using the rule
+    correlation_rels = related_correlation_rules([indicator_id])
+    if correlation_rels:
+        raise ValidationError(dict(message=f'sorry, you cannot delete this rule because it is linked to {len(correlation_rels)} correlation(s)', correlations=correlation_rels))
 
-        # perform deletion
-        helper.execute_query('''
-                LET vertex_deletions = (
-                            FOR doc IN siemrules_vertex_collection
-                            FILTER doc._key IN @keys
-                            REMOVE doc IN siemrules_vertex_collection
-                            RETURN doc.id
-                )
+    # perform deletion
+    helper.execute_query('''
+            LET vertex_deletions = (
+                        FOR doc IN siemrules_vertex_collection
+                        FILTER doc._key IN @keys
+                        REMOVE doc IN siemrules_vertex_collection
+                        RETURN doc.id
+            )
 
-                LET edge_deletions = (
-                            FOR doc IN siemrules_edge_collection
-                            FILTER doc._key IN @keys
-                            REMOVE doc  IN siemrules_edge_collection
-                            RETURN doc.id
-                )
-                RETURN {vertex_deletions, edge_deletions}
-                
-        ''', bind_vars=dict(keys=[obj['_key'] for obj in rules+rels]), paginate=False)
+            LET edge_deletions = (
+                        FOR doc IN siemrules_edge_collection
+                        FILTER doc._key IN @keys
+                        REMOVE doc  IN siemrules_edge_collection
+                        RETURN doc.id
+            )
+            RETURN {vertex_deletions, edge_deletions}
+            
+    ''', bind_vars=dict(keys=[obj['_key'] for obj in rules+rels]), paginate=False)
 
-        # remove rule from report
-        if  report:
-            report['object_refs'].remove(indicator_id)
-            for obj in rules:
-                with contextlib.suppress(Exception):
-                    report['object_refs'].remove(obj['id'])
+    # remove rule from report
+    if  report:
+        report['object_refs'].remove(indicator_id)
+        for obj in rules:
+            with contextlib.suppress(Exception):
+                report['object_refs'].remove(obj['id'])
 
-            helper.execute_query('UPDATE {_key: @report_key} WITH @report_update IN siemrules_vertex_collection', 
-                                bind_vars=dict(report_key=report['_key'], report_update=dict(object_refs=report['object_refs'], modified=new_modified)), paginate=False)
-    else: #revert
-        if not revert_key_id:
-            raise ParseError(f"cannot find rule `{indicator_id}` @ {rule_date}")
-        
-        do_reversion(helper, revert_key_id)
-
-        helper.execute_query('''
-                LET vertex_deletions = (
-                    FOR d in @vertices
-                     UPDATE {_key: d._key} WITH  {_is_latest: FALSE} IN siemrules_vertex_collection
-                    RETURN TRUE
-                )
-
-                LET edge_deletions = (
-                    FOR d in @edges
-                    UPDATE {_key: d._key} WITH {_is_latest: FALSE} IN siemrules_edge_collection
-                    RETURN TRUE
-                )
-                RETURN {vertex_deletions, edge_deletions}
-                
-        ''', bind_vars=dict(vertices=rules, edges=rels), paginate=False)
+        helper.execute_query('UPDATE {_key: @report_key} WITH @report_update IN siemrules_vertex_collection', 
+                            bind_vars=dict(report_key=report['_key'], report_update=dict(object_refs=report['object_refs'], modified=new_modified)), paginate=False)
 
     return True
 
-def do_reversion(helper, revision_id):
-    objects: list[dict] = helper.execute_query('''
-                LET vertex_obj = DOCUMENT(@revision_id)
-
-                LET edge_objects = (
-                    FOR d in siemrules_edge_collection
-                    FILTER d._from == @revision_id AND d._is_ref != TRUE
-                    RETURN d
-                )
-                FOR doc IN UNION([vertex_obj], edge_objects)
-                RETURN doc
-                
-        ''', bind_vars=dict(revision_id=revision_id), paginate=False)
-    
-    indicator = objects[0]
-    version = indicator['modified']
-    
-    for obj in objects:
-        obj.pop("_record_modified", None)
-        obj.pop("_record_created", None)
-        obj.pop("_record_md5_hash", None)
-        obj.pop("_from", None)
-        obj.pop("_from", None)
-        for k in [
-            '_record_modified',
-            '_record_created',
-            '_record_md5_hash',
-            '_from',
-            '_id',
-            '_key',
-        ]:
-            obj.pop(k, None)
-        obj['_is_latest'] = True
-        obj['modified'] = datetime.now(UTC).isoformat().replace('+00:00', 'Z')
-    ext_refs: list[dict] = [ref for ref in indicator.get('external_references', []) if ref['source_name'] != 'siemrules-reverted-to']
-    ext_refs.append(dict(source_name='siemrules-reverted-to', description=version))
-    indicator['external_references'] = ext_refs
-
-    make_upload(indicator.get('_stixify_report_id', ''), make_bundle(objects), s2a_kwargs=dict(always_latest=True))
-
-
-def indicator_to_rule(indicator: dict) -> SigmaRuleDetection|tuple[RuleModel, list[dict]]:
+def indicator_to_rule(indicator: dict) -> tuple[RuleModel|SigmaRuleDetection, list[dict]]:
     for ref in indicator.get('external_references', []):
         if ref['source_name'] == 'siemrules-created-type':
             if ref.get('external_id', '').startswith('file'):
-                return yaml_to_detection(indicator['pattern'])
+                return (yaml_to_detection(indicator['pattern']), [])
             else:
                 return yaml_to_rule(indicator['pattern'])
     else:
@@ -452,10 +393,7 @@ def make_clone(indicator_id: str, new_uuid: str, data: dict):
     _, _, old_uuid = old_stix_id.rpartition('--')
     old_arango_id = rule['_id']
     rule['id'] = 'indicator--'+new_uuid
-    old_pattern = indicator_to_rule(rule)
-    other_documents = []
-    if isinstance(old_pattern, tuple):
-        old_pattern, other_documents = old_pattern
+    old_pattern, other_documents = indicator_to_rule(rule)
     author_ref = old_pattern.author
     identity = data.get('identity', settings.STIX_IDENTITY.copy())
     author_ref = identity['id']

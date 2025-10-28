@@ -149,7 +149,4 @@ def test_make_clone_baserule_links_report(celery_eager, client: django.test.Clie
 
 
 def rule_to_detection(indicator):
-    cloned_detection = indicator_to_rule(indicator)
-    if isinstance(cloned_detection, tuple):
-        cloned_detection = cloned_detection[0]
-    return cloned_detection
+    return indicator_to_rule(indicator)[0]
