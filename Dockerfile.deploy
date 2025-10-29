@@ -18,7 +18,6 @@ ENV INPUT_TOKEN_LIMIT=12500
 ENV USE_S3_STORAGE=1
 ENV CTIBUTLER_BASE_URL=https://api.ctibutler.com
 ENV VULMATCH_BASE_URL=http://api.vulmatch.com
-ENV HISTORY4FEED_URL=http://host.docker.internal:8002/
 ENV ARANGODB_USERNAME=siemrules
 ENV ARANGODB_HOST_URL=http://host.docker.internal:8529
 ENV POSTGRES_USER=siemrules
