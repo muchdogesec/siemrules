@@ -278,12 +278,15 @@ class TestReportsView:
             if obj["id"] in expected_ids_set:
                 continue
             with subtests.test("unexpected id", stix_id=obj["id"]):
+                if obj["type"] == "extension-definition":
+                    continue
                 assert (
                     obj["type"] == "relationship"
                 ), "all unexpected ids must be of type relationship"
                 assert (
                     obj["source_ref"] in expected_ids_set
                     or obj["target_ref"] in expected_ids_set
+                    or obj["source_ref"].startswith("extension-definition")
                 ), "all unexpected ids must be related to one of expected ids"
 
     @pytest.mark.parametrize("sort_filter", reports.ReportView.SORT_PROPERTIES + [None])

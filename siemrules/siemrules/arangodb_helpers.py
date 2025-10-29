@@ -122,13 +122,10 @@ def get_rules(request: request.Request, paginate=True, all_versions=False, nokee
     if ingestion_method := helper.query.get('create_type'):
         filters.append('FILTER @ingestion_method IN doc.external_references')
         binds.update(ingestion_method=dict(source_name='siemrules-created-type', external_id=ingestion_method))
-    elif rule_type := helper.query.get('rule_type'):
-        match rule_type:
-            case 'base-rule':
-                rule_type = 'file'
-            case 'correlation-rule':
-                rule_type = 'correlation'
-        filters.append('FILTER doc.external_references[? ANY FILTER CURRENT.source_name == "siemrules-created-type" AND STARTS_WITH(CURRENT.external_id, @rule_type)]')
+
+    if rule_type := helper.query.get('rule_type'):
+        rule_type, _, _ = rule_type.partition('-')
+        filters.append('FILTER doc.x_sigma_type == @rule_type')
         binds.update(rule_type=rule_type)
 
     query = """

@@ -89,7 +89,6 @@ def test_get_rules(params, expected_ids):
     request = Request(HttpRequest())
     request.query_params.update(params)
     result = get_rules(request)
-
     assert {obj["id"] for obj in result.data["rules"]} == expected_ids
 
 @pytest.mark.parametrize(
