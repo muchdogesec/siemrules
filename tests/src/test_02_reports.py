@@ -11,8 +11,6 @@ from rest_framework.validators import ValidationError
 
 from tests.src.utils import is_sorted
 
-
-@pytest.mark.django_db
 class TestReportsView:
     @pytest.fixture(autouse=True)
     def setup(self):

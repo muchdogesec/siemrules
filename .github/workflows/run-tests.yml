@@ -61,7 +61,7 @@ jobs:
         id: unit_tests
         run: |
           set -a; source tests/tests.env; set +a
-          pytest --cov --cov-branch --cov-report=xml --cov-report=term --junitxml=unittest.junit.xml -o junit_family=legacy tests/ --ignore=tests/st/
+          pytest --cov --cov-branch --cov-report=xml --cov-report=term --junitxml=unittest.junit.xml -o junit_family=legacy tests/ --ignore=tests/st/ -v
 
       - name: Schema tests
         id: schema_tests

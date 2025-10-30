@@ -22,7 +22,6 @@ RULE_TYPES = [
 
 
 
-
 @pytest.mark.parametrize(
     ["params", "expected_ids"],
     [
@@ -83,7 +82,6 @@ RULE_TYPES = [
         pytest.param(dict(tlp_level='clear'), [], id='tlp level clear'),
     ],
 )
-@pytest.mark.django_db
 def test_get_rules(params, expected_ids):
     expected_ids = set(expected_ids)
     request = Request(HttpRequest())

@@ -17,7 +17,6 @@ from siemrules.siemrules import correlations
 correlation_url = "/api/v1/correlation-rules/"
 
 
-@pytest.mark.django_db
 def test_correlation_create__manual(client: django.test.Client):
     rule = """
 title: Many failed logins
@@ -242,7 +241,6 @@ def test_add_rule_indicator_correlation_indicator(rule, job_data, expected_dict)
         }
     ],
 )
-@pytest.mark.django_db
 def test_correlation_create__prompt(client: django.test.Client, rule_payload: dict):
 
     with patch("siemrules.worker.tasks.new_correlation_task") as mock_task:

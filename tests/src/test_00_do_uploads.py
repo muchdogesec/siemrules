@@ -35,7 +35,6 @@ from tests.src import data as test_data
         pytest.param(*test_data.SIGMA_RULE_3, id="item 3"),
     ]
 )
-@pytest.mark.django_db
 def test_make_uploads(client, celery_eager, rule_id, sigma_yaml):
     save_model = FileSigmaYamlSerializer.save
     with patch(
@@ -55,7 +54,6 @@ def test_make_uploads(client, celery_eager, rule_id, sigma_yaml):
         assert job_resp.data['state'] == 'completed'
 
 
-@pytest.mark.django_db
 @pytest.mark.parametrize("modification", [test_data.MODIFY_1, test_data.MODIFY_2])
 def test_modify_base_rule_manual(
     celery_eager, client: django.test.Client, modification
@@ -87,7 +85,6 @@ def test_modify_base_rule_manual(
 
 correlation_url = "/api/v1/correlation-rules/"
 @pytest.mark.parametrize("rule", [test_data.CORRELATION_RULE_1, test_data.CORRELATION_RULE_2])
-@pytest.mark.django_db
 def test_upload_correlation(celery_eager, client, rule):
     rule_id, rule = rule
 
@@ -102,7 +99,6 @@ def test_upload_correlation(celery_eager, client, rule):
         resp = client.get(correlation_url + f"indicator--{rule_id}/")
         assert resp.status_code == 200
 
-@pytest.mark.django_db
 @pytest.mark.parametrize(
     ["rule_id", "modification"],
     [
@@ -135,7 +131,6 @@ def test_modify_correlation_manual(celery_eager, client, rule_id, modification):
 
     assert indicator['modified'] == job_resp.data['extra']['resultant_version']
 
-@pytest.mark.django_db
 @pytest.mark.parametrize(
     ["rule_id", "modification"],
     [

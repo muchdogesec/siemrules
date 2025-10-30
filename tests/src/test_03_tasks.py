@@ -21,8 +21,6 @@ from siemrules.worker import tasks
 import stix2
 from django.core.files.uploadedfile import SimpleUploadedFile
 
-
-@pytest.mark.django_db
 def test_new_task(job):
     file = job.file
 
@@ -36,7 +34,6 @@ def test_new_task(job):
         mock_error_task.assert_called_once_with(job.id)
 
 
-@pytest.mark.django_db
 @pytest.mark.parametrize(
     "job_type",
     [models.JobType.CORRELATION_PROMPT, models.JobType.CORRELATION_SIGMA],
@@ -65,7 +62,6 @@ def test_new_correlation_task(job: models.Job, job_type):
         mock_error_task.assert_called_once_with(job.id)
 
 
-@pytest.mark.django_db
 def test_process_correlation(job):
     correlation = mock.Mock()
     related_indicators = mock.Mock()
@@ -82,7 +78,6 @@ def test_process_correlation(job):
         )
 
 
-@pytest.mark.django_db
 def test_upload_correlation(job):
     correlation = mock.Mock()
     related_indicators = mock.Mock()
@@ -105,7 +100,6 @@ def test_upload_correlation(job):
         )
 
 
-@pytest.mark.django_db
 def test_process_correlation_ai(job):
     data = dict(
         author="some author",
@@ -186,7 +180,6 @@ def report():
     )
 
 
-@pytest.mark.django_db
 def test_run_txt2detection(job, report, profile):
     mock_file = File.objects.create(
         name="test_file",
@@ -268,7 +261,6 @@ def test_run_txt2detection(job, report, profile):
         assert result == {"mocked": "detection_output"}
 
 
-@pytest.mark.django_db
 def test_run_file2txt(job):
     with patch("tempfile.NamedTemporaryFile") as mock_tempfile, patch(
         "siemrules.worker.tasks.get_parser_class"
@@ -289,7 +281,6 @@ def test_run_file2txt(job):
         mock_create_image.assert_called_once()
 
 
-@pytest.mark.django_db
 def test_upload_to_arango(job):
     bundle = {"objects": []}
     from django.conf import settings
@@ -320,7 +311,6 @@ def test_upload_to_arango(job):
         mock_db_view.assert_called()
 
 
-@pytest.mark.django_db
 def test_upload_objects(job):
     bundle = {"objects": []}
     from django.conf import settings
@@ -347,7 +337,6 @@ def test_upload_objects(job):
         mock_s2a_instance.run.assert_called_once()
 
 
-@pytest.mark.django_db
 def test_job_completed(job):
     job.state = models.JobState.PENDING
     job.save()
@@ -360,14 +349,12 @@ def test_job_completed(job):
     assert job.pk == job.id
 
 
-@pytest.mark.django_db
 def test_job_failure(job):
     with mock.patch("siemrules.siemrules.models.Job.objects.get", return_value=job):
         job_failed(SimpleNamespace(id=uuid.uuid4()), None, None, job.id)
         assert job.state == models.JobState.FAILED
 
 
-@pytest.mark.django_db
 def test_process_report_success(job):
 
     with mock.patch(
@@ -388,7 +375,6 @@ def test_process_report_success(job):
         assert job.state == models.JobState.PENDING
 
 
-@pytest.mark.django_db
 def test_process_report_fail(job):
 
     with mock.patch(

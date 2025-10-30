@@ -15,7 +15,6 @@ from tests.src.utils import is_sorted
 from tests.utils import Transport
 
 
-@pytest.mark.django_db
 class TestFileView:
     @pytest.fixture(autouse=True)
     def setup(self, profile):
@@ -38,7 +37,7 @@ class TestFileView:
             ),
             mode="txt",
             name="dummy name",
-            profile_id=profile.id
+            profile_id=profile.id,
         )
         with patch("siemrules.worker.tasks.new_task") as mock_task:
             response = client.post(
@@ -56,7 +55,10 @@ class TestFileView:
     def test_file_create__text(self, client: django.test.Client, profile):
         mock_file_content = b"dummy content"
         file_data = dict(
-            text_input=mock_file_content.decode(), ai_provider="openai", name="dummy name", profile_id=profile.id
+            text_input=mock_file_content.decode(),
+            ai_provider="openai",
+            name="dummy name",
+            profile_id=profile.id,
         )
         with patch("siemrules.worker.tasks.new_task") as mock_task:
             response = client.post(
@@ -83,27 +85,27 @@ class TestFileView:
             assert response.status_code == status.HTTP_204_NO_CONTENT
             mock_delete.assert_called_once()
 
-
     def test_processing_log(self, client, job, api_schema):
         job.file.txt2detection_data = {"some_new": "data"}
         job.file.save()
         response = client.get(f"{self.url}{job.file.id}/processing-log/")
         assert response.json() == {"some_new": "data"}
         assert response.status_code == 200
-        api_schema['/api/v1/files/{file_id}/processing-log/']['GET'].validate_response(Transport.get_st_response(response))
-
+        api_schema["/api/v1/files/{file_id}/processing-log/"]["GET"].validate_response(
+            Transport.get_st_response(response)
+        )
 
     def test_nav_layer(self, client, job, fake_txt2stix_extractions, api_schema):
         job.file.txt2detection_data = fake_txt2stix_extractions
         job.file.save()
         response = client.get(f"{self.url}{job.file.id}/attack-navigator/")
         assert response.status_code == 200
-        assert response.json()['name'] == "fake python vulnerability report"
-        api_schema['/api/v1/files/{file_id}/attack-navigator/']['GET'].validate_response(Transport.get_st_response(response))
+        assert response.json()["name"] == "fake python vulnerability report"
+        api_schema["/api/v1/files/{file_id}/attack-navigator/"][
+            "GET"
+        ].validate_response(Transport.get_st_response(response))
 
 
-
-@pytest.mark.django_db
 class TestJobView:
     @pytest.fixture(autouse=True)
     def setup(self):
@@ -125,7 +127,6 @@ class TestJobView:
         assert response.data["id"] == str(self.job.id)
 
 
-@pytest.mark.django_db
 class TestBaseRuleView:
     @pytest.fixture(autouse=True)
     def setup(self):
@@ -181,7 +182,9 @@ class TestBaseRuleView:
     ):
         rule_url = f"{self.url}{rule_id}/"
         response = client.get(rule_url + "versions/")
-        assert is_sorted(response.data, reverse=True), "versions must be sorted in descending order"
+        assert is_sorted(
+            response.data, reverse=True
+        ), "versions must be sorted in descending order"
         assert len(response.data) == expected_version_count
         for version in chain([None], response.data):
             with subtests.test(
@@ -191,9 +194,8 @@ class TestBaseRuleView:
                 if version:
                     params = dict(version=version)
                 rule_resp = client.get(rule_url, query_params=params)
-                assert rule_resp.data['id'] == rule_id
+                assert rule_resp.data["id"] == rule_id
                 assert rule_resp.data["modified"] == version or response.data[0]
-
 
     def test_revert_rule(self, client: django.test.Client, celery_eager):
         rule_id = "indicator--2683daab-aa64-52ff-a001-3ea5aee9dd72"
@@ -203,22 +205,33 @@ class TestBaseRuleView:
         assert versions_resp.status_code == 200, versions_resp.json()
         versions_before_revert = list(versions_resp.data)
         revert_version = random.choice(versions_before_revert[1:])
-        object_before_revert = client.get(rule_url, query_params=dict(version=revert_version)).json()
+        object_before_revert = client.get(
+            rule_url, query_params=dict(version=revert_version)
+        ).json()
 
-        response = client.patch(rule_url + "modify/revert/", data=dict(version=revert_version), content_type="application/json")
+        response = client.patch(
+            rule_url + "modify/revert/",
+            data=dict(version=revert_version),
+            content_type="application/json",
+        )
         assert response.status_code == 201, response.json()
         object_after_revert = client.get(rule_url).json()
-        assert object_after_revert['modified'] > max(versions_before_revert), "object_after_revert must be newer than all previously existing objects"
+        assert object_after_revert["modified"] > max(
+            versions_before_revert
+        ), "object_after_revert must be newer than all previously existing objects"
 
-        
         versions_resp = client.get(rule_url + "versions/")
         assert versions_resp.status_code == 200, versions_resp.json()
         versions_after_revert = list(versions_resp.data)
-        assert len(versions_after_revert) == len(versions_before_revert) + 1, "count(versions_after_revert) must be count(versions_before_revert)+1"
-        assert set(versions_after_revert).issuperset(versions_before_revert), "versions_after_revert must be a superset of versions_before_revert"
+        assert (
+            len(versions_after_revert) == len(versions_before_revert) + 1
+        ), "count(versions_after_revert) must be count(versions_before_revert)+1"
+        assert set(versions_after_revert).issuperset(
+            versions_before_revert
+        ), "versions_after_revert must be a superset of versions_before_revert"
 
         for k in object_before_revert.keys():
-            if k in ['external_references', 'modified']:
+            if k in ["external_references", "modified"]:
                 continue
             assert object_before_revert[k] == object_after_revert[k]
 
@@ -229,44 +242,70 @@ class TestBaseRuleView:
         versions_resp = client.get(rule_url + "versions/")
         assert versions_resp.status_code == 200, versions_resp.json()
         versions_before_revert = list(versions_resp.data)
-        revert_version = versions_before_revert[0] #latest version
+        revert_version = versions_before_revert[0]  # latest version
 
-        response = client.patch(rule_url + "modify/revert/", data=dict(version=revert_version), content_type="application/json")
+        response = client.patch(
+            rule_url + "modify/revert/",
+            data=dict(version=revert_version),
+            content_type="application/json",
+        )
         assert response.status_code == 400, response.json()
 
     def test_revert_bad_version(self, client: django.test.Client):
         rule_id = "indicator--2683daab-aa64-52ff-a001-3ea5aee9dd72"
         rule_url = f"{self.url}{rule_id}/"
 
-        revert_version = "2001-01-01T01:01:01.001Z" #bad version
+        revert_version = "2001-01-01T01:01:01.001Z"  # bad version
 
-        response = client.patch(rule_url + "modify/revert/", data=dict(version=revert_version), content_type="application/json")
+        response = client.patch(
+            rule_url + "modify/revert/",
+            data=dict(version=revert_version),
+            content_type="application/json",
+        )
         assert response.status_code == 400, response.json()
 
-@pytest.mark.django_db
-def test_retrieve_profile(profile, client):
-    resp = client.get(f'/api/v1/profiles/{profile.id}/')
-    assert resp.status_code == 200
-    assert resp.json()['id'] == str(profile.id)
 
-@pytest.mark.django_db
-def test_list_profile(profile, client):
-    resp = client.get(f'/api/v1/profiles/')
+def test_retrieve_profile(profile, client):
+    resp = client.get(f"/api/v1/profiles/{profile.id}/")
     assert resp.status_code == 200
-    assert resp.json()['profiles'][0]['id'] == str(profile.id)
+    assert resp.json()["id"] == str(profile.id)
+
+
+def test_default_profile():
+    file = models.File.objects.create(name="test_file.txt", mimetype="text/plain")
+    assert file.profile == file.profile.default_profile()
+
+
+def test_regular_profile_does_not_use_default_profile(profile, default_profile):
+    default_profile.is_default = True
+    default_profile.save()
+
+    file = models.File.objects.create(
+        name="test_file.txt", mimetype="text/plain", profile=profile
+    )
+    assert file.profile == profile
+
+
+def test_list_profile(profile, client):
+    resp = client.get(f"/api/v1/profiles/")
+    assert resp.status_code == 200
+    assert resp.json()["profiles"][0]["id"] == str(profile.id)
+
 
 def test_profile_extractors(client):
-    resp = client.get(f'/api/v1/profiles/extractors/')
+    resp = client.get(f"/api/v1/profiles/extractors/")
     assert resp.status_code == 200
-    assert set(resp.json()).issuperset(['ipv4-addr', 'ipv6-addr'])
+    assert set(resp.json()).issuperset(["ipv4-addr", "ipv6-addr"])
+
 
 def test_healthcheck(client):
-    resp = client.get('/api/healthcheck/')
+    resp = client.get("/api/healthcheck/")
     assert resp.status_code == 204
 
 
 def test_healthcheck_service(client, api_schema):
-    resp = client.get('/api/healthcheck/service/')
+    resp = client.get("/api/healthcheck/service/")
     assert resp.status_code == 200
-    api_schema['/api/healthcheck/service/']['GET'].validate_response(Transport.get_st_response(resp))
-    
+    api_schema["/api/healthcheck/service/"]["GET"].validate_response(
+        Transport.get_st_response(resp)
+    )
