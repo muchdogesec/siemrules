@@ -49,13 +49,10 @@ def validate_file(file: InMemoryUploadedFile, mode: str):
 
 
 class Profile(models.Model):
-    id = models.UUIDField(default=uuid.uuid4, primary_key=True)
+    id = models.UUIDField(primary_key=True)
     name = models.CharField(max_length=256, unique=True)
-    defang = models.BooleanField(default=True)
     created = models.DateTimeField(default=timezone.now, null=False)
     ai_provider = models.CharField(max_length=256, null=True, blank=True)
-    ai_create_attack_flow = models.BooleanField(default=False)
-    ai_create_attack_navigator_layer = models.BooleanField(default=False)
     ignore_embedded_relationships = models.BooleanField(default=False)
     ignore_embedded_relationships_smo = models.BooleanField(default=False)
     ignore_embedded_relationships_sro = models.BooleanField(default=False)
@@ -77,6 +74,7 @@ class Profile(models.Model):
         if not self.id:
             name = self.name
             self.id = uuid.uuid5(settings.STIX_NAMESPACE, name)
+        print(self.name, self.id, settings.STIX_NAMESPACE)
 
         with transaction.atomic():
             existing_profiles = Profile.objects.select_for_update()

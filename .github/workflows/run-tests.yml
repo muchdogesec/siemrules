@@ -47,6 +47,10 @@ jobs:
             echo ARANGODB_HOST_URL="http://$IP_ADDRESS:18529" >> tests/tests.env
             export DJANGO_WWW_PATH=$PWD/django_www_path/
             echo DJANGO_WWW_PATH="$DJANGO_WWW_PATH" >> tests/tests.env
+            echo "CTIBUTLER_BASE_URL=https://api.ctibutler.com/" >> tests/tests.env
+            echo "CTIBUTLER_API_KEY=${{ secrets.CTIBUTLER_API_KEY }}" >> tests/tests.env
+            echo "VULMATCH_BASE_URL=https://api.vulmatch.com/" >> tests/tests.env
+            echo "VULMATCH_API_KEY=${{ secrets.VULMATCH_API_KEY }}" >> tests/tests.env
             mkdir -p $DJANGO_WWW_PATH
             
             pip install -r tests/requirements.txt -r requirements.txt
@@ -57,7 +61,7 @@ jobs:
         id: unit_tests
         run: |
           set -a; source tests/tests.env; set +a
-          pytest --cov --cov-branch --cov-report=xml --cov-report=term --junitxml=unittest.junit.xml -o junit_family=legacy tests/ --ignore=tests/st/
+          pytest --cov --cov-branch --cov-report=xml --cov-report=term --junitxml=unittest.junit.xml -o junit_family=legacy tests/ --ignore=tests/st/ -v
 
       - name: Schema tests
         id: schema_tests

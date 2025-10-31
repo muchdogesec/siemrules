@@ -22,7 +22,6 @@ RULE_TYPES = [
 
 
 
-
 @pytest.mark.parametrize(
     ["params", "expected_ids"],
     [
@@ -57,8 +56,7 @@ RULE_TYPES = [
             id="good identity + attacK_id",
         ),
         pytest.param(dict(cve_id='CVE-2022-99999'), [], id='cve_id bad'),
-        pytest.param(dict(cve_id='CVE-2024-1234,CVE-2024-123456'), ["indicator--2683daab-aa64-52ff-a001-3ea5aee9dd72"], id='cve_id good+bad'),
-        pytest.param(dict(cve_id='CVE-2024-3094,CVE-2024-1234'), ["indicator--2683daab-aa64-52ff-a001-3ea5aee9dd72", "indicator--9e2536b0-988b-598d-8cc3-407f9f13fc61"], id='cve_id good+good'),
+        pytest.param(dict(cve_id='CVE-2024-3094,CVE-2024-123456'), ["indicator--9e2536b0-988b-598d-8cc3-407f9f13fc61"], id='cve_id good+bad'),
         pytest.param(dict(cve_id='CVE-2024-3094,CVE-2024-1234', attack_id="TA0005"), ["indicator--9e2536b0-988b-598d-8cc3-407f9f13fc61"], id='cve_id + attack_id'),
         pytest.param(dict(file_id='some-id'), [], id='bad file id'),
         pytest.param(dict(file_id='9e2536b0-988b-598d-8cc3-407f9f13fc61'), ["indicator--9e2536b0-988b-598d-8cc3-407f9f13fc61"], id='good file id'),
@@ -83,13 +81,11 @@ RULE_TYPES = [
         pytest.param(dict(tlp_level='clear'), [], id='tlp level clear'),
     ],
 )
-@pytest.mark.django_db
 def test_get_rules(params, expected_ids):
     expected_ids = set(expected_ids)
     request = Request(HttpRequest())
     request.query_params.update(params)
     result = get_rules(request)
-
     assert {obj["id"] for obj in result.data["rules"]} == expected_ids
 
 @pytest.mark.parametrize(

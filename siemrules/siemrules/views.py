@@ -163,7 +163,6 @@ class SchemaViewCached(SpectacularAPIView):
             * `tlp_level` (optional): This will be assigned to all SDOs and SROs created and added to the Base Rule as a tag (e.g. `tlp.red`). SIEM Rules uses TLPv2. This is a txt2detection setting. Either `clear`, `green`, `amber`, `amber+strict`, `red`. If not passed default is `clear`. 
              * `license` (optional): [License of the rule according the SPDX ID specification](https://spdx.org/licenses/) (e.g. `MIT`). Will be added to the Rule. This is a txt2detection setting.
              * `references`: A list of URLs to be added as `references` in the Sigma Rule property and in the `external_references` property of the Indicator and Report STIX object created. e.g `"https://www.google.com/"`, `"https://www.facebook.com/"`. We don't currently assign AI to generate `references` due to hallucinations.
-            * `defang` (optional): Whether to defang the observables in the text. e.g. turns `1.1.1[.]1` to `1.1.1.1` for extraction. This is a file2txt setting.
             * `ai_provider` (required): An AI provider and model to be used for rule generation in format `provider:model` e.g. `openai:gpt-4o`. This is a txt2detection setting.
             * `ignore_embedded_relationships` (optional, default: `false`): boolean, if `true` passed, this will stop ANY embedded relationships from being generated. This applies for all object types (SDO, SCO, SRO, SMO). If you want to target certain object types see `ignore_embedded_relationships_sro` and `ignore_embedded_relationships_sro` flags. This is a stix2arango setting.
             * `ignore_embedded_relationships_sro` (optional, default: false): boolean, if true passed, will stop any embedded relationships from being generated from SRO objects (type = `relationship`). This is a stix2arango setting.
@@ -1364,7 +1363,7 @@ class CorrelationRuleView(RuleView):
         },
     ),
 )
-class ProfileView(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.DestroyModelMixin, viewsets.GenericViewSet):
+class ProfileView(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.DestroyModelMixin, mixins.CreateModelMixin, viewsets.GenericViewSet):
     openapi_tags = ["Profiles"]
     serializer_class = ProfileSerializer
     pagination_class = Pagination("profiles")

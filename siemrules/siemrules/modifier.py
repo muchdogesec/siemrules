@@ -19,7 +19,7 @@ from txt2detection.models import (
     SigmaRuleDetection,
     Statuses,
     SigmaTag,
-    Level
+    Level,
 )
 
 from llama_index.core import ChatPromptTemplate
@@ -27,7 +27,14 @@ from llama_index.core.base.llms.types import ChatMessage, MessageRole
 from llama_index.core.program import LLMTextCompletionProgram
 from drf_pydantic import BaseModel as DRFBaseModel
 from rest_framework import validators
-from txt2detection.models import SigmaTag, BaseDetection, Statuses, Level, tlp_from_tags, set_tlp_level_in_tags
+from txt2detection.models import (
+    SigmaTag,
+    BaseDetection,
+    Statuses,
+    Level,
+    tlp_from_tags,
+    set_tlp_level_in_tags,
+)
 
 
 def modify_indicator(report, indicator: dict, detection: BaseDetection):
@@ -36,28 +43,30 @@ def modify_indicator(report, indicator: dict, detection: BaseDetection):
         None,
         "red",
         "description",
-        report.get('labels', []),
-        datetime(2020, 1, 1),
-        report_id=report['id'].replace('report--', ''),
+        report.get("labels", []),
+        indicator["created"],
+        report_id=report["id"].replace("report--", ""),
         modified=datetime.now(UTC),
         external_refs=[
-            ref for ref in indicator.get('external_references', []) if ref['source_name'] == "siemrules-created-type"
-        ]
+            ref
+            for ref in indicator.get("external_references", [])
+            if ref["source_name"] == "siemrules-created-type"
+        ],
     )
-    
-    detection.detection_id = indicator['id'].replace('indicator--', '')
+
+    detection.detection_id = indicator["id"].replace("indicator--", "")
     bundler.report.external_references.clear()
-    bundler.report.external_references.extend(report['external_references'])
+    bundler.report.external_references.extend(report["external_references"])
     bundler.report.object_marking_refs.clear()
-    bundler.report.object_marking_refs.extend(report['object_marking_refs'])
+    bundler.report.object_marking_refs.extend(report["object_marking_refs"])
     container = DetectionContainer(success=True, detections=[])
     detection.modified = bundler.modified.date()
     container.detections.append(detection)
-    bundler.bundle.objects.clear() # remove any default object
+    bundler.bundle.objects.clear()  # remove any default object
     bundler.bundle_detections(container)
     retval = []
-    for obj in bundler.bundle_dict['objects']:
-        if obj['type'] == 'indicator':
+    for obj in bundler.bundle_dict["objects"]:
+        if obj["type"] == "indicator":
             retval.insert(0, obj)
         else:
             retval.append(obj)
@@ -82,17 +91,25 @@ class DRFDetection(DRFBaseModel, ModifierDetection):
 
     @staticmethod
     def is_valid(s, initial_data):
-            unknown_keys = set(initial_data.keys()) - set(s.fields.keys())
-            if unknown_keys:
-                raise validators.ValidationError("Got unexpected fields: {}".format(unknown_keys))
-            
+        unknown_keys = set(initial_data.keys()) - set(s.fields.keys())
+        if unknown_keys:
+            raise validators.ValidationError(
+                "Got unexpected fields: {}".format(unknown_keys)
+            )
+
     @classmethod
     def merge_detection(cls, old_detection: BaseDetection, request_data: dict):
-        return {**old_detection.model_dump(exclude=['date'], exclude_unset=True, exclude_none=True), **request_data}
-    
+        return {
+            **old_detection.model_dump(
+                exclude=["date"], exclude_unset=True, exclude_none=True
+            ),
+            **request_data,
+        }
+
     def to_sigma_rule_detection(self):
         return SigmaRuleDetection.model_validate(self.model_dump())
-    
+
+
 class DRFSigmaRule(DRFBaseModel, SigmaRuleDetection):
     drf_config = {"validate_pydantic": True}
     _identity: dict = None
@@ -102,43 +119,51 @@ class DRFSigmaRule(DRFBaseModel, SigmaRuleDetection):
     def is_valid(s, initial_data):
         unknown_keys = set(initial_data.keys()) - set(s.fields.keys())
         if unknown_keys:
-            raise validators.ValidationError("Got unknown fields: {}".format(unknown_keys))
-        
-    @field_validator('author', mode='before')
+            raise validators.ValidationError(
+                "Got unknown fields: {}".format(unknown_keys)
+            )
+
+    @field_validator("author", mode="before")
     @classmethod
     def validate_author(cls, author):
         from siemrules.siemrules.correlations.utils import validate_author
+
         return validate_author(author)
-    
+
     def model_post_init(self, __context):
         if self.author:
             self._identity = json.loads(self.author)
         return super().model_post_init(__context)
-    
+
     def clean_author(self):
         if self.author and self._identity:
-            self.author = self._identity['id']
-    
+            self.author = self._identity["id"]
+
     def to_file_serializer(self, request_body):
         try:
             self.clean_author()
             rule = self.make_rule(None)
         except jsonschema.exceptions.ValidationError as e:
-            raise validators.ValidationError(f'validation with schema failed: {e.json_path}: {e.message}')
-        from siemrules.siemrules.serializers import FileSigmaYamlSerializer
-        data = dict(
-                name=self.title,
-                identity=self._identity,
-                sigma_file=SimpleUploadedFile(f"{slugify(self.title)}.yml", content=bytes(rule, 'utf-8'), content_type="application/sigma+yaml"),
-                tlp_level=self.tlp_level.name.replace('-', '+'),
+            raise validators.ValidationError(
+                f"validation with schema failed: {e.json_path}: {e.message}"
             )
+        from siemrules.siemrules.serializers import FileSigmaYamlSerializer
 
-        s = FileSigmaYamlSerializer(
-            data=data
+        data = dict(
+            name=self.title,
+            identity=self._identity,
+            sigma_file=SimpleUploadedFile(
+                f"{slugify(self.title)}.yml",
+                content=bytes(rule, "utf-8"),
+                content_type="application/sigma+yaml",
+            ),
+            tlp_level=self.tlp_level.name.replace("-", "+"),
         )
+
+        s = FileSigmaYamlSerializer(data=data)
         s.is_valid(raise_exception=True)
         return s
-    
+
     @field_validator("tags", mode="before")
     @classmethod
     def add_default_tlp(cls, tags):
@@ -149,7 +174,7 @@ class DRFSigmaRule(DRFBaseModel, SigmaRuleDetection):
             return tags
         except Exception as e:
             raise ValueError(e)
-            
+
 
 def yaml_to_detection(modification: str, indicator_types=[]):
     indicator_types = indicator_types or []
@@ -158,26 +183,31 @@ def yaml_to_detection(modification: str, indicator_types=[]):
     return SigmaRuleDetection.model_validate(modification)
 
 
-
-def get_modification(model, input_text, old_detection: SigmaRuleDetection, prompt) -> SigmaRuleDetection:
-    old_detection._bundler = SimpleNamespace(report=SimpleNamespace(created=datetime.now(), modified=datetime.now()))
+def get_modification(
+    model, input_text, old_detection: SigmaRuleDetection, prompt
+) -> SigmaRuleDetection:
+    old_detection._bundler = SimpleNamespace(
+        report=SimpleNamespace(created=datetime.now(), modified=datetime.now())
+    )
     assert isinstance(old_detection, BaseDetection), "rule must be of type detection"
     detections = DetectionContainer(success=True, detections=[old_detection])
     ai_detection = LLMTextCompletionProgram.from_defaults(
         output_parser=ParserWithLogging(SigmaRuleDetection),
-        prompt=ChatPromptTemplate(prompts.SIEMRULES_PROMPT.message_templates
-        + [
-            ChatMessage.from_str("{old_rule}", MessageRole.ASSISTANT),
-            ChatMessage.from_str(
-                "Please answer in the specified format.\n{correction_prompt}",
-                MessageRole.USER,
-            ),
-        ]),
+        prompt=ChatPromptTemplate(
+            prompts.SIEMRULES_PROMPT.message_templates
+            + [
+                ChatMessage.from_str("{old_rule}", MessageRole.ASSISTANT),
+                ChatMessage.from_str(
+                    "Please answer in the specified format.\n{correction_prompt}",
+                    MessageRole.USER,
+                ),
+            ]
+        ),
         verbose=True,
         llm=model.llm,
     )(
         document=input_text,
-        old_rule=detections.model_dump(mode='json', exclude=['date', 'modified']),
+        old_rule=detections.model_dump(mode="json", exclude=["date", "modified"]),
         correction_prompt=prompt,
     )
 
@@ -185,4 +215,3 @@ def get_modification(model, input_text, old_detection: SigmaRuleDetection, promp
     for attr in ai_detection.model_fields_set:
         setattr(retval, attr, getattr(ai_detection, attr))
     return retval
-

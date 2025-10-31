@@ -47,7 +47,6 @@ from siemrules.siemrules.arangodb_helpers import (
         {"description": "Cloned Description for Sigma Rule 4"},
     ],
 )
-@pytest.mark.django_db
 def test_clone(subtests, celery_eager, client: django.test.Client, indicator_id, rule_type, payload):
     rule_url = f"/api/v1/{rule_type}/{indicator_id}/"
     orig_rule_resp = client.get(rule_url)
