@@ -239,17 +239,6 @@ class ProfileSerializer(serializers.ModelSerializer):
         fields = "__all__"
         read_only_fields = ["id", "created", "is_default"]
 
-    def validate(self, attrs):
-        if not attrs.get("ai_provider"):
-            if attrs.get("ai_create_attack_flow"):
-                raise validators.ValidationError(
-                    "`ai_provider` is required when `ai_create_attack_flow == true`"
-                )
-            if attrs.get("ai_create_attack_navigator_layer"):
-                raise validators.ValidationError(
-                    "`ai_provider` is required when `ai_create_attack_navigator_layer == true`"
-                )
-        return super().validate(attrs)
 
 
 class FileDocumentSerializer(FileSerializer):
