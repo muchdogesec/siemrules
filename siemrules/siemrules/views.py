@@ -414,28 +414,6 @@ class FileView(
         obj = self.get_object()
         return Response(obj.txt2detection_data)
 
-    @extend_schema(
-        responses={
-            (200, "application/json"): serializers.AttackNavigatorDomainSerializer,
-            (404, "application/json"): DEFAULT_404_ERROR,
-        },
-        summary="Get the generated attack navigator",
-        description=textwrap.dedent(
-            """
-            Whan a file is uploaded, it is converted to pdf and saved.
-            
-            This endpoint is useful for loading the file in a generic pdf viewer (vs. trying to work with different filetypes of the original input).
-            """
-        ),
-    )
-    @decorators.action(detail=True, methods=["GET"], url_path="attack-navigator")
-    def nav_layer(self, request, *args, file_id=None, **kwargs):
-        obj = self.get_object()
-        nav = obj.txt2detection_data and obj.txt2detection_data.get("navigator_layer")
-        if not nav:
-            raise exceptions.NotFound("navigator layer not created for file")
-        return Response(nav[0])
-
 
 @extend_schema_view(
     list=extend_schema(
@@ -587,7 +565,9 @@ class RuleView(viewsets.GenericViewSet):
             job_instance = models.Job.objects.create(
                 type=models.JobType.BASE_MODIFY,
                 data=dict(
-                    modification_method="revert", indicator_id=indicator_id, base_version=selected_version
+                    modification_method="revert",
+                    indicator_id=indicator_id,
+                    base_version=selected_version,
                 ),
             )
             job_s = JobSerializer(job_instance)
@@ -602,7 +582,9 @@ class RuleView(viewsets.GenericViewSet):
             job_instance = models.Job.objects.create(
                 type=models.JobType.CORRELATION_MODIFY,
                 data=dict(
-                    modification_method="revert", correlation_id=indicator_id, base_version=selected_version
+                    modification_method="revert",
+                    correlation_id=indicator_id,
+                    base_version=selected_version,
                 ),
             )
             job_s = CorrelationJobSerializer(job_instance)
@@ -645,7 +627,97 @@ class RuleView(viewsets.GenericViewSet):
             indicator_id,
             request,
             version=request.query_params.get("version"),
-            rule_type=self.rule_type
+            rule_type=self.rule_type,
+        )
+
+    @extend_schema(
+        responses={
+            (200, "application/json"): serializers.AttackNavigatorDomainSerializer,
+            (404, "application/json"): DEFAULT_404_ERROR,
+        },
+        summary="Get the generated attack navigator",
+        description=textwrap.dedent(
+            """
+            Whan a file is uploaded, it is converted to pdf and saved.
+            
+            This endpoint is useful for loading the file in a generic pdf viewer (vs. trying to work with different filetypes of the original input).
+            """
+        ),
+    )
+    @decorators.action(detail=True, methods=["GET"], url_path="attack-navigator")
+    def nav_layer(self, request, *args, indicator_id=None, **kwargs):
+        objects = arangodb_helpers.get_objects_for_rule(
+            indicator_id,
+            request,
+            version=request.query_params.get("version"),
+            rule_type=self.rule_type,
+            with_limit=False,
+        )
+        objects.sort(key=lambda x: x["id"])
+        techniques = {}
+        report = None
+        metadata = [dict(name="rule_id", value=indicator_id)]
+        secondary_rules = set()
+
+        for obj in objects:
+            if (
+                obj["type"] == "relationship"
+                and obj["relationship_type"] == "related-to"
+            ):
+                ref = obj.get("external_references") and obj["external_references"][0]
+                if (
+                    ref
+                    and ref["source_name"] == "mitre-attack"
+                    and not ref["external_id"].startswith("TA")
+                ):
+                    comments = techniques.setdefault(ref["external_id"], [])
+                    comments.append(obj["description"])
+
+                    if obj['source_ref'] != indicator_id:
+                        secondary_rules.add(obj['source_ref'])
+            if obj["id"] == indicator_id:
+                indicator = obj
+
+            if obj["type"] == "report" and indicator_id in obj["object_refs"]:
+                report = obj
+
+        if report:
+            metadata.append(dict(name="report_id", value=report["id"]))
+        for s in secondary_rules:
+            metadata.append(dict(name='secondary_rule', value=s))
+
+        return Response(
+            {
+                "name": indicator["name"],
+                "domain": "enterprise-attack",
+                "versions": {
+                    "layer": "4.5",
+                    "navigator": "5.1.0",
+                },
+                "techniques": [
+                    {
+                        "comment": "|".join(comments),
+                        "score": 100,
+                        "showSubtechniques": True,
+                        "techniqueID": techniqueId,
+                    }
+                    for techniqueId, comments in techniques.items()
+                ],
+                "gradient": {
+                    "colors": ["#ffffff", "#ff6666"],
+                    "minValue": 0,
+                    "maxValue": 100,
+                },
+                "legendItems": [],
+                "metadata": metadata,
+                "links": [
+                    {
+                        "label": "Generated using siemrules",
+                        "url": "https://github.com/muchdogesec/siemrules/",
+                    }
+                ],
+                "layout": {"layout": "side"},
+            }
         )
 
 
@@ -1010,7 +1082,6 @@ class BaseRuleView(RuleView):
                 type=bool,
                 description="If set to `true` all embedded SROs are removed from the response.",
             ),
-
             OpenApiParameter(
                 "types",
                 many=True,
@@ -1363,7 +1434,13 @@ class CorrelationRuleView(RuleView):
         },
     ),
 )
-class ProfileView(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.DestroyModelMixin, mixins.CreateModelMixin, viewsets.GenericViewSet):
+class ProfileView(
+    mixins.ListModelMixin,
+    mixins.RetrieveModelMixin,
+    mixins.DestroyModelMixin,
+    mixins.CreateModelMixin,
+    viewsets.GenericViewSet,
+):
     openapi_tags = ["Profiles"]
     serializer_class = ProfileSerializer
     pagination_class = Pagination("profiles")
@@ -1388,7 +1465,7 @@ class ProfileView(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.Destr
         )
 
     @extend_schema(request=None)
-    @decorators.action(detail=True, methods=['PATCH'])
+    @decorators.action(detail=True, methods=["PATCH"])
     def make_default(self, request, *args, profile_id=None, **kwargs):
         profile = self.get_object()
         profile.is_default = True

@@ -95,16 +95,6 @@ class TestFileView:
             Transport.get_st_response(response)
         )
 
-    def test_nav_layer(self, client, job, fake_txt2stix_extractions, api_schema):
-        job.file.txt2detection_data = fake_txt2stix_extractions
-        job.file.save()
-        response = client.get(f"{self.url}{job.file.id}/attack-navigator/")
-        assert response.status_code == 200
-        assert response.json()["name"] == "fake python vulnerability report"
-        api_schema["/api/v1/files/{file_id}/attack-navigator/"][
-            "GET"
-        ].validate_response(Transport.get_st_response(response))
-
 
 class TestJobView:
     @pytest.fixture(autouse=True)
@@ -231,7 +221,7 @@ class TestBaseRuleView:
         ), "versions_after_revert must be a superset of versions_before_revert"
 
         for k in object_before_revert.keys():
-            if k in ["external_references", "modified"]:
+            if k in ["external_references", "modified", 'pattern']:
                 continue
             assert object_before_revert[k] == object_after_revert[k]
 

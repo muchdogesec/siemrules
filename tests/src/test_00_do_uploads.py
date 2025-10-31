@@ -37,11 +37,7 @@ from tests.src import data as test_data
 )
 def test_make_uploads(client, celery_eager, rule_id, sigma_yaml):
     save_model = FileSigmaYamlSerializer.save
-    with patch(
-        "txt2detection.bundler.Bundler.get_attack_objects", side_effect=lambda attack_ids: [v for k,v in test_data.objects_lookup.items() if k in attack_ids]
-    ) as get_attack_objects, patch(
-        "txt2detection.bundler.Bundler.get_cve_objects", side_effect=lambda cve_ids: [v for k,v in test_data.objects_lookup.items() if k in cve_ids]
-    ) as get_cve_objects, patch.object(FileSigmaYamlSerializer, "save", autospec=True, side_effect=lambda *x, **t: save_model(*x, **{**t, "id":rule_id})):
+    with patch.object(FileSigmaYamlSerializer, "save", autospec=True, side_effect=lambda *x, **t: save_model(*x, **{**t, "id":rule_id})):
         resp = client.post(
             f"/api/v1/files/yml/",
             data=sigma_yaml,
@@ -60,21 +56,17 @@ def test_modify_base_rule_manual(
 ):
     base_time = datetime.now(UTC)
     indicator_id = modification["rule_id"]
-    with patch(
-        "txt2detection.bundler.Bundler.get_attack_objects", side_effect=lambda attack_ids: [v for k,v in test_data.objects_lookup.items() if k in attack_ids]
-    ) as get_attack_objects, patch(
-        "txt2detection.bundler.Bundler.get_cve_objects", side_effect=lambda cve_ids: [v for k,v in test_data.objects_lookup.items() if k in cve_ids]
-    ) as get_cve_objects:
-        resp = client.post(
-            f"/api/v1/base-rules/{indicator_id}/modify/yml/",
-            data=modification["sigma"],
-            content_type="application/sigma+yaml",
-        )
-        assert resp.status_code == 201, resp.json()
+    
+    resp = client.post(
+        f"/api/v1/base-rules/{indicator_id}/modify/yml/",
+        data=modification["sigma"],
+        content_type="application/sigma+yaml",
+    )
+    assert resp.status_code == 201, resp.json()
 
-        job_resp = client.get(f"/api/v1/jobs/{resp.data['id']}/")
-        assert job_resp.status_code == 200
-        assert job_resp.data['state'] == 'completed'
+    job_resp = client.get(f"/api/v1/jobs/{resp.data['id']}/")
+    assert job_resp.status_code == 200
+    assert job_resp.data['state'] == 'completed'
 
     resp = client.get(
         f"/api/v1/base-rules/{indicator_id}/",

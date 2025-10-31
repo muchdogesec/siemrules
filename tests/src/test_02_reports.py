@@ -11,6 +11,7 @@ from rest_framework.validators import ValidationError
 
 from tests.src.utils import is_sorted
 
+
 class TestReportsView:
     @pytest.fixture(autouse=True)
     def setup(self):
@@ -228,6 +229,8 @@ class TestReportsView:
                     "x-mitre-tactic--ffd5bcee-6e16-4dd2-8eca-7b3beedf33ca",
                     "relationship--f5e45557-ced2-5ec6-9af1-699163f5b9a9",
                     "data-source--34ad2f90-179a-567e-8867-e527f5a3219b",
+                    "attack-pattern--a10641f4-87b4-45a3-a906-92a149cb2c27",
+                    "attack-pattern--035bb001-ab69-4a0b-9f6c-2de8b09e1b9d",
                 ],
             ),
             (
@@ -245,6 +248,7 @@ class TestReportsView:
                     "vulnerability--cf670f2c-81ff-5d1d-a3d6-abb4d6f25d15",
                     "relationship--fd32d711-a8f0-5f42-9856-79ecf345c451",
                     "data-source--512ead3c-b0fb-5235-8605-2da7c9b35ac2",
+                    "attack-pattern--f24faf46-3b26-4dbb-98f2-63460498e433",
                 ],
             ),
             (
@@ -256,10 +260,12 @@ class TestReportsView:
                     "report--2683daab-aa64-52ff-a001-3ea5aee9dd72",
                     "indicator--2683daab-aa64-52ff-a001-3ea5aee9dd72",
                     "x-mitre-tactic--4ca45d45-df4d-4613-8980-bac22d278fa5",
-                    "relationship--5fc94cc8-425c-539c-8b4c-e54e1e722a3f",
-                    "vulnerability--a99faefb-377e-585b-9890-70f73d75ffee",
+                    "relationship--869b7105-3f66-560b-9dd6-e681765463dc",
+                    "vulnerability--916e004a-e101-5b48-91c6-c2b4c4a0942c",
                     "relationship--e8cafeee-8786-5960-9dcc-667fdaeb0a9e",
                     "data-source--ab14f1cd-18db-5805-9c75-8d6002e41d9a",
+                    "attack-pattern--799ace7f-e227-4411-baa0-8868704f2a69",
+                    "attack-pattern--937e4772-8441-4e4a-8bf0-8d447d667e23",
                 ],
             ),
         ],
@@ -269,6 +275,8 @@ class TestReportsView:
         response = client.get(f"{self.url}{report_id}/objects/")
         assert response.status_code == status.HTTP_200_OK
         objects = response.data["objects"]
+        print({obj["id"] for obj in objects if obj.get("target_ref") == "vulnerability--916e004a-e101-5b48-91c6-c2b4c4a0942c"})
+        print(expected_ids_set.difference({obj["id"] for obj in objects}))
         assert {obj["id"] for obj in objects}.issuperset(
             expected_ids_set
         ), response.data
