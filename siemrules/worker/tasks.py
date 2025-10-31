@@ -234,8 +234,6 @@ def run_file2txt(file: models.File):
         parser_class = get_parser_class(file.mode, file.file.name)
         converter: BaseParser = parser_class(str(input_file), file.mode, file.profile.extract_text_from_image, settings.GOOGLE_VISION_API_KEY)
         output = converter.convert()
-        if file.profile.defang:
-            output = Fanger(output).defang()
 
         file.markdown_file.save('markdown.md', io.StringIO(output), save=True)
 
