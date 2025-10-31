@@ -1364,7 +1364,7 @@ class CorrelationRuleView(RuleView):
         },
     ),
 )
-class ProfileView(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.DestroyModelMixin, viewsets.GenericViewSet):
+class ProfileView(mixins.ListModelMixin, mixins.RetrieveModelMixin, mixins.DestroyModelMixin, mixins.CreateModelMixin, viewsets.GenericViewSet):
     openapi_tags = ["Profiles"]
     serializer_class = ProfileSerializer
     pagination_class = Pagination("profiles")

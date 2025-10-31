@@ -286,6 +286,38 @@ def test_regular_profile_does_not_use_default_profile(profile, default_profile):
     assert file.profile == profile
 
 
+def test_create_profile(client):
+    payload = {
+        "ai_provider": "anthropic:claude-sonnet-4-5",
+        "include_embedded_relationships_attributes": [],
+        "generate_pdf": True,
+        "name": "test_profile 3",
+        "extract_text_from_image": True,
+    }
+
+    resp = client.post(
+        f"/api/v1/profiles/", data=payload, content_type="application/json"
+    )
+    assert resp.status_code == 201, resp.content
+    data = resp.json()
+    del data['created']
+    assert data == {
+        "id": "cf51da4a-296f-5b4d-adc9-a80a26990cd4",
+        "ai_provider": "anthropic:claude-sonnet-4-5",
+        "ignore_embedded_relationships": False,
+        "ignore_embedded_relationships_sro": False,
+        "ignore_embedded_relationships_smo": False,
+        "include_embedded_relationships_attributes": [],
+        "generate_pdf": True,
+        "name": "test_profile 3",
+        "extract_text_from_image": True,
+        "is_default": False,
+    }
+    if not resp.json()["is_default"]:
+        resp = client.patch(f"/api/v1/profiles/{data['id']}/make_default/")
+        assert resp.json()["is_default"] == True
+
+
 def test_list_profile(profile, client):
     resp = client.get(f"/api/v1/profiles/")
     assert resp.status_code == 200

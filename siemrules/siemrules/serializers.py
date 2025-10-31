@@ -209,19 +209,6 @@ class ProfileSerializer(serializers.ModelSerializer):
         validators=[validate_model],
         help_text="An AI provider and model to be used for rule generation in format `provider:model` e.g. `openai:gpt-4o`.",
     )
-    ai_create_attack_flow = serializers.BooleanField(
-        required=False,
-        help_text="should create attack-flow (default is `false`)",
-        default=False,
-    )
-    ai_create_attack_navigator_layer = serializers.BooleanField(
-        required=False,
-        help_text="should create attack navigator layer (default is `false`)",
-        default=False,
-    )
-    defang = serializers.BooleanField(
-        help_text="If the text should be defanged before processing"
-    )
 
     ignore_embedded_relationships = serializers.BooleanField(
         required=False, help_text="applies to SDO and SCO types (default is `false`)"
@@ -250,7 +237,7 @@ class ProfileSerializer(serializers.ModelSerializer):
     class Meta:
         model = Profile
         fields = "__all__"
-        read_only_fields = ["id", "created"]
+        read_only_fields = ["id", "created", "is_default"]
 
     def validate(self, attrs):
         if not attrs.get("ai_provider"):
