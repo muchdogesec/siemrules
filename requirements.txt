@@ -533,7 +533,7 @@ tqdm==4.67.1
     #   txt2detection
 transformers==4.57.0
     # via llama-index-llms-openai-like
-txt2detection[llms] @ https://github.com/muchdogesec/txt2detection/archive/refs/heads/implement-create-navigator.zip
+txt2detection[llms]==1.0.12
     # via -r requirements.in
 typing-extensions==4.15.0
     # via
