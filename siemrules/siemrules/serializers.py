@@ -240,7 +240,6 @@ class ProfileSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "created", "is_default"]
 
 
-
 class FileDocumentSerializer(FileSerializer):
     type_label = "siemrules.file"
     profile_id = ProfileIDField(help_text="profile id to use", required=True, allow_null=False)
@@ -399,7 +398,11 @@ class AttackNavigatorDomainSerializer(JSONSchemaSerializer):
                     "attack": {"type": "string", "example": "17.0"},
                     "navigator": {"type": "string", "example": "5.1.0"},
                 },
-                "required": ["layer", "attack", "navigator"],
+                "required": [
+                    "layer",
+                    # "attack",
+                    "navigator",
+                ],
                 "additionalProperties": False,
             },
             "name": {"type": "string"},

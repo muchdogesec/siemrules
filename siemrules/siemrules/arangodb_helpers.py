@@ -179,7 +179,7 @@ def get_single_rule_versions(indicator_id):
         raise NotFound(f"no rule with id `{indicator_id}`")
     return Response(sorted([rule['modified'] for rule in rules], reverse=True))
 
-def get_objects_for_rule(indicator_id, request, version=None, rule_type=None):
+def get_objects_for_rule(indicator_id, request, version=None, rule_type=None, with_limit=True):
     rule = get_single_rule(indicator_id, version=version, nokeep=False).data
 
     helper = ArangoDBHelper(settings.VIEW_NAME, request)
@@ -205,10 +205,14 @@ def get_objects_for_rule(indicator_id, request, version=None, rule_type=None):
     FOR doc IN @@view
     SEARCH doc._id IN obj_ids
     #filters
-    LIMIT @offset, @count
+    //LIMIT
     RETURN KEEP(doc, KEYS(doc, TRUE))
     '''
     query = query.replace('#filters', '\n'.join(filters)).replace('#obj_ids_str', obj_ids_str)
+    if with_limit:
+        query = query.replace('//LIMIT', 'LIMIT @offset, @count')
+    else:
+        return helper.execute_query(query, bind_vars=binds, paginate=False)
     return helper.execute_query(query, bind_vars=binds)
 
 
