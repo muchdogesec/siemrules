@@ -1371,7 +1371,7 @@ class CorrelationRuleView(RuleView):
         summary="Search profiles",
         description=textwrap.dedent(
             """
-            Profiles determine how txt2stix processes the text in each File. A profile consists of extractors. You can search for existing profiles here.
+            Profiles determine how txt2detection processes the file inputes.
             """
         ),
         responses={400: DEFAULT_400_ERROR, 200: ProfileSerializer},
@@ -1393,6 +1393,7 @@ class CorrelationRuleView(RuleView):
         summary="Create a new profile",
         description=textwrap.dedent(
             """
+            Profiles define how file uploads are processed. You must have at least one profile defined, and it must be marked as default.
             """
         ),
         responses={400: DEFAULT_400_ERROR, 201: ProfileSerializer},
@@ -1410,7 +1411,11 @@ class CorrelationRuleView(RuleView):
     ),
     extractors=extend_schema(
         summary="Show all observable types that can be extracted by all profiles",
-        description="Show all observable types that can be extracted by all profiles",
+        description==textwrap.dedent(
+            """
+            Show all observable types that can be extracted by all profiles",
+            """
+        ),
         responses={
             200: OpenApiResponse(
                 list[str],
