@@ -1411,7 +1411,7 @@ class CorrelationRuleView(RuleView):
     ),
     extractors=extend_schema(
         summary="Show all observable types that can be extracted by all profiles",
-        description==textwrap.dedent(
+        description=textwrap.dedent(
             """
             Show all observable types that can be extracted by all profiles",
             """
@@ -1438,6 +1438,11 @@ class CorrelationRuleView(RuleView):
             )
         },
     ),
+    make_default=extend_schema(
+        request=None,
+        summary="Make profile into default",
+        description="Make the passed profile id into default profile, this profile will be used on endpoints that do not support profile (yml endpoints)",
+    )
 )
 class ProfileView(
     mixins.ListModelMixin,
@@ -1469,7 +1474,6 @@ class ProfileView(
             lookup_expr="icontains",
         )
 
-    @extend_schema(request=None)
     @decorators.action(detail=True, methods=["PATCH"])
     def make_default(self, request, *args, profile_id=None, **kwargs):
         profile = self.get_object()

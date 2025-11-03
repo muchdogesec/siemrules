@@ -8,7 +8,6 @@ def test_nav_layer_correlation(client, api_schema):
     api_schema["/api/v1/correlation-rules/{indicator_id}/attack-navigator/"][
         "GET"
     ].validate_response(Transport.get_st_response(response))
-    print(response.json())
     assert response.json() == {
         "name": "new title",
         "domain": "enterprise-attack",
@@ -66,7 +65,6 @@ def test_nav_layer_base(client, api_schema):
     api_schema["/api/v1/base-rules/{indicator_id}/attack-navigator/"][
         "GET"
     ].validate_response(Transport.get_st_response(response))
-    print(response.json())
     assert response.json() == {
         "name": "Detection of Malicious Code in xz Tarballs",
         "domain": "enterprise-attack",
