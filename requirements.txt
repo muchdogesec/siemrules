@@ -97,7 +97,7 @@ distro==1.9.0
     # via
     #   anthropic
     #   openai
-django==5.2.7
+django==5.2.8
     # via
     #   -r requirements.in
     #   django-cors-headers
@@ -245,6 +245,8 @@ jmespath==1.0.1
     #   botocore
 joblib==1.5.2
     # via nltk
+json-repair==0.52.4
+    # via txt2detection
 jsonschema==4.25.1
     # via
     #   drf-spectacular
