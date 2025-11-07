@@ -125,7 +125,7 @@ dnspython==2.8.0
     # via email-validator
 docstring-parser==0.17.0
     # via anthropic
-dogesec-commons==1.2.2
+dogesec-commons==1.2.8
     # via -r requirements.in
 drf-pydantic==2.9.0
     # via -r requirements.in
