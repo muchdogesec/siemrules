@@ -113,10 +113,10 @@ def modify_correlation(job_id, indicator, new_rule_data):
     match modify_type := job.data['modification_method']:
         case 'prompt':
             new_rule = correlations.get_modification(
-                parse_ai_model(job.data["ai_provider"]),
+                parse_ai_model(job.data['payload']["ai_provider"]),
                 "",
                 old_detection,
-                job.data["prompt"],
+                job.data['payload']["prompt"],
             )
         case 'sigma'|'revert':
             new_rule = RuleModel.model_validate(new_rule_data)
@@ -154,10 +154,10 @@ def modify_base_rule(job_id, indicator, report, new_rule_data):
         case 'prompt':
             input_text = "<SKIPPED INPUT>"
             new_rule = base_rule_modifier.get_modification(
-                parse_ai_model(job.data["ai_provider"]),
+                parse_ai_model(job.data['payload']["ai_provider"]),
                 input_text,
                 old_detection,
-                job.data["prompt"],
+                job.data['payload']["prompt"],
             )
         case 'sigma'|'revert':
             new_rule = txt2detection.models.SigmaRuleDetection.model_validate(new_rule_data)
