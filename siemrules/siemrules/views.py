@@ -536,9 +536,7 @@ class RuleView(viewsets.GenericViewSet):
     )
     @decorators.action(methods=["GET"], detail=True, pagination_class=None)
     def versions(self, request, *args, indicator_id=None, **kwargs):
-        return arangodb_helpers.get_single_rule_versions(
-            indicator_id,
-        )
+        return arangodb_helpers.get_single_rule_versions(indicator_id, self.rule_type)
 
     @extend_schema(
         request=serializers.RuleRevertSerializer,
@@ -548,7 +546,9 @@ class RuleView(viewsets.GenericViewSet):
     def revert(self, request, *args, indicator_id=None, **kwargs):
         s = serializers.RuleRevertSerializer(data=request.data)
         s.is_valid(raise_exception=True)
-        versions = arangodb_helpers.get_single_rule_versions(indicator_id).data
+        versions = arangodb_helpers.get_single_rule_versions(
+            indicator_id, self.rule_type
+        ).data
         selected_version = s.initial_data["version"]
         if selected_version not in versions:
             raise validators.ValidationError("selected version does not exist")
@@ -673,8 +673,8 @@ class RuleView(viewsets.GenericViewSet):
                     comments = techniques.setdefault(ref["external_id"], [])
                     comments.append(obj["description"])
 
-                    if obj['source_ref'] != indicator_id:
-                        secondary_rules.add(obj['source_ref'])
+                    if obj["source_ref"] != indicator_id:
+                        secondary_rules.add(obj["source_ref"])
             if obj["id"] == indicator_id:
                 indicator = obj
 
@@ -684,7 +684,7 @@ class RuleView(viewsets.GenericViewSet):
         if report:
             metadata.append(dict(name="report_id", value=report["id"]))
         for s in secondary_rules:
-            metadata.append(dict(name='secondary_rule', value=s))
+            metadata.append(dict(name="secondary_rule", value=s))
 
         return Response(
             {
@@ -1283,7 +1283,9 @@ class CorrelationRuleView(RuleView):
         job_instance = models.Job.objects.create(
             type=models.JobType.CORRELATION_MODIFY,
             data=dict(
-                modification_method="prompt", correlation_id=indicator_id, **s.data
+                modification_method="prompt",
+                correlation_id=indicator_id,
+                payload=s.data,
             ),
         )
         job_s = CorrelationJobSerializer(job_instance)
@@ -1442,7 +1444,7 @@ class CorrelationRuleView(RuleView):
         request=None,
         summary="Make profile into default",
         description="Make the passed profile id into default profile, this profile will be used on endpoints that do not support profile (yml endpoints)",
-    )
+    ),
 )
 class ProfileView(
     mixins.ListModelMixin,
