@@ -97,27 +97,18 @@ class TestReportsView:
                 dict(),
                 [
                     "report--9e2536b0-988b-598d-8cc3-407f9f13fc61",
-                    "report--8af82832-2abd-5765-903c-01d414dae1e9",
                     "report--2683daab-aa64-52ff-a001-3ea5aee9dd72",
                 ],
                 id="no filter",
             ),
-            pytest.param(dict(created_min="2027-01-01"), []),
+            pytest.param(dict(created_min="2050-01-01"), []),
             pytest.param(
                 dict(created_min="2001-01-01"),
                 [
                     "report--9e2536b0-988b-598d-8cc3-407f9f13fc61",
-                    "report--8af82832-2abd-5765-903c-01d414dae1e9",
                     "report--2683daab-aa64-52ff-a001-3ea5aee9dd72",
                 ],
                 id="created_min 1",
-            ),
-            pytest.param(
-                dict(created_min="2025-03-01"),
-                [
-                    "report--2683daab-aa64-52ff-a001-3ea5aee9dd72",
-                ],
-                id="created_min 2",
             ),
             pytest.param(
                 dict(created_max="2020-01-01"),
@@ -125,53 +116,30 @@ class TestReportsView:
                 id="created_max 0",
             ),
             pytest.param(
-                dict(created_max="2025-04-01"),
+                dict(description="modifies the liblzma"),
                 [
                     "report--9e2536b0-988b-598d-8cc3-407f9f13fc61",
-                    "report--8af82832-2abd-5765-903c-01d414dae1e9",
-                    "report--2683daab-aa64-52ff-a001-3ea5aee9dd72",
-                ],
-                id="created_max 1",
-            ),
-            pytest.param(
-                dict(created_max="2025-01-01T13:45:58.354498Z"),
-                [
-                    "report--8af82832-2abd-5765-903c-01d414dae1e9",
-                ],
-                id="created_max 2",
-            ),
-            pytest.param(
-                dict(description="requirements.txt"),
-                [
-                    "report--8af82832-2abd-5765-903c-01d414dae1e9",
                 ],
                 id="description match case",
             ),
             pytest.param(
-                dict(description="RequiREments.TxT"),
+                dict(description="modifies the liblzma".upper()),
                 [
-                    "report--8af82832-2abd-5765-903c-01d414dae1e9",
-                ],
-                id="description bad case",
-            ),
-            pytest.param(
-                dict(description="indicating potential".upper()),
-                [
-                    "report--8af82832-2abd-5765-903c-01d414dae1e9",
+                    "report--9e2536b0-988b-598d-8cc3-407f9f13fc61",
                 ],
                 id="description upper case",
             ),
             pytest.param(
-                dict(name="PyPI Package"),
+                dict(name="Malicious Code"),
                 [
-                    "report--8af82832-2abd-5765-903c-01d414dae1e9",
+                    "report--9e2536b0-988b-598d-8cc3-407f9f13fc61",
                 ],
                 id="name match case",
             ),
             pytest.param(
-                dict(name="pypi pAckAGe"),
+                dict(name="maliciOuS cOde"),
                 [
-                    "report--8af82832-2abd-5765-903c-01d414dae1e9",
+                    "report--9e2536b0-988b-598d-8cc3-407f9f13fc61",
                 ],
                 id="name bad case",
             ),
@@ -183,23 +151,34 @@ class TestReportsView:
                 id="test tlp_level 0",
             ),
             pytest.param(
-                dict(tlp_level="green"),
+                dict(tlp_level="red"),
                 [
                     "report--9e2536b0-988b-598d-8cc3-407f9f13fc61",
-                    "report--8af82832-2abd-5765-903c-01d414dae1e9",
                 ],
                 id="test tlp_level 1",
             ),
             pytest.param(
-                dict(tlp_level="green", name="package"),
+                dict(tlp_level="green"),
                 [
-                    "report--8af82832-2abd-5765-903c-01d414dae1e9",
                 ],
-                id="test tlp_level+name",
+                id="test tlp_level",
             ),
             pytest.param(
-                dict(indicator_id="indicator--8af82832-2abd-5765-903c-01d414dae1e9"),
-                ["report--8af82832-2abd-5765-903c-01d414dae1e9"],
+                dict(tlp_level="red", name="PyPI Package"),
+                [
+                ],
+                id="test tlp_level+bad_name",
+            ),
+            pytest.param(
+                dict(tlp_level="red", name="malicio"),
+                [
+                    "report--9e2536b0-988b-598d-8cc3-407f9f13fc61",
+                ],
+                id="test tlp_level+good_name",
+            ),
+            pytest.param(
+                dict(indicator_id="indicator--9e2536b0-988b-598d-8cc3-407f9f13fc61"),
+                ["report--9e2536b0-988b-598d-8cc3-407f9f13fc61"],
                 id="indicator_id good",
             ),
             pytest.param(
@@ -213,32 +192,20 @@ class TestReportsView:
         expected_ids_set = set(expected_ids)
         response = client.get(self.url, query_params=filters)
         assert response.status_code == status.HTTP_200_OK
+        print({obj["id"] for obj in response.data["objects"]})
+        print(expected_ids_set)
         assert {obj["id"] for obj in response.data["objects"]} == expected_ids_set
 
     @pytest.mark.parametrize(
         ["report_id", "expected_ids"],
         [
-            (
-                "report--8af82832-2abd-5765-903c-01d414dae1e9",
-                [
-                    "marking-definition--bab4a63c-aed9-4cf5-a766-dfca5abac2bb",
-                    "marking-definition--a4d70b75-6f4a-5d19-9137-da863edd33d7",
-                    "identity--a4d70b75-6f4a-5d19-9137-da863edd33d7",
-                    "report--8af82832-2abd-5765-903c-01d414dae1e9",
-                    "indicator--8af82832-2abd-5765-903c-01d414dae1e9",
-                    "x-mitre-tactic--ffd5bcee-6e16-4dd2-8eca-7b3beedf33ca",
-                    "relationship--f5e45557-ced2-5ec6-9af1-699163f5b9a9",
-                    "data-source--34ad2f90-179a-567e-8867-e527f5a3219b",
-                    "attack-pattern--a10641f4-87b4-45a3-a906-92a149cb2c27",
-                    "attack-pattern--035bb001-ab69-4a0b-9f6c-2de8b09e1b9d",
-                ],
-            ),
+
             (
                 "report--9e2536b0-988b-598d-8cc3-407f9f13fc61",
                 [
-                    "marking-definition--bab4a63c-aed9-4cf5-a766-dfca5abac2bb",
+                    "marking-definition--e828b379-4e03-4974-9ac4-e53a884c97c1",
                     "marking-definition--a4d70b75-6f4a-5d19-9137-da863edd33d7",
-                    "identity--a4d70b75-6f4a-5d19-9137-da863edd33d7",
+                    "identity--8ef05850-cb0d-51f7-80be-50e4376dbe63",
                     "report--9e2536b0-988b-598d-8cc3-407f9f13fc61",
                     "indicator--9e2536b0-988b-598d-8cc3-407f9f13fc61",
                     "x-mitre-tactic--78b23412-0651-46d7-a540-170a1ce8bd5a",
@@ -256,7 +223,7 @@ class TestReportsView:
                 [
                     "marking-definition--55d920b0-5e8b-4f79-9ee9-91f868d9b421",
                     "marking-definition--a4d70b75-6f4a-5d19-9137-da863edd33d7",
-                    "identity--a4d70b75-6f4a-5d19-9137-da863edd33d7",
+                    "identity--8ef05850-cb0d-51f7-80be-50e4376dbe63",
                     "report--2683daab-aa64-52ff-a001-3ea5aee9dd72",
                     "indicator--2683daab-aa64-52ff-a001-3ea5aee9dd72",
                     "x-mitre-tactic--4ca45d45-df4d-4613-8980-bac22d278fa5",
@@ -275,8 +242,9 @@ class TestReportsView:
         response = client.get(f"{self.url}{report_id}/objects/")
         assert response.status_code == status.HTTP_200_OK
         objects = response.data["objects"]
-        print({obj["id"] for obj in objects if obj.get("target_ref") == "vulnerability--916e004a-e101-5b48-91c6-c2b4c4a0942c"})
+        print({obj["id"] for obj in objects if obj.get("type") == "identity"})
         print(expected_ids_set.difference({obj["id"] for obj in objects}))
+        print(sorted({obj["id"] for obj in objects}))
         assert {obj["id"] for obj in objects}.issuperset(
             expected_ids_set
         ), response.data

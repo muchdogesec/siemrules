@@ -21,6 +21,7 @@ from txt2detection.models import (
     SigmaTag,
     Level,
 )
+import stix2
 
 from llama_index.core import ChatPromptTemplate
 from llama_index.core.base.llms.types import ChatMessage, MessageRole
@@ -38,27 +39,41 @@ from txt2detection.models import (
 
 
 def modify_indicator(report, indicator: dict, detection: BaseDetection):
+    report_id = report and report["id"] or indicator["id"]
+    fake_identity = stix2.Identity(
+        id=indicator["created_by_ref"],
+        name="Dummy Identity",
+    )
     bundler = Bundler(
         "name",
-        None,
+        fake_identity,
         "red",
         "description",
         report.get("labels", []),
         indicator["created"],
-        report_id=report["id"].replace("report--", ""),
+        report_id=report_id.replace("report--", "").replace("indicator--", ""),
         modified=datetime.now(UTC),
         external_refs=[
-            ref
-            for ref in indicator.get("external_references", [])
-            if ref["source_name"] == "siemrules-created-type"
         ],
     )
+    print(
+        indicator["created_by_ref"],
+        bundler.report.created_by_ref,
+        report and report["created_by_ref"],
+        getattr(detection, "author", None),
+    )
+    bundler.report.external_references.clear()
+    bundler.report.object_marking_refs.clear()
+    bundler.report.external_references.extend(
+        [
+            x
+            for x in indicator["external_references"]
+            if x["source_name"] not in ["mitre-attack", "cve"]
+        ]
+    )
+    bundler.report.object_marking_refs.extend(indicator["object_marking_refs"])
 
     detection.detection_id = indicator["id"].replace("indicator--", "")
-    bundler.report.external_references.clear()
-    bundler.report.external_references.extend(report["external_references"])
-    bundler.report.object_marking_refs.clear()
-    bundler.report.object_marking_refs.extend(report["object_marking_refs"])
     container = DetectionContainer(success=True, detections=[])
     detection.modified = bundler.modified.date()
     container.detections.append(detection)

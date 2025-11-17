@@ -178,7 +178,7 @@ class JobType(models.TextChoices):
 
 class Job(models.Model):
     type = models.CharField(choices=JobType.choices, max_length=20, default=JobType.FILE_SIGMA)
-    file = models.OneToOneField(File, on_delete=models.CASCADE, default=None, null=True)
+    file = models.OneToOneField(File, on_delete=models.SET_NULL, default=None, null=True)
     id = models.UUIDField(default=uuid.uuid4, primary_key=True)
     state = models.CharField(choices=JobState.choices, max_length=20, default=JobState.PENDING)
     error = models.CharField(max_length=65536, null=True)
@@ -195,6 +195,44 @@ class Job(models.Model):
     @property
     def profile(self):
         return (self.file and self.file.profile) or Profile.default_profile()
+    
+class VersionAction(models.TextChoices):
+    CREATE = "create"
+    MODIFY = "modify"
+
+
+class VersionRuleType(models.TextChoices):
+    BASE_RULE = "base"
+    CORRELATION_RULE = "correlation"
+
+class VersionTypes(models.TextChoices):
+    SIGMA  = "sigma"
+    PROMPT = "prompt"
+    FILE   = "file"
+    CLONE  = "clone"
+    REVERT = "revert"
+
+
+
+class Version(models.Model):
+    # id = models.CharField(primary_key=True, default=None)
+    rule_id = models.CharField(max_length=48)
+    modified = models.CharField(max_length=30)
+    action = models.CharField(max_length=16, choices=VersionAction.choices)
+    type = models.CharField(max_length=16, choices=VersionTypes.choices)
+    rule_type = models.CharField(max_length=32, choices=VersionRuleType.choices)
+    ###
+    prompt = models.TextField(null=True, default=None)
+    file = models.ForeignKey(File, on_delete=models.CASCADE, default=None, null=True)
+    job = models.ForeignKey(Job, on_delete=models.SET_NULL, default=None, null=True)
+    cloned_from = models.CharField(max_length=100, null=True, default=None)
+    reverted_to = models.DateTimeField(null=True, default=None)
+
+    class Meta:
+        ordering = ["-modified"]
+        verbose_name = "Version entry"
+        verbose_name_plural = "Version entries"
+
 
 
 @receiver(post_save, sender=Job)

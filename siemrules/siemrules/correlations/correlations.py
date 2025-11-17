@@ -43,7 +43,6 @@ def make_rule(rule: RuleModel, other_documents: list[dict], id):
 def add_rule_indicator(
     rule: RuleModel,
     base_rule_indicators=None,
-    correlation_rule_type="manual",
     job_data=None,
 ):
     job_data = job_data or dict()
@@ -65,7 +64,6 @@ def add_rule_indicator(
     )
 
     ext_refs = [
-        dict(source_name="siemrules-created-type", external_id=correlation_rule_type)
     ]
     for ref in getattr(rule, "references", None) or []:
         ext_refs.append(

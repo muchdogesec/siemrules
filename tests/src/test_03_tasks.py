@@ -153,7 +153,6 @@ def report():
                     "source_name": "description_md5_hash",
                     "external_id": "6532ad7e15543e41f6f24042a82f6140",
                 },
-                {"source_name": "siemrules-created-type", "external_id": "file.sigma"},
                 {
                     "source_name": "txt2detection",
                     "description": "txt2detection-reference",
@@ -232,7 +231,7 @@ def test_run_txt2detection(job, report, profile):
         mock_run_txt2detection.return_value = mock_bundler
 
         # Run the function
-        result = run_txt2detection(mock_file_copy)
+        result, remove_file = run_txt2detection(mock_file_copy)
         ##########
         mock_parse_ai_model.assert_called_once_with(profile.ai_provider)
         mock_parse_stix.assert_called_once_with(mock_file_copy.identity)
@@ -249,10 +248,6 @@ def test_run_txt2detection(job, report, profile):
             level=mock_file.level,
             status=mock_file.status,
             external_refs=[
-                {
-                    "source_name": "siemrules-created-type",
-                    "external_id": mock_file.job.type,
-                }
             ],
             created=mock_file.created,
         )
@@ -355,12 +350,20 @@ def test_job_failure(job):
         assert job.state == models.JobState.FAILED
 
 
-def test_process_report_success(job):
+@pytest.mark.parametrize(
+    'deletes_file',
+    [
+        True,
+        False
+    ]
+)
+def test_process_report_success(job, deletes_file):
 
+    mocked_bundle = {'objects': []}
     with mock.patch(
         "siemrules.worker.tasks.run_file2txt", return_value=None
     ) as mock_run_file2txt, mock.patch(
-        "siemrules.worker.tasks.run_txt2detection", return_value="detection_bundle"
+        "siemrules.worker.tasks.run_txt2detection", return_value=[mocked_bundle, deletes_file]
     ) as mock_run_txt2detection, mock.patch(
         "siemrules.worker.tasks.upload_to_arango", return_value=None
     ) as mock_upload_to_arango:
@@ -368,11 +371,16 @@ def test_process_report_success(job):
         process_report(job.file.name, job.id)
 
         job.refresh_from_db()
-        mock_run_file2txt.assert_called_once_with(job.file)
-        mock_run_txt2detection.assert_called_once_with(job.file)
-        mock_upload_to_arango.assert_called_once_with(job, "detection_bundle")
+        mock_run_file2txt.assert_called_once()
+        mock_run_txt2detection.assert_called_once()
+        assert mock_run_file2txt.call_args[0][0] == mock_run_txt2detection.call_args[0][0]
+        mock_upload_to_arango.assert_called_once_with(job, mocked_bundle)
         assert job.error is None
         assert job.state == models.JobState.PENDING
+        if deletes_file:
+            assert job.file == None
+        else:
+            assert str(job.file.id) == "f4b9c920-33de-4d52-827f-40362f161aca"
 
 
 def test_process_report_fail(job):

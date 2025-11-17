@@ -529,14 +529,20 @@ class RuleView(viewsets.GenericViewSet):
             rule_type=self.rule_type,
         )
 
-    @extend_schema(
-        responses={
-            200: {"type": "array", "items": {"type": "string", "format": "date-time"}}
-        },
-    )
-    @decorators.action(methods=["GET"], detail=True, pagination_class=None)
+    # @extend_schema(
+    #     responses={
+    #         200: {"type": "array", "items": {"type": "string", "format": "date-time"}}
+    #     },
+    # )
+    # @decorators.action(methods=["GET"], detail=True, pagination_class=None)
+    # def versions2(self, request, *args, indicator_id=None, **kwargs):
+    #     return arangodb_helpers.get_single_rule_versions(indicator_id, self.rule_type)
+
+    @decorators.action(methods=["GET"], detail=True, pagination_class=None, serializer_class=serializers.VersionSerializer(many=True))
     def versions(self, request, *args, indicator_id=None, **kwargs):
-        return arangodb_helpers.get_single_rule_versions(indicator_id, self.rule_type)
+        q = models.Version.objects.filter(rule_id=indicator_id)
+        s = serializers.VersionSerializer(q, many=True)
+        return Response([{k: v for k, v in vv.items() if v} for vv in s.data])
 
     @extend_schema(
         request=serializers.RuleRevertSerializer,
@@ -656,6 +662,7 @@ class RuleView(viewsets.GenericViewSet):
         objects.sort(key=lambda x: x["id"])
         techniques = {}
         report = None
+        indicator = None
         metadata = [dict(name="rule_id", value=indicator_id)]
         secondary_rules = set()
 
@@ -681,9 +688,12 @@ class RuleView(viewsets.GenericViewSet):
             if obj["type"] == "report" and indicator_id in obj["object_refs"]:
                 report = obj
 
+        if not indicator:
+            raise exceptions.ParseError({"error": "bad bundle"})
+
         if report:
             metadata.append(dict(name="report_id", value=report["id"]))
-        for s in secondary_rules:
+        for s in sorted(secondary_rules):
             metadata.append(dict(name="secondary_rule", value=s))
 
         return Response(

@@ -134,8 +134,8 @@ def test_make_clone_baserule_links_report(celery_eager, client: django.test.Clie
     expected_relationship_id = 'relationship--3ca6a2be-427f-56eb-9a17-03e4ef6af72b'
     report_id = 'report--9e2536b0-988b-598d-8cc3-407f9f13fc61'
     with mock.patch('siemrules.siemrules.arangodb_helpers.make_upload') as mock_make_upload:
-        output_id = make_clone(indicator_id, new_rule_id, dict(title='New Rule Title'))
-        assert output_id == new_rule_id
+        new_indicator = make_clone(indicator_id, new_rule_id, dict(title='New Rule Title'))
+        assert new_indicator['id'] == new_rule_id
         bundle = mock_make_upload.call_args[0][1]
         mock_make_upload.assert_called_once_with('', bundle)
         objects = {obj['id']: obj for obj in bundle['objects']}

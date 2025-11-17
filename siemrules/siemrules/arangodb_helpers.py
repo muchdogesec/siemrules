@@ -122,14 +122,6 @@ def get_rules(request: request.Request, paginate=True, all_versions=False, nokee
             """
         )
 
-    if ingestion_method := helper.query.get("create_type"):
-        filters.append("FILTER @ingestion_method IN doc.external_references")
-        binds.update(
-            ingestion_method=dict(
-                source_name="siemrules-created-type", external_id=ingestion_method
-            )
-        )
-
     if rule_type := helper.query.get("rule_type"):
         rule_type, _, _ = rule_type.partition("-")
         filters.append("FILTER doc.x_sigma_type == @rule_type")
@@ -428,14 +420,13 @@ def delete_rule(indicator_id):
 def indicator_to_rule(
     indicator: dict,
 ) -> tuple[RuleModel | SigmaRuleDetection, list[dict]]:
-    for ref in indicator.get("external_references", []):
-        if ref["source_name"] == "siemrules-created-type":
-            if ref.get("external_id", "").startswith("file"):
-                return (yaml_to_detection(indicator["pattern"]), [])
-            else:
-                return yaml_to_rule(indicator["pattern"])
-    else:
-        raise ParseError("unable to determine rule type")
+    match indicator['x_sigma_type']:
+        case 'base':
+            return yaml_to_detection(indicator["pattern"]), []
+        case 'correlation':
+            return yaml_to_rule(indicator["pattern"])
+        case _:
+            raise ParseError("unable to determine rule type")
 
 
 def make_clone(indicator_id: str, new_uuid: str, data: dict):
@@ -584,7 +575,7 @@ def make_clone(indicator_id: str, new_uuid: str, data: dict):
     objects += [identity]
 
     make_upload(rule.get("_stixify_report_id", ""), make_bundle(objects))
-    return rule["id"]
+    return rule
 
 
 def make_bundle(objects):

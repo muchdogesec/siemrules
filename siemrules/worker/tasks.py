@@ -10,7 +10,7 @@ import txt2detection.models
 from siemrules.siemrules import modifier as base_rule_modifier
 from siemrules.siemrules.correlations import correlations
 from siemrules.siemrules.correlations.models import RuleModel
-from siemrules.siemrules.models import Job, File, JobType
+from siemrules.siemrules.models import Job, File, JobType, Version
 from siemrules.siemrules import arangodb_helpers, models
 from celery import Task, shared_task
 from txt2detection.utils import validate_token_count, parse_model as parse_ai_model
@@ -118,7 +118,9 @@ def new_clone_rule_task(job):
 def clone_rule(job_id):
     job = Job.objects.get(id=job_id)
     _, _, new_indicator_uuid = job.data["indicator_id"].rpartition("--")
-    arangodb_helpers.make_clone(job.data["cloned_from"], new_indicator_uuid, job.data)
+    indicator = arangodb_helpers.make_clone(job.data["cloned_from"], new_indicator_uuid, job.data)
+    add_versions(job_id, models.VersionAction.CREATE, type=models.VersionTypes.CLONE, objects=[indicator], cloned_from=job.data["cloned_from"])
+
 
 
 @shared_task
@@ -127,6 +129,7 @@ def modify_correlation(job_id, indicator, new_rule_data):
 
     job = Job.objects.get(id=job_id)
     old_detection, _ = correlations.yaml_to_rule(indicator["pattern"])
+    version_kwargs = {}
     match modify_type := job.data["modification_method"]:
         case "prompt":
             new_rule = correlations.get_modification(
@@ -135,10 +138,18 @@ def modify_correlation(job_id, indicator, new_rule_data):
                 old_detection,
                 job.data["payload"]["prompt"],
             )
+            version_kwargs["prompt"] = job.data["payload"]["prompt"]
+            version_type = models.VersionTypes.PROMPT
         case "sigma" | "revert":
             new_rule = RuleModel.model_validate(new_rule_data)
+            version_type = models.VersionTypes.SIGMA
         case _:
             raise ValueError(f"unknown type `{modify_type}`")
+        
+    if modify_type == 'revert':
+        version_kwargs["reverted_to"] = indicator['modified']
+        version_type = models.VersionTypes.REVERT
+    
 
     base_rule_indicators = CorrelationRuleView.get_rules(
         new_rule.correlation.rules or []
@@ -148,7 +159,6 @@ def modify_correlation(job_id, indicator, new_rule_data):
     new_objects = correlations.add_rule_indicator(
         new_rule,
         base_rule_indicators,
-        get_rule_type(indicator),
         dict(modified=datetime.now(UTC)),
     )
     arangodb_helpers.modify_rule(
@@ -158,16 +168,8 @@ def modify_correlation(job_id, indicator, new_rule_data):
         new_objects,
     )
     job.data["resultant_version"] = format_datetime(new_objects[0]["modified"])
+    add_versions(job_id, models.VersionAction.MODIFY, version_type, objects=new_objects, **version_kwargs)
     job.save(update_fields=["data"])
-
-
-def get_rule_type(indicator):
-    rule_type = "base.modify"
-    for ref in indicator.get("external_references", []):
-        if ref["source_name"] == "siemrules-created-type":
-            rule_type = ref["external_id"]
-            break
-    return rule_type
 
 
 @shared_task
@@ -176,6 +178,8 @@ def modify_base_rule(job_id, indicator, report, new_rule_data):
     old_detection = yaml_to_detection(
         indicator["pattern"], indicator.get("indicator_types", [])
     )
+    version_kwargs = {}
+    version_type = None
     match modify_type := job.data["modification_method"]:
         case "prompt":
             input_text = "<SKIPPED INPUT>"
@@ -185,12 +189,22 @@ def modify_base_rule(job_id, indicator, report, new_rule_data):
                 old_detection,
                 job.data["payload"]["prompt"],
             )
+            version_kwargs["prompt"] = job.data["payload"]["prompt"]
+            version_type = models.VersionTypes.PROMPT
+
         case "sigma" | "revert":
             new_rule = txt2detection.models.SigmaRuleDetection.model_validate(
                 new_rule_data
             )
+            version_type = models.VersionTypes.SIGMA
         case _:
             raise ValueError(f"unknown type `{modify_type}`")
+        
+    
+    if modify_type == 'revert':
+        version_kwargs["reverted_to"] = indicator['modified']
+        version_type = models.VersionTypes.REVERT
+    
 
     new_rule.tlp_level = old_detection.tlp_level.name
     new_objects = base_rule_modifier.modify_indicator(report, indicator, new_rule)
@@ -201,6 +215,7 @@ def modify_base_rule(job_id, indicator, report, new_rule_data):
         new_objects,
     )
     job.data["resultant_version"] = format_datetime(new_objects[0]["modified"])
+    add_versions(job_id, models.VersionAction.MODIFY, version_type, objects=new_objects, **version_kwargs)
     job.save(update_fields=["data"])
 
 
@@ -208,6 +223,7 @@ def run_txt2detection(file: models.File):
     input_str = None
     provider = None
     kwargs = {}
+    remove_file = False
     if file.mode == "sigma":
         kwargs["sigma_file"] = file.file.read().decode()
     else:
@@ -217,7 +233,6 @@ def run_txt2detection(file: models.File):
     job: Job = file.job
     kwargs.update(
         external_refs=[
-            dict(source_name="siemrules-created-type", external_id=job.type)
         ],
         created=file.created,
     )
@@ -244,7 +259,11 @@ def run_txt2detection(file: models.File):
     file.license = bundler.license
     file.save()
 
-    return bundler.bundle_dict
+    if 'sigma_file' in kwargs:
+        remove_file = True
+        bundler.bundle.objects[:] = [obj for obj in bundler.bundle.objects if obj['type'] != 'report']
+
+    return bundler.bundle_dict, remove_file
 
 
 def run_file2txt(file: models.File):
@@ -343,20 +362,47 @@ def make_bundle(objects):
 @shared_task
 def process_report(filename, job_id, *args):
     job = Job.objects.get(id=job_id)
+    version_kwargs = {}
+    remove_file = False
+    version_type = None
     try:
         if job.file.mode == "sigma":
-            pass
+            version_type = models.VersionTypes.SIGMA
         else:
+            version_type = models.VersionTypes.FILE if job.type == models.JobType.FILE_FILE else models.VersionTypes.PROMPT
             run_file2txt(job.file)
-        bundle = run_txt2detection(job.file)
+            version_kwargs.update(file_id=job.file.id)
+        bundle, remove_file = run_txt2detection(job.file)
         upload_to_arango(job, bundle)
+        add_versions(job_id, models.VersionAction.CREATE, version_type, bundle["objects"], **version_kwargs)
         job.file.save()
     except Exception as e:
         error = f"report failed to process with: {e}"
         logging.exception(error)
         raise
+    if remove_file:
+        job.file.delete()
+        job.file = None
     job.save()
     return job_id
+
+
+def add_versions(job_id, action, type, objects, **kwargs):
+    versions = []
+    for obj in objects:
+        rule_type = obj.get("x_sigma_type")
+        if obj["type"] == "indicator" and obj.get("x_sigma_type"):
+            version = Version.objects.create(
+                modified=format_datetime(obj["modified"]),
+                action=action,
+                type=type,
+                rule_type=rule_type,
+                rule_id=obj["id"],
+                job_id=job_id,
+                **kwargs,
+            )
+            versions.append(version)
+    return versions
 
 
 @shared_task
@@ -369,8 +415,15 @@ def process_correlation(job_id, correlation: RuleModel, related_indicators):
 
 def upload_correlation(correlation, related_indicators, job: Job):
     objects = correlations.add_rule_indicator(
-        correlation, related_indicators, job.type, job.data
+        correlation, related_indicators, job.data
     )
+    versions_kwargs = dict()
+    versions_type=models.VersionTypes.SIGMA
+    if job.type == JobType.CORRELATION_PROMPT:
+        versions_kwargs["prompt"] = job.data["payload"]["prompt"]
+        versions_type = models.VersionTypes.PROMPT
+    
+    add_versions(job.id, models.VersionAction.CREATE, versions_type, [f for f in objects if f['id'].endswith(str(correlation.rule_id))], **versions_kwargs)
     upload_objects(
         job, make_bundle(objects), None, stix2arango_note=f"siemrules-correlation"
     )

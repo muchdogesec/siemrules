@@ -3,7 +3,7 @@ from enum import StrEnum, auto
 import uuid
 from django.core.files.uploadedfile import SimpleUploadedFile
 from rest_framework import serializers, validators
-from siemrules.siemrules.models import File, Job, FileImage, Profile, TLP_Levels
+from siemrules.siemrules.models import File, Job, FileImage, Profile, TLP_Levels, Version
 from drf_spectacular.utils import extend_schema_field
 import file2txt.parsers.core as f2t_core
 from txt2detection.utils import parse_model as parse_ai_model, valid_licenses
@@ -473,3 +473,10 @@ class AttackNavigatorDomainSerializer(JSONSchemaSerializer):
         },
         "additionalProperties": True,
     }
+
+
+class VersionSerializer(serializers.ModelSerializer):
+    file_id = serializers.UUIDField(source='file.id', read_only=True, required=False)
+    class Meta:
+        model = Version
+        exclude = ['id', 'rule_id', 'rule_type', "job", "file"]
