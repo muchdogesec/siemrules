@@ -12,7 +12,7 @@ from dogesec_commons.objects.helpers import OBJECT_TYPES
 from siemrules.siemrules.correlations import correlations
 from siemrules.siemrules.correlations.correlations import yaml_to_rule
 from siemrules.siemrules.modifier import yaml_to_detection
-from siemrules.siemrules.utils import TLP_LEVEL_STIX_ID_MAPPING, TLP_Levels
+from siemrules.siemrules.utils import TLP_LEVEL_STIX_ID_MAPPING, TLP_Levels, format_datetime
 
 from txt2detection.models import TLP_LEVEL as T2D_TLP_LEVEL, SigmaRuleDetection
 from siemrules.siemrules.correlations.models import RuleModel, set_tlp_level_in_tags
@@ -23,7 +23,6 @@ if typing.TYPE_CHECKING:
     from siemrules import settings
 from rest_framework.exceptions import NotFound, ParseError, ValidationError
 from rest_framework.response import Response
-from stix2.utils import format_datetime
 
 
 RULES_SORT_FIELDS = [
@@ -426,7 +425,7 @@ def indicator_to_rule(
         case 'correlation':
             return yaml_to_rule(indicator["pattern"])
         case _:
-            raise ParseError("unable to determine rule type")
+            raise ParseError("unable to determine rule type")   
 
 
 def make_clone(indicator_id: str, new_uuid: str, data: dict):
@@ -434,7 +433,7 @@ def make_clone(indicator_id: str, new_uuid: str, data: dict):
     r = request_from_queries(indicator_id=indicator_id)
     helper = ArangoDBHelper(settings.VIEW_NAME, r)
     now = datetime.now(UTC)
-    now_str = now.isoformat().replace("+00:00", "Z")
+    now_str = format_datetime(now)
 
     rules = get_rules(r, paginate=False, nokeep=False)
     if not rules:

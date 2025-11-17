@@ -20,9 +20,9 @@ from file2txt.converter import Fanger, get_parser_class
 from file2txt.parsers.core import BaseParser
 from django.conf import settings
 import typing
-from stix2.utils import format_datetime as stix2_format_date
 
 from siemrules.siemrules.modifier import get_modification, yaml_to_detection
+from siemrules.siemrules.utils import format_datetime
 from siemrules.worker import pdf_converter
 
 if typing.TYPE_CHECKING:
@@ -42,12 +42,6 @@ from django.core.files.base import File as DjangoFile
 from stix2arango.stix2arango import Stix2Arango
 
 POLL_INTERVAL = 1
-
-
-def format_datetime(s: str | datetime) -> str:
-    if isinstance(s, str):
-        return s
-    return stix2_format_date(s)
 
 
 def new_task(job: Job):

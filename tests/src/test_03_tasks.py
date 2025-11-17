@@ -95,7 +95,6 @@ def test_upload_correlation(job):
         mock_upload_objects.assert_called_once_with(
             job,
             mock_upload_objects.call_args[0][1],
-            None,
             stix2arango_note=f"siemrules-correlation",
         )
 
