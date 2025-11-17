@@ -184,7 +184,9 @@ class TestBaseRuleView:
             versions_before_revert
         ), "object_after_revert must be newer than all previously existing objects"
 
-        versions_resp = client.get(rule_url + "versions/")
+        versions_resp = arangodb_helpers.get_single_rule_versions(
+            rule_id, 'base'
+        )
         assert versions_resp.status_code == 200, versions_resp.json()
         versions_after_revert = list(versions_resp.data)
         assert (
@@ -199,11 +201,18 @@ class TestBaseRuleView:
                 continue
             assert object_before_revert[k] == object_after_revert[k]
 
+
+        ## test revert in list
+        versions_resp = client.get(rule_url + "versions/")
+        assert {'action': 'modify', 'modified': versions_after_revert[-1], 'reverted_to': revert_version, 'type': 'revert'} in versions_resp.data
+
     def test_revert_to_latest(self, client: django.test.Client):
         rule_id = "indicator--2683daab-aa64-52ff-a001-3ea5aee9dd72"
         rule_url = f"{self.url}{rule_id}/"
 
-        versions_resp = client.get(rule_url + "versions/")
+        versions_resp = arangodb_helpers.get_single_rule_versions(
+            rule_id, 'base'
+        )
         assert versions_resp.status_code == 200, versions_resp.json()
         versions_before_revert = list(versions_resp.data)
         revert_version = versions_before_revert[0]  # latest version
