@@ -89,12 +89,13 @@ def test_upload_correlation(job):
         mock_add_rule_indicator.return_value = []
         tasks.upload_correlation(correlation, related_indicators, job)
         mock_add_rule_indicator.assert_called_once_with(
-            correlation, related_indicators, job.type, job.data
+            correlation, related_indicators, job.data
         )
         mock_upload_objects.assert_called_once()
         mock_upload_objects.assert_called_once_with(
             job,
             mock_upload_objects.call_args[0][1],
+            None,
             stix2arango_note=f"siemrules-correlation",
         )
 
