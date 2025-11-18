@@ -226,7 +226,7 @@ class Version(models.Model):
     file = models.ForeignKey(File, on_delete=models.CASCADE, default=None, null=True)
     job = models.ForeignKey(Job, on_delete=models.SET_NULL, default=None, null=True)
     cloned_from = models.CharField(max_length=100, null=True, default=None)
-    reverted_to = models.DateTimeField(null=True, default=None)
+    reverted_to = models.CharField(null=True, default=None)
 
     class Meta:
         ordering = ["-modified"]

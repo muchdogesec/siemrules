@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, patch
 
 url = "/api/v1/identities/"
 def test_destroy_identity(client: django.test.Client):
-    identity_id = "identity--a4d70b75-6f4a-5d19-9137-da863edd33d7"
+    identity_id = "identity--8ef05850-cb0d-51f7-80be-50e4376dbe63"
     collected_objects = dict()
 
     with patch("siemrules.siemrules.models.File.objects.filter") as mock_filter_file, \
