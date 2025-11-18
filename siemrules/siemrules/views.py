@@ -303,13 +303,13 @@ class FileView(
         serializer = DRFSigmaRule.drf_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         rule = DRFSigmaRule.model_validate(serializer.validated_data)
-        file_serializer = rule.to_file_serializer(request_body=request_body)
+        file_serializer, sigma_yaml = rule.to_file_serializer(request_body=request_body)
         file_instance = file_serializer.save(mimetype="application/x-yaml")
         job_instance = models.Job.objects.create(
             file=file_instance, type=models.JobType.FILE_SIGMA
         )
         job_serializer = JobSerializer(job_instance)
-        tasks.new_task(job_instance)
+        tasks.new_task(job_instance, sigma_yaml=sigma_yaml)
         return Response(job_serializer.data, status=status.HTTP_201_CREATED)
 
     @extend_schema(
@@ -1325,6 +1325,7 @@ class CorrelationRuleView(RuleView):
         parser_classes=[SigmaRuleParser],
     )
     def create_from_sigma(self, request, *args, **kwargs):
+        request_body = request.body
         rule_s = DRFCorrelationRule.drf_serializer(data=request.data)
         rule_s.is_valid(raise_exception=True)
         rule = DRFCorrelationRule.model_validate(rule_s.data)
@@ -1332,10 +1333,12 @@ class CorrelationRuleView(RuleView):
         related_indicators = []
         if rule.correlation.rules:
             related_indicators = self.get_rules(rule.correlation.rules)
-
+        file_serializer = correlations.serializers.to_file_serializer(rule, request_body)
+        file_instance = file_serializer.save(mimetype="application/x-yaml")
         job_instance = models.Job.objects.create(
             type=models.JobType.CORRELATION_SIGMA,
-            data=dict(input_form="sigma", correlation_id=str(uuid.uuid4())),
+            data=dict(input_form="sigma", correlation_id=str(file_instance.id)),
+            file=file_instance,
         )
         job_s = CorrelationJobSerializer(job_instance)
 

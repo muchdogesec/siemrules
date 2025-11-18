@@ -163,13 +163,12 @@ class DRFSigmaRule(DRFBaseModel, SigmaRuleDetection):
                 f"validation with schema failed: {e.json_path}: {e.message}"
             )
         from siemrules.siemrules.serializers import FileSigmaYamlSerializer
-
         data = dict(
             name=self.title,
             identity=self._identity,
             sigma_file=SimpleUploadedFile(
                 f"{slugify(self.title)}.yml",
-                content=bytes(rule, "utf-8"),
+                content=request_body,
                 content_type="application/sigma+yaml",
             ),
             tlp_level=self.tlp_level.name.replace("-", "+"),
@@ -177,7 +176,7 @@ class DRFSigmaRule(DRFBaseModel, SigmaRuleDetection):
 
         s = FileSigmaYamlSerializer(data=data)
         s.is_valid(raise_exception=True)
-        return s
+        return s, rule
 
     @field_validator("tags", mode="before")
     @classmethod

@@ -19,4 +19,9 @@ class Migration(migrations.Migration):
             name='base_version',
             field=models.CharField(default=None, null=True),
         ),
+        migrations.AddField(
+            model_name='file',
+            name='type',
+            field=models.CharField(choices=[('base', 'Base Rule'), ('correlation', 'Correlation Rule')], default='base'),
+        ),
     ]

@@ -44,8 +44,8 @@ from stix2arango.stix2arango import Stix2Arango
 POLL_INTERVAL = 1
 
 
-def new_task(job: Job):
-    task: Task = process_report.s(job.file.file.name, job.id)
+def new_task(job: Job, **kwargs):
+    task: Task = process_report.s(job.file.file.name, job.id, **kwargs)
 
     task.apply_async(
         countdown=POLL_INTERVAL,
@@ -212,13 +212,12 @@ def modify_base_rule(job_id, indicator, report, new_rule_data):
     job.save(update_fields=["data"])
 
 
-def run_txt2detection(file: models.File):
+def run_txt2detection(file: models.File, sigma_yaml):
     input_str = None
     provider = None
     kwargs = {}
-    remove_file = False
     if file.mode == "sigma":
-        kwargs["sigma_file"] = file.file.read().decode()
+        kwargs["sigma_file"] = sigma_yaml
     else:
         input_str = file.markdown_file.read().decode()
         provider = parse_ai_model(file.profile.ai_provider)
@@ -253,10 +252,9 @@ def run_txt2detection(file: models.File):
     file.save()
 
     if 'sigma_file' in kwargs:
-        remove_file = True
         bundler.bundle.objects[:] = [obj for obj in bundler.bundle.objects if obj['type'] != 'report']
 
-    return bundler.bundle_dict, remove_file
+    return bundler.bundle_dict
 
 
 def run_file2txt(file: models.File):
@@ -353,10 +351,9 @@ def make_bundle(objects):
 
 
 @shared_task
-def process_report(filename, job_id, *args):
+def process_report(filename, job_id, *args, sigma_yaml=None):
     job = Job.objects.get(id=job_id)
-    version_kwargs = {}
-    remove_file = False
+    version_kwargs = dict(file_id=job.file.id)
     version_type = None
     try:
         if job.file.mode == "sigma":
@@ -365,7 +362,7 @@ def process_report(filename, job_id, *args):
             version_type = models.VersionTypes.FILE if job.type == models.JobType.FILE_FILE else models.VersionTypes.PROMPT
             run_file2txt(job.file)
             version_kwargs.update(file_id=job.file.id)
-        bundle, remove_file = run_txt2detection(job.file)
+        bundle = run_txt2detection(job.file, sigma_yaml)
         upload_to_arango(job, bundle)
         add_versions(job_id, models.VersionAction.CREATE, version_type, bundle["objects"], **version_kwargs)
         job.file.save()
@@ -373,9 +370,6 @@ def process_report(filename, job_id, *args):
         error = f"report failed to process with: {e}"
         logging.exception(error)
         raise
-    if remove_file:
-        job.file.delete()
-        job.file = None
     job.save()
     return job_id
 

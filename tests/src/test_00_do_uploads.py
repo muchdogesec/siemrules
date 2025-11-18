@@ -9,6 +9,7 @@ from llama_index.core.program import LLMTextCompletionProgram
 import django.test
 from unittest.mock import MagicMock, patch
 import yaml
+from siemrules.siemrules import models
 from siemrules.siemrules.correlations.correlations import yaml_to_rule
 from siemrules.siemrules.correlations.models import RuleModel
 from siemrules.siemrules.modifier import yaml_to_detection
@@ -53,13 +54,13 @@ def test_base_yml_upload(client, celery_eager, rule_id, sigma_yaml, api_schema):
         job_resp = client.get(f"/api/v1/jobs/{resp.data['id']}/")
         assert job_resp.status_code == 200
         assert job_resp.data["state"] == "completed"
-        assert job_resp.data['file_id'] == None
 
         version_resp = client.get(f'/api/v1/base-rules/indicator--{rule_id}/versions/')
         api_schema['/api/v1/base-rules/{indicator_id}/versions/'][
         "GET"
         ].validate_response(Transport.get_st_response(version_resp))
-        assert {'modified': '2024-05-01T00:00:00.000Z', 'action': 'create', 'type': 'sigma'} in version_resp.data
+        assert {'modified': '2024-05-01T00:00:00.000Z', 'action': 'create', 'type': 'sigma', 'file_id': rule_id} in version_resp.data
+        assert models.File.objects.get(pk=rule_id).file.read().decode() == sigma_yaml
 
 @pytest.mark.parametrize(
     ["rule_id", "tlp_level", "sigma_yaml"],
@@ -146,23 +147,24 @@ def test_upload_correlation(celery_eager, client, rule, api_schema):
     rule_id, rule = rule
 
     with patch.object(RuleModel, "_rule_id", rule_id):
-        response = client.post(
+        job_resp = client.post(
             correlation_url + "create/yml/",
             format="sigma",
             data=rule,
             content_type="application/sigma+yaml",
         )
-        print(response.content)
-        assert response.status_code == 200
+        assert job_resp.status_code == 200
+
         resp = client.get(correlation_url + f"indicator--{rule_id}/")
         assert resp.status_code == 200
+        file = models.Job.objects.get(id=job_resp.data['id']).file
+        assert file.file.read().decode() == rule
 
     version_resp = client.get(f'/api/v1/correlation-rules/indicator--{rule_id}/versions/')
     api_schema['/api/v1/correlation-rules/{indicator_id}/versions/'][
     "GET"
     ].validate_response(Transport.get_st_response(version_resp))
-    print(version_resp.data)
-    assert {'modified': version_resp.data[0]['modified'], 'action': 'create', 'type': 'sigma'} in version_resp.data
+    assert {'modified': version_resp.data[0]['modified'], 'action': 'create', 'type': 'sigma', 'file_id': str(file.id)} in version_resp.data
 
 @pytest.mark.parametrize(
     ["rule_id", "modification"],

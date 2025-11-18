@@ -24,7 +24,7 @@ def create_report_id():
     return ""
 
 def default_identity():
-    return settings.STIX_IDENTITY
+    return settings.STIX_IDENTITY.copy()
 
 def validate_identity(value):
     try:
@@ -47,6 +47,10 @@ def validate_file(file: InMemoryUploadedFile, mode: str):
         raise ValidationError(f"Unsupported file extension `{ext}`")
     return True
 
+
+class VersionRuleType(models.TextChoices):
+    BASE_RULE = "base"
+    CORRELATION_RULE = "correlation"
 
 class Profile(models.Model):
     id = models.UUIDField(primary_key=True)
@@ -104,6 +108,7 @@ class File(models.Model):
     file = models.FileField(max_length=1024, upload_to=upload_to_func)
     mimetype = models.CharField(max_length=512)
     mode = models.CharField(max_length=256)
+    type = models.CharField(choices=VersionRuleType.choices, default=VersionRuleType.BASE_RULE)
     markdown_file = models.FileField(max_length=512, upload_to=upload_to_func, null=True)
     pdf_file = models.FileField(max_length=1024, upload_to=upload_to_func, null=True)
     txt2detection_data = models.JSONField(default=None, null=True)
@@ -201,9 +206,6 @@ class VersionAction(models.TextChoices):
     MODIFY = "modify"
 
 
-class VersionRuleType(models.TextChoices):
-    BASE_RULE = "base"
-    CORRELATION_RULE = "correlation"
 
 class VersionTypes(models.TextChoices):
     SIGMA  = "sigma"
@@ -232,6 +234,15 @@ class Version(models.Model):
         ordering = ["-modified"]
         verbose_name = "Version entry"
         verbose_name_plural = "Version entries"
+
+
+    @property
+    def real_file_id(self):
+        if self.file:
+            return self.file.id
+        elif self.job and self.job.file:
+            return self.job.file.id
+        return None
 
 
 

@@ -21,6 +21,7 @@ from siemrules.worker import tasks
 import stix2
 from django.core.files.uploadedfile import SimpleUploadedFile
 
+
 def test_new_task(job):
     file = job.file
 
@@ -225,13 +226,13 @@ def test_run_txt2detection(job, report, profile):
         mock_bundler.report = report
         mock_bundler.data.model_dump.return_value = {"bundle": "processing-logs"}
         mock_bundler.bundle_dict = {"mocked": "detection_output"}
-        mock_bundler.tlp_level.name = 'red'
-        mock_bundler.reference_urls = ['red']
-        mock_bundler.license = '0BSD'
+        mock_bundler.tlp_level.name = "red"
+        mock_bundler.reference_urls = ["red"]
+        mock_bundler.license = "0BSD"
         mock_run_txt2detection.return_value = mock_bundler
 
         # Run the function
-        result, remove_file = run_txt2detection(mock_file_copy)
+        result = run_txt2detection(mock_file_copy, None)
         ##########
         mock_parse_ai_model.assert_called_once_with(profile.ai_provider)
         mock_parse_stix.assert_called_once_with(mock_file_copy.identity)
@@ -247,8 +248,7 @@ def test_run_txt2detection(job, report, profile):
             license=mock_file.license,
             level=mock_file.level,
             status=mock_file.status,
-            external_refs=[
-            ],
+            external_refs=[],
             created=mock_file.created,
         )
         mock_file.refresh_from_db()
@@ -350,20 +350,13 @@ def test_job_failure(job):
         assert job.state == models.JobState.FAILED
 
 
-@pytest.mark.parametrize(
-    'deletes_file',
-    [
-        True,
-        False
-    ]
-)
-def test_process_report_success(job, deletes_file):
+def test_process_report_success(job):
 
-    mocked_bundle = {'objects': []}
+    mocked_bundle = {"objects": []}
     with mock.patch(
         "siemrules.worker.tasks.run_file2txt", return_value=None
     ) as mock_run_file2txt, mock.patch(
-        "siemrules.worker.tasks.run_txt2detection", return_value=[mocked_bundle, deletes_file]
+        "siemrules.worker.tasks.run_txt2detection", return_value=mocked_bundle
     ) as mock_run_txt2detection, mock.patch(
         "siemrules.worker.tasks.upload_to_arango", return_value=None
     ) as mock_upload_to_arango:
@@ -373,14 +366,13 @@ def test_process_report_success(job, deletes_file):
         job.refresh_from_db()
         mock_run_file2txt.assert_called_once()
         mock_run_txt2detection.assert_called_once()
-        assert mock_run_file2txt.call_args[0][0] == mock_run_txt2detection.call_args[0][0]
+        assert (
+            mock_run_file2txt.call_args[0][0] == mock_run_txt2detection.call_args[0][0]
+        )
         mock_upload_to_arango.assert_called_once_with(job, mocked_bundle)
         assert job.error is None
         assert job.state == models.JobState.PENDING
-        if deletes_file:
-            assert job.file == None
-        else:
-            assert str(job.file.id) == "f4b9c920-33de-4d52-827f-40362f161aca"
+        assert str(job.file.id) == "f4b9c920-33de-4d52-827f-40362f161aca"
 
 
 def test_process_report_fail(job):

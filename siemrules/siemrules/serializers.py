@@ -476,7 +476,7 @@ class AttackNavigatorDomainSerializer(JSONSchemaSerializer):
 
 
 class VersionSerializer(serializers.ModelSerializer):
-    file_id = serializers.UUIDField(source='file.id', read_only=True, required=False)
+    file_id = serializers.UUIDField(source='real_file_id', read_only=True, required=False)
     class Meta:
         model = Version
         exclude = ['id', 'rule_id', 'rule_type', "job", "file"]
