@@ -141,7 +141,7 @@ def modify_correlation(job_id, indicator, new_rule_data):
             raise ValueError(f"unknown type `{modify_type}`")
         
     if modify_type == 'revert':
-        version_kwargs["reverted_to"] = indicator['modified']
+        version_kwargs["reverted_to"] = job.data['base_version']
         version_type = models.VersionTypes.REVERT
     
 
@@ -196,7 +196,7 @@ def modify_base_rule(job_id, indicator, report, new_rule_data):
         
     
     if modify_type == 'revert':
-        version_kwargs["reverted_to"] = indicator['modified']
+        version_kwargs["reverted_to"] = job.data['base_version']
         version_type = models.VersionTypes.REVERT
     
 

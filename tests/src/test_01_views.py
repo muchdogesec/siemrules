@@ -204,7 +204,7 @@ class TestBaseRuleView:
 
         ## test revert in list
         versions_resp = client.get(rule_url + "versions/")
-        assert {'action': 'modify', 'modified': versions_after_revert[-1], 'reverted_to': revert_version, 'type': 'revert'} in versions_resp.data
+        assert {'action': 'modify', 'modified': object_after_revert['modified'], 'reverted_to': object_before_revert['modified'], 'type': 'revert'} in versions_resp.data
 
     def test_revert_to_latest(self, client: django.test.Client):
         rule_id = "indicator--2683daab-aa64-52ff-a001-3ea5aee9dd72"

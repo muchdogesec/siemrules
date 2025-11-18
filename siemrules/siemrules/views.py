@@ -652,7 +652,7 @@ class RuleView(viewsets.GenericViewSet):
     )
     @decorators.action(detail=True, methods=["GET"], url_path="attack-navigator")
     def nav_layer(self, request, *args, indicator_id=None, **kwargs):
-        objects = arangodb_helpers.get_objects_for_rule(
+        indicator, objects = arangodb_helpers._get_rule_bundle(
             indicator_id,
             request,
             version=request.query_params.get("version"),
@@ -662,7 +662,6 @@ class RuleView(viewsets.GenericViewSet):
         objects.sort(key=lambda x: x["id"])
         techniques = {}
         report = None
-        indicator = None
         metadata = [dict(name="rule_id", value=indicator_id)]
         secondary_rules = set()
 
@@ -682,14 +681,9 @@ class RuleView(viewsets.GenericViewSet):
 
                     if obj["source_ref"] != indicator_id:
                         secondary_rules.add(obj["source_ref"])
-            if obj["id"] == indicator_id:
-                indicator = obj
 
             if obj["type"] == "report" and indicator_id in obj["object_refs"]:
                 report = obj
-
-        if not indicator:
-            raise exceptions.ParseError({"error": "bad bundle"})
 
         if report:
             metadata.append(dict(name="report_id", value=report["id"]))

@@ -183,6 +183,9 @@ def get_single_rule_versions(indicator_id, rule_type):
 def get_objects_for_rule(
     indicator_id, request, version=None, rule_type=None, with_limit=True
 ):
+    return _get_rule_bundle(indicator_id, request, version=version, rule_type=rule_type, with_limit=with_limit)[1]
+    
+def _get_rule_bundle(indicator_id, request, version=None, rule_type=None, with_limit=True):
     rule = get_single_rule(indicator_id, version=version, nokeep=False).data
 
     helper = ArangoDBHelper(settings.VIEW_NAME, request)
@@ -214,11 +217,12 @@ def get_objects_for_rule(
     query = query.replace("#filters", "\n".join(filters)).replace(
         "#obj_ids_str", obj_ids_str
     )
+    paginate = True
     if with_limit:
         query = query.replace("//LIMIT", "LIMIT @offset, @count")
     else:
-        return helper.execute_query(query, bind_vars=binds, paginate=False)
-    return helper.execute_query(query, bind_vars=binds)
+        paginate = False
+    return rule, helper.execute_query(query, bind_vars=binds, paginate=paginate)
 
 
 def get_objects_by_id(indicator_id):
