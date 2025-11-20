@@ -1,9 +1,18 @@
+from datetime import datetime
 from rest_framework import viewsets, parsers, decorators, mixins, renderers
 from django.db import models
 import yaml
 from rest_framework.exceptions import ParseError
 
 from siemrules.siemrules.modifier import yaml_to_detection
+from stix2.utils import format_datetime as stix2_format_date
+
+
+def format_datetime(s: str | datetime) -> str:
+    if isinstance(s, str):
+        return s
+    return stix2_format_date(s)
+
 
 class TLP_Levels(models.TextChoices):
     RED = "red"

@@ -8,7 +8,7 @@ import django.test
 from rest_framework import status
 from unittest.mock import patch
 from django.core.files.uploadedfile import SimpleUploadedFile
-from siemrules.siemrules import models
+from siemrules.siemrules import arangodb_helpers, models
 from rest_framework.response import Response
 
 from tests.src.utils import is_sorted
@@ -159,39 +159,13 @@ class TestBaseRuleView:
             if format == "sigma":
                 assert response.content.decode() == mock_sigma_rule_pattern
 
-    @pytest.mark.parametrize(
-        ["rule_id", "expected_version_count"],
-        [
-            ["indicator--2683daab-aa64-52ff-a001-3ea5aee9dd72", 3],
-            ["indicator--8af82832-2abd-5765-903c-01d414dae1e9", 1],
-            ["indicator--9e2536b0-988b-598d-8cc3-407f9f13fc61", 1],
-        ],
-    )
-    def test_versions(
-        self, client: django.test.Client, rule_id, expected_version_count, subtests
-    ):
-        rule_url = f"{self.url}{rule_id}/"
-        response = client.get(rule_url + "versions/")
-        assert is_sorted(
-            response.data, reverse=True
-        ), "versions must be sorted in descending order"
-        assert len(response.data) == expected_version_count
-        for version in chain([None], response.data):
-            with subtests.test(
-                "test_retrieve_with_version_param", rule_id=rule_id, version=version
-            ):
-                params = None
-                if version:
-                    params = dict(version=version)
-                rule_resp = client.get(rule_url, query_params=params)
-                assert rule_resp.data["id"] == rule_id
-                assert rule_resp.data["modified"] == version or response.data[0]
-
     def test_revert_rule(self, client: django.test.Client, celery_eager):
         rule_id = "indicator--2683daab-aa64-52ff-a001-3ea5aee9dd72"
         rule_url = f"{self.url}{rule_id}/"
 
-        versions_resp = client.get(rule_url + "versions/")
+        versions_resp = arangodb_helpers.get_single_rule_versions(
+            rule_id, 'base'
+        )
         assert versions_resp.status_code == 200, versions_resp.json()
         versions_before_revert = list(versions_resp.data)
         revert_version = random.choice(versions_before_revert[1:])
@@ -210,7 +184,9 @@ class TestBaseRuleView:
             versions_before_revert
         ), "object_after_revert must be newer than all previously existing objects"
 
-        versions_resp = client.get(rule_url + "versions/")
+        versions_resp = arangodb_helpers.get_single_rule_versions(
+            rule_id, 'base'
+        )
         assert versions_resp.status_code == 200, versions_resp.json()
         versions_after_revert = list(versions_resp.data)
         assert (
@@ -225,11 +201,18 @@ class TestBaseRuleView:
                 continue
             assert object_before_revert[k] == object_after_revert[k]
 
+
+        ## test revert in list
+        versions_resp = client.get(rule_url + "versions/")
+        assert {'action': 'modify', 'modified': object_after_revert['modified'], 'base_version': object_before_revert['modified'], 'type': 'revert'} in versions_resp.data
+
     def test_revert_to_latest(self, client: django.test.Client):
         rule_id = "indicator--2683daab-aa64-52ff-a001-3ea5aee9dd72"
         rule_url = f"{self.url}{rule_id}/"
 
-        versions_resp = client.get(rule_url + "versions/")
+        versions_resp = arangodb_helpers.get_single_rule_versions(
+            rule_id, 'base'
+        )
         assert versions_resp.status_code == 200, versions_resp.json()
         versions_before_revert = list(versions_resp.data)
         revert_version = versions_before_revert[0]  # latest version

@@ -21,6 +21,7 @@ from siemrules.worker import tasks
 import stix2
 from django.core.files.uploadedfile import SimpleUploadedFile
 
+
 def test_new_task(job):
     file = job.file
 
@@ -89,7 +90,7 @@ def test_upload_correlation(job):
         mock_add_rule_indicator.return_value = []
         tasks.upload_correlation(correlation, related_indicators, job)
         mock_add_rule_indicator.assert_called_once_with(
-            correlation, related_indicators, job.type, job.data
+            correlation, related_indicators, job.data
         )
         mock_upload_objects.assert_called_once()
         mock_upload_objects.assert_called_once_with(
@@ -153,7 +154,6 @@ def report():
                     "source_name": "description_md5_hash",
                     "external_id": "6532ad7e15543e41f6f24042a82f6140",
                 },
-                {"source_name": "siemrules-created-type", "external_id": "file.sigma"},
                 {
                     "source_name": "txt2detection",
                     "description": "txt2detection-reference",
@@ -226,13 +226,13 @@ def test_run_txt2detection(job, report, profile):
         mock_bundler.report = report
         mock_bundler.data.model_dump.return_value = {"bundle": "processing-logs"}
         mock_bundler.bundle_dict = {"mocked": "detection_output"}
-        mock_bundler.tlp_level.name = 'red'
-        mock_bundler.reference_urls = ['red']
-        mock_bundler.license = '0BSD'
+        mock_bundler.tlp_level.name = "red"
+        mock_bundler.reference_urls = ["red"]
+        mock_bundler.license = "0BSD"
         mock_run_txt2detection.return_value = mock_bundler
 
         # Run the function
-        result = run_txt2detection(mock_file_copy)
+        result = run_txt2detection(mock_file_copy, None)
         ##########
         mock_parse_ai_model.assert_called_once_with(profile.ai_provider)
         mock_parse_stix.assert_called_once_with(mock_file_copy.identity)
@@ -248,12 +248,7 @@ def test_run_txt2detection(job, report, profile):
             license=mock_file.license,
             level=mock_file.level,
             status=mock_file.status,
-            external_refs=[
-                {
-                    "source_name": "siemrules-created-type",
-                    "external_id": mock_file.job.type,
-                }
-            ],
+            external_refs=[],
             created=mock_file.created,
         )
         mock_file.refresh_from_db()
@@ -357,10 +352,11 @@ def test_job_failure(job):
 
 def test_process_report_success(job):
 
+    mocked_bundle = {"objects": []}
     with mock.patch(
         "siemrules.worker.tasks.run_file2txt", return_value=None
     ) as mock_run_file2txt, mock.patch(
-        "siemrules.worker.tasks.run_txt2detection", return_value="detection_bundle"
+        "siemrules.worker.tasks.run_txt2detection", return_value=mocked_bundle
     ) as mock_run_txt2detection, mock.patch(
         "siemrules.worker.tasks.upload_to_arango", return_value=None
     ) as mock_upload_to_arango:
@@ -368,11 +364,15 @@ def test_process_report_success(job):
         process_report(job.file.name, job.id)
 
         job.refresh_from_db()
-        mock_run_file2txt.assert_called_once_with(job.file)
-        mock_run_txt2detection.assert_called_once_with(job.file)
-        mock_upload_to_arango.assert_called_once_with(job, "detection_bundle")
+        mock_run_file2txt.assert_called_once()
+        mock_run_txt2detection.assert_called_once()
+        assert (
+            mock_run_file2txt.call_args[0][0] == mock_run_txt2detection.call_args[0][0]
+        )
+        mock_upload_to_arango.assert_called_once_with(job, mocked_bundle)
         assert job.error is None
         assert job.state == models.JobState.PENDING
+        assert str(job.file.id) == "f4b9c920-33de-4d52-827f-40362f161aca"
 
 
 def test_process_report_fail(job):

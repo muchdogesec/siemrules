@@ -12,7 +12,7 @@ from dogesec_commons.objects.helpers import OBJECT_TYPES
 from siemrules.siemrules.correlations import correlations
 from siemrules.siemrules.correlations.correlations import yaml_to_rule
 from siemrules.siemrules.modifier import yaml_to_detection
-from siemrules.siemrules.utils import TLP_LEVEL_STIX_ID_MAPPING, TLP_Levels
+from siemrules.siemrules.utils import TLP_LEVEL_STIX_ID_MAPPING, TLP_Levels, format_datetime
 
 from txt2detection.models import TLP_LEVEL as T2D_TLP_LEVEL, SigmaRuleDetection
 from siemrules.siemrules.correlations.models import RuleModel, set_tlp_level_in_tags
@@ -23,7 +23,6 @@ if typing.TYPE_CHECKING:
     from siemrules import settings
 from rest_framework.exceptions import NotFound, ParseError, ValidationError
 from rest_framework.response import Response
-from stix2.utils import format_datetime
 
 
 RULES_SORT_FIELDS = [
@@ -122,14 +121,6 @@ def get_rules(request: request.Request, paginate=True, all_versions=False, nokee
             """
         )
 
-    if ingestion_method := helper.query.get("create_type"):
-        filters.append("FILTER @ingestion_method IN doc.external_references")
-        binds.update(
-            ingestion_method=dict(
-                source_name="siemrules-created-type", external_id=ingestion_method
-            )
-        )
-
     if rule_type := helper.query.get("rule_type"):
         rule_type, _, _ = rule_type.partition("-")
         filters.append("FILTER doc.x_sigma_type == @rule_type")
@@ -192,6 +183,9 @@ def get_single_rule_versions(indicator_id, rule_type):
 def get_objects_for_rule(
     indicator_id, request, version=None, rule_type=None, with_limit=True
 ):
+    return _get_rule_bundle(indicator_id, request, version=version, rule_type=rule_type, with_limit=with_limit)[1]
+    
+def _get_rule_bundle(indicator_id, request, version=None, rule_type=None, with_limit=True):
     rule = get_single_rule(indicator_id, version=version, nokeep=False).data
 
     helper = ArangoDBHelper(settings.VIEW_NAME, request)
@@ -223,11 +217,12 @@ def get_objects_for_rule(
     query = query.replace("#filters", "\n".join(filters)).replace(
         "#obj_ids_str", obj_ids_str
     )
+    paginate = True
     if with_limit:
         query = query.replace("//LIMIT", "LIMIT @offset, @count")
     else:
-        return helper.execute_query(query, bind_vars=binds, paginate=False)
-    return helper.execute_query(query, bind_vars=binds)
+        paginate = False
+    return rule, helper.execute_query(query, bind_vars=binds, paginate=paginate)
 
 
 def get_objects_by_id(indicator_id):
@@ -428,14 +423,13 @@ def delete_rule(indicator_id):
 def indicator_to_rule(
     indicator: dict,
 ) -> tuple[RuleModel | SigmaRuleDetection, list[dict]]:
-    for ref in indicator.get("external_references", []):
-        if ref["source_name"] == "siemrules-created-type":
-            if ref.get("external_id", "").startswith("file"):
-                return (yaml_to_detection(indicator["pattern"]), [])
-            else:
-                return yaml_to_rule(indicator["pattern"])
-    else:
-        raise ParseError("unable to determine rule type")
+    match indicator['x_sigma_type']:
+        case 'base':
+            return yaml_to_detection(indicator["pattern"]), []
+        case 'correlation':
+            return yaml_to_rule(indicator["pattern"])
+        case _:
+            raise ParseError("unable to determine rule type")   
 
 
 def make_clone(indicator_id: str, new_uuid: str, data: dict):
@@ -443,7 +437,7 @@ def make_clone(indicator_id: str, new_uuid: str, data: dict):
     r = request_from_queries(indicator_id=indicator_id)
     helper = ArangoDBHelper(settings.VIEW_NAME, r)
     now = datetime.now(UTC)
-    now_str = now.isoformat().replace("+00:00", "Z")
+    now_str = format_datetime(now)
 
     rules = get_rules(r, paginate=False, nokeep=False)
     if not rules:
@@ -584,7 +578,7 @@ def make_clone(indicator_id: str, new_uuid: str, data: dict):
     objects += [identity]
 
     make_upload(rule.get("_stixify_report_id", ""), make_bundle(objects))
-    return rule["id"]
+    return rule
 
 
 def make_bundle(objects):

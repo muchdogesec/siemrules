@@ -39,6 +39,7 @@ date: 2024-05-01
 
 SIGMA_RULE_2 = (
     "9e2536b0-988b-598d-8cc3-407f9f13fc61",
+    "red",
     """
 id: 9e2536b0-988b-598d-8cc3-407f9f13fc61
 title: Detection of Malicious Code in xz Tarballs
@@ -79,6 +80,7 @@ date: 2025-01-23
 
 SIGMA_RULE_3 = (
     "2683daab-aa64-52ff-a001-3ea5aee9dd72",
+    "amber",
     """
 id: 2683daab-aa64-52ff-a001-3ea5aee9dd72
 title: Detection of Stored Cross-Site Scripting in Exclusive Addons for Elementor
@@ -167,4 +169,35 @@ correlation:
 tags:
     - tlp.green
 """,
+)
+
+
+from txt2detection.models import AIDetection
+
+AI_DETECTION_1 = AIDetection(
+    title="test",
+    description="test description",
+    status="experimental",
+    level="high",
+    tags=["tlp.green", "attack.t1008"],
+    license="0BSD",
+    falsepositives=["false positive 1", "false positive 2"],
+    references=["https://example.com/ref1", "https://example.com/ref2"],
+    logsource={"category": "test", "product": "test"},
+    detection={"condition": "test condition"},
+    indicator_types=[]
+)
+
+AI_DETECTION_1 = AIDetection(
+    title="another test",
+    description="another test description",
+    status="stable",
+    level="medium",
+    tags=["tlp.red", "attack.t1557"],
+    license="MIT",
+    falsepositives=["another false positive"],
+    references=["https://example.com/another_ref"],
+    logsource={"category": "another_test", "product": "another_test"},
+    detection={"condition": "another test condition"},
+    indicator_types=[]
 )

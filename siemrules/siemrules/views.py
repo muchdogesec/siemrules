@@ -303,13 +303,13 @@ class FileView(
         serializer = DRFSigmaRule.drf_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         rule = DRFSigmaRule.model_validate(serializer.validated_data)
-        file_serializer = rule.to_file_serializer(request_body=request_body)
+        file_serializer, sigma_yaml = rule.to_file_serializer(request_body=request_body)
         file_instance = file_serializer.save(mimetype="application/x-yaml")
         job_instance = models.Job.objects.create(
             file=file_instance, type=models.JobType.FILE_SIGMA
         )
         job_serializer = JobSerializer(job_instance)
-        tasks.new_task(job_instance)
+        tasks.new_task(job_instance, sigma_yaml=sigma_yaml)
         return Response(job_serializer.data, status=status.HTTP_201_CREATED)
 
     @extend_schema(
@@ -529,14 +529,20 @@ class RuleView(viewsets.GenericViewSet):
             rule_type=self.rule_type,
         )
 
-    @extend_schema(
-        responses={
-            200: {"type": "array", "items": {"type": "string", "format": "date-time"}}
-        },
-    )
-    @decorators.action(methods=["GET"], detail=True, pagination_class=None)
+    # @extend_schema(
+    #     responses={
+    #         200: {"type": "array", "items": {"type": "string", "format": "date-time"}}
+    #     },
+    # )
+    # @decorators.action(methods=["GET"], detail=True, pagination_class=None)
+    # def versions2(self, request, *args, indicator_id=None, **kwargs):
+    #     return arangodb_helpers.get_single_rule_versions(indicator_id, self.rule_type)
+
+    @decorators.action(methods=["GET"], detail=True, pagination_class=None, serializer_class=serializers.VersionSerializer(many=True))
     def versions(self, request, *args, indicator_id=None, **kwargs):
-        return arangodb_helpers.get_single_rule_versions(indicator_id, self.rule_type)
+        q = models.Version.objects.filter(rule_id=indicator_id)
+        s = serializers.VersionSerializer(q, many=True)
+        return Response([{k: v for k, v in vv.items() if v} for vv in s.data])
 
     @extend_schema(
         request=serializers.RuleRevertSerializer,
@@ -646,7 +652,7 @@ class RuleView(viewsets.GenericViewSet):
     )
     @decorators.action(detail=True, methods=["GET"], url_path="attack-navigator")
     def nav_layer(self, request, *args, indicator_id=None, **kwargs):
-        objects = arangodb_helpers.get_objects_for_rule(
+        indicator, objects = arangodb_helpers._get_rule_bundle(
             indicator_id,
             request,
             version=request.query_params.get("version"),
@@ -675,15 +681,13 @@ class RuleView(viewsets.GenericViewSet):
 
                     if obj["source_ref"] != indicator_id:
                         secondary_rules.add(obj["source_ref"])
-            if obj["id"] == indicator_id:
-                indicator = obj
 
             if obj["type"] == "report" and indicator_id in obj["object_refs"]:
                 report = obj
 
         if report:
             metadata.append(dict(name="report_id", value=report["id"]))
-        for s in secondary_rules:
+        for s in sorted(secondary_rules):
             metadata.append(dict(name="secondary_rule", value=s))
 
         return Response(
@@ -1321,6 +1325,7 @@ class CorrelationRuleView(RuleView):
         parser_classes=[SigmaRuleParser],
     )
     def create_from_sigma(self, request, *args, **kwargs):
+        request_body = request.body
         rule_s = DRFCorrelationRule.drf_serializer(data=request.data)
         rule_s.is_valid(raise_exception=True)
         rule = DRFCorrelationRule.model_validate(rule_s.data)
@@ -1328,10 +1333,12 @@ class CorrelationRuleView(RuleView):
         related_indicators = []
         if rule.correlation.rules:
             related_indicators = self.get_rules(rule.correlation.rules)
-
+        file_serializer = correlations.serializers.to_file_serializer(rule, request_body)
+        file_instance = file_serializer.save(mimetype="application/x-yaml")
         job_instance = models.Job.objects.create(
             type=models.JobType.CORRELATION_SIGMA,
-            data=dict(input_form="sigma", correlation_id=str(uuid.uuid4())),
+            data=dict(input_form="sigma", correlation_id=str(file_instance.id)),
+            file=file_instance,
         )
         job_s = CorrelationJobSerializer(job_instance)
 

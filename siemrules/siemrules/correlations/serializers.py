@@ -1,5 +1,9 @@
 import copy
 from datetime import datetime, UTC
+import json
+
+import jsonschema
+from siemrules.siemrules import models
 from siemrules.siemrules.serializers import STIXIdentityField, validate_model
 from siemrules.siemrules.utils import TLP_Levels
 from .models import RuleModel as CorrelationRule, Correlation, BaseRuleModel, RuleModelExtraProperties, set_tlp_level_in_tags, tlp_from_tags
@@ -13,6 +17,8 @@ from pydantic import Field, field_validator
 from txt2detection.models import SigmaTag
 
 
+from django.template.defaultfilters import slugify
+from django.core.files.uploadedfile import SimpleUploadedFile
 
 
 
@@ -30,6 +36,31 @@ class DRFCorrelationRule(DRFBaseModel, CorrelationRule):
             return tags
         except Exception as e:
             raise ValueError(e)
+        
+
+
+def to_file_serializer(rule: CorrelationRule, request_body):
+    self = rule
+    _identity = models.default_identity()
+    if self.author:
+        _identity = json.loads(self.author)
+
+    from siemrules.siemrules.serializers import FileSigmaYamlSerializer
+    data = dict(
+        name=rule.title,
+        identity=_identity,
+        sigma_file=SimpleUploadedFile(
+            f"correlation-{slugify(rule.title)}.yml",
+            content=request_body,
+            content_type="application/sigma+yaml",
+        ),
+        type=models.VersionRuleType.CORRELATION_RULE,
+        tlp_level=rule.tlp_level.name.replace("-", "+"),
+    )
+
+    s = FileSigmaYamlSerializer(data=data)
+    s.is_valid(raise_exception=True)
+    return s
 
 def default_tags_factory():
     return ['tlp.clear']

@@ -43,8 +43,6 @@ RULE_TYPES = [
             dict(created_by_ref="identity--a4d70b75-6f4a-5d19-9137-da863edd33d7"),
             [
                 "indicator--8af82832-2abd-5765-903c-01d414dae1e9",
-                "indicator--2683daab-aa64-52ff-a001-3ea5aee9dd72",
-                "indicator--9e2536b0-988b-598d-8cc3-407f9f13fc61",
             ],
             id="good identity",
         ),
@@ -68,7 +66,6 @@ RULE_TYPES = [
         pytest.param(dict(name='eLemENtor'), ["indicator--2683daab-aa64-52ff-a001-3ea5aee9dd72"], id='good name bad case 2'),
         pytest.param(dict(tlp_level='green'), [
             'indicator--8af82832-2abd-5765-903c-01d414dae1e9',
-            'indicator--9e2536b0-988b-598d-8cc3-407f9f13fc61',
             "indicator--8072047b-998e-43fc-a807-15c669c7343b",
         ], id='tlp level green'),
         pytest.param(dict(tlp_level='amber'), ['indicator--2683daab-aa64-52ff-a001-3ea5aee9dd72', "indicator--0e95725d-7320-415d-80f7-004da920fc11"], id='tlp level amber 1'),
@@ -88,22 +85,6 @@ def test_get_rules(params, expected_ids):
     result = get_rules(request)
     assert {obj["id"] for obj in result.data["rules"]} == expected_ids
 
-@pytest.mark.parametrize(
-    'create_type',
-    [
-        "file.file",
-        "file.prompt",
-        "file.sigma",
-        "correlation.prompt",
-        "correlation.sigma",
-    ]
-)
-def test_get_rules__ingestion_method(create_type):
-    request = request_from_queries(create_type=create_type)
-    result = get_rules(request)
-
-    for obj in result.data["rules"]:
-        assert dict(source_name='siemrules-created-type', external_id=create_type) in obj['external_references']
 
 @pytest.mark.parametrize(
         'sort_param',
