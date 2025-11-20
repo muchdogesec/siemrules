@@ -27,6 +27,12 @@ An API that takes a file containing threat intelligence and turns it into a dete
 git clone https://github.com/muchdogesec/siemrules
 ```
 
+### Pre-requisites
+
+**IMPORTANT**: ArangoDB and Postgres must be running. These are not deployed in the compose file.
+
+If you are not sure what you are doing here, [follow the basic setup steps here](https://community.dogesec.com/t/best-way-to-create-databases-for-obstracts/153/2).
+
 ### Configuration options
 
 SIEM Rules has various settings that are defined in an `.env` file.
