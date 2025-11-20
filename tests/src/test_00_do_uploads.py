@@ -27,6 +27,12 @@ from tests.src import data as test_data
 
 
 
+@pytest.fixture(autouse=True)
+def db_access_without_rollback_and_truncate(request, django_db_setup, django_db_blocker):
+    django_db_blocker.unblock()
+    yield
+    django_db_blocker.restore()
+
 @pytest.mark.parametrize(
     ["rule_id", "sigma_yaml"],
     [

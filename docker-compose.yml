@@ -3,7 +3,6 @@ services:
         extra_hosts:
             - "host.docker.internal:host-gateway"
         environment:
-            - POSTGRES_HOST=pgdb
             - DEBUG=1
             - DJANGO_ALLOWED_HOSTS=localhost 127.0.0.1 [::1] django
             - CELERY_BROKER_URL=redis://redis:6379/0
@@ -12,24 +11,20 @@ services:
             - ./.env
         build: .
         image: django-siemrules
-        # volumes:
-        #     - ./tmp:/tmp/
-    django:
-        extends: django_env
-        command: >
-                bash -c "
-                        python manage.py makemigrations &&
-                                python manage.py migrate &&
-                                    python manage.py runserver 0.0.0.0:8008
-                        "
         volumes:
             - .:/usr/src/app/
             - ./var_www:/var/www/
+        command: >
+                bash -c "
+                        python manage.py makemigrations &&
+                                python manage.py migrate
+                        "
+    django:
+        extends: django_env
+        command: python manage.py runserver 0.0.0.0:8008
         ports:
             - 8008:8008
         depends_on:
-            pgdb:
-                condition: service_healthy
             redis:
                 condition: service_started
     celery:
@@ -44,19 +39,5 @@ services:
         depends_on:
             - django
             - redis
-    pgdb:
-        image: postgres
-        env_file:
-          - ./.env
-        volumes:
-            - pgdata:/var/lib/postgresql/data/
-        healthcheck:
-            test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
-            interval: 10s
-            retries: 5
-            start_period: 30s
-            timeout: 10s
     redis:
         image: "redis:alpine"
-volumes:
-    pgdata:
