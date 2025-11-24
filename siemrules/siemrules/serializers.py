@@ -137,7 +137,6 @@ class ProfileIDField(serializers.PrimaryKeyRelatedField):
 
 
 class FileSerializer(serializers.ModelSerializer):
-
     job_id = serializers.UUIDField(source="job.id", read_only=True)
     mimetype = serializers.CharField(read_only=True)
     download_url = serializers.FileField(source="file", read_only=True, allow_null=True)
@@ -200,7 +199,7 @@ class FileSerializer(serializers.ModelSerializer):
     class Meta:
         model = File
         exclude = ["markdown_file", "status", "level", "profile", "txt2detection_data", "pdf_file"]
-        read_only_fields = ["id"]
+        read_only_fields = ["id", "type"]
 
 
 class ProfileSerializer(serializers.ModelSerializer):
