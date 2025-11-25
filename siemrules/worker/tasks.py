@@ -253,6 +253,12 @@ def run_txt2detection(file: models.File, sigma_yaml):
 
     if 'sigma_file' in kwargs:
         bundler.bundle.objects[:] = [obj for obj in bundler.bundle.objects if obj['type'] != 'report']
+    else:
+        report = next(
+            (obj for obj in bundler.bundle.objects if obj["type"] == "report"),
+            None,
+        )
+        report['external_references'].append(dict(source_name="siemrules-generated-from", external_id=f"generated."+ ('prompt' if job.type == JobType.FILE_TEXT else 'report')))
 
     return bundler.bundle_dict
 
