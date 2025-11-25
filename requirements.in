@@ -20,14 +20,6 @@ pySigma-backend-elasticsearch==1.1.6
 pySigma-backend-kusto==0.4.4
 pysigma-backend-splunk==1.1.3
 
-## llms
-llama-index-core>=0.12.39
-llama-index-llms-anthropic
-llama-index-llms-openai
-llama-index-llms-openrouter
-llama-index-llms-gemini
-llama-index-llms-deepseek
-
 ## dogesec
 
 txt2detection[llms]
