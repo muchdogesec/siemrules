@@ -230,6 +230,17 @@ def test_run_txt2detection(job, report, profile):
         mock_bundler.reference_urls = ["red"]
         mock_bundler.license = "0BSD"
         mock_run_txt2detection.return_value = mock_bundler
+        report = {"type": "report", "external_references": []}
+        mock_bundler.bundle.objects = [
+            {"type": "indicator"},
+            {"type": "indicator"},
+            {"type": "indicator"},
+            report,
+            {"type": "indicator"},
+            {"type": "indicator"},
+        ]
+
+        ##########
 
         # Run the function
         result = run_txt2detection(mock_file_copy, None)
@@ -254,6 +265,7 @@ def test_run_txt2detection(job, report, profile):
         mock_file.refresh_from_db()
         assert mock_file.txt2detection_data == {"bundle": "processing-logs"}
         assert result == {"mocked": "detection_output"}
+        assert {'source_name': 'siemrules-generated-from', 'external_id': 'generated.report'} in report["external_references"]
 
 
 def test_run_file2txt(job):
