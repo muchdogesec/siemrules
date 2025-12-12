@@ -482,7 +482,7 @@ stix2==3.0.1
     #   txt2detection
 stix2-patterns==2.0.0
     # via stix2
-stix2arango==1.1.6
+stix2arango==1.1.8
     # via -r requirements.in
 stix2extensions==2.0.1
     # via txt2detection
