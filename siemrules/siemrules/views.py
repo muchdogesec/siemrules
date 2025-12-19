@@ -1365,7 +1365,7 @@ class CorrelationRuleView(RuleView):
         job_instance = models.Job.objects.create(
             type=models.JobType.CORRELATION_PROMPT,
             data=dict(
-                input_form="ai_prompt", **s.data, correlation_id=str(uuid.uuid4())
+                input_form="ai_prompt", payload=s.data, correlation_id=str(uuid.uuid4())
             ),
         )
         job_s = CorrelationJobSerializer(job_instance)

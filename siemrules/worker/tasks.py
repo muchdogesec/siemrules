@@ -62,6 +62,7 @@ def new_correlation_task(job: Job, correlation: RuleModel, related_indicators, d
         JobType.CORRELATION_SIGMA,
     ], f"unsupported {job.type=}"
     task: Task
+
     match job.type:
         case JobType.CORRELATION_SIGMA:
             task = process_correlation.s(

@@ -254,10 +254,10 @@ def test_correlation_create__prompt(client: django.test.Client, rule_payload: di
         job: models.Job = mock_task.mock_calls[0].args[0]
         assert job.type == models.JobType.CORRELATION_PROMPT
         assert job.data["input_form"] == "ai_prompt"
-        assert job.data["ai_provider"] == rule_payload["ai_provider"]
-        assert job.data["prompt"] == rule_payload["prompt"]
+        assert job.data["payload"]["ai_provider"] == rule_payload["ai_provider"]
+        assert job.data["payload"]["prompt"] == rule_payload["prompt"]
         assert "correlation_id" in job.data
-        assert rule_payload.get("tlp_level", "clear") == job.data["tlp_level"]
+        assert rule_payload.get("tlp_level", "clear") == job.data["payload"].get("tlp_level", "clear")
 
 def test_modify_correlation_from_prompt(client: django.test.Client):
     pass
