@@ -244,8 +244,6 @@ class Version(models.Model):
             return self.job.file.id
         return None
 
-
-
 @receiver(post_save, sender=Job)
 def remove_file_on_job_failure(sender, instance: Job, **kwargs):
     if instance.file == None:
