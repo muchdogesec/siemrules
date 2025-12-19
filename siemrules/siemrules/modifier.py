@@ -39,7 +39,11 @@ from txt2detection.models import (
 
 
 def modify_indicator(report, indicator: dict, detection: BaseDetection):
-    report_id = report and report["id"] or indicator["id"]
+    labels = []
+    report_id = indicator['id'].replace("indicator--", "")
+    if report:
+        labels = report.get("labels", [])
+        report_id = report["id"].replace("report--", "")
     fake_identity = stix2.Identity(
         id=indicator["created_by_ref"],
         name="Dummy Identity",
@@ -49,18 +53,12 @@ def modify_indicator(report, indicator: dict, detection: BaseDetection):
         fake_identity,
         "red",
         "description",
-        report.get("labels", []),
+        labels,
         indicator["created"],
-        report_id=report_id.replace("report--", "").replace("indicator--", ""),
+        report_id=report_id,
         modified=datetime.now(UTC),
         external_refs=[
         ],
-    )
-    print(
-        indicator["created_by_ref"],
-        bundler.report.created_by_ref,
-        report and report["created_by_ref"],
-        getattr(detection, "author", None),
     )
     bundler.report.external_references.clear()
     bundler.report.object_marking_refs.clear()

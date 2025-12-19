@@ -926,11 +926,6 @@ class BaseRuleView(RuleView):
     def modify_base_rule_manual(self, request, *args, indicator_id=None, **kwargs):
         report, indicator, all_objs = arangodb_helpers.get_objects_by_id(indicator_id)
 
-        if not report:
-            raise ParseError(
-                f"cannot find report associated with rule `{indicator_id}`"
-            )
-
         old_detection = yaml_to_detection(
             indicator["pattern"], indicator.get("indicator_types", [])
         )
