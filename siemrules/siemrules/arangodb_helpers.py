@@ -601,3 +601,58 @@ def related_correlation_rules(indicator_ids):
         paginate=False,
     )
     return [dict(id=r["source_ref"], version=r["modified"]) for r in correlation_rels]
+
+
+DATA_SOURCES_SORT_FIELDS = [
+    "definition_ascending",
+    "definition_descending",
+    "category_ascending",
+    "category_descending",
+    "product_ascending",
+    "product_descending",
+]
+
+
+def get_data_sources(request: request.Request, paginate=True):
+    helper = ArangoDBHelper(settings.VIEW_NAME, request, result_key="data_sources")
+    binds = {}
+    filters = []
+
+    if product := helper.query.get("product"):
+        binds["product"] = "%" + product.lower().replace('%', r'\%') + "%"
+        filters.append("FILTER doc.product LIKE @product")
+
+    if category := helper.query.get("category"):
+        binds["category"] = "%" + category.lower().replace('%', r'\%') + "%"
+        filters.append("FILTER doc.category LIKE @category")
+
+    if definition := helper.query.get("definition"):
+        binds["definition"] = "%" + definition.lower().replace('%', r'\%') + "%"
+        filters.append("FILTER LOWER(doc.definition) LIKE @definition")
+
+    if service := helper.query.get("service"):
+        binds["service"] = "%" + service.lower().replace('%', r'\%') + "%"
+        filters.append("FILTER doc.service LIKE @service")
+
+
+    query = """
+FOR doc IN siemrules_vertex_collection
+FILTER doc.type == 'data-source' AND doc._is_latest
+
+@filters
+@sort_stmt
+#LIMIT
+RETURN KEEP(doc, KEYS(doc, TRUE))
+""".replace("@filters", "\n".join(filters)).replace(
+        "@sort_stmt",
+        helper.get_sort_stmt(
+            DATA_SOURCES_SORT_FIELDS,
+        ),
+    )
+
+    limit_str = ""
+    if paginate:
+        limit_str = "LIMIT @offset, @count"
+    query = query.replace("#LIMIT", limit_str)
+    
+    return helper.execute_query(query, bind_vars=binds, paginate=paginate)

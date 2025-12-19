@@ -1532,3 +1532,56 @@ class HealthCheckView(viewsets.ViewSet):
         from txt2detection.credential_checker import check_statuses
 
         return check_statuses(test_llms=True)
+
+
+@extend_schema_view(
+    list=extend_schema(
+        summary="Search and retrieve Data Sources",
+        description=textwrap.dedent(
+            """
+            This endpoint allows you to search for STIX Data Source objects. Data Sources represent the different types of information that can be collected for security monitoring and detection.
+
+            You can filter Data Sources using wildcard text search on the following fields:
+            * `product`: The product or platform where the data originates (e.g., "windows", "linux", "application")
+            * `category`: The category or collection the data source belongs to
+            * `definition`: The definition or description of the data source
+            * `service`: The specific service that provides the data (e.g., "xz", "sshd")
+
+            All text searches use wildcard matching, so partial matches will be returned.
+            """
+        ),
+        responses={200: OpenApiResponse(description="List of data sources"), 400: DEFAULT_400_ERROR},
+        parameters=[
+            OpenApiParameter(
+                "product",
+                description="Filter by product name using wildcard search. E.g., 'app' will match 'application'.",
+                type=str,
+            ),
+            OpenApiParameter(
+                "category",
+                description="Filter by category using wildcard search.",
+                type=str,
+            ),
+            OpenApiParameter(
+                "definition",
+                description="Filter by definition using wildcard search.",
+                type=str,
+            ),
+            OpenApiParameter(
+                "service",
+                description="Filter by service name using wildcard search.",
+                type=str,
+            ),
+            OpenApiParameter(
+                "sort",
+                description="Sort results by property",
+                enum=arangodb_helpers.DATA_SOURCES_SORT_FIELDS,
+            ),
+        ] + arangodb_helpers.ArangoDBHelper.get_schema_operation_parameters(),
+    ),
+)
+class DataSourceView(viewsets.ViewSet):
+    openapi_tags = ["Objects"]
+
+    def list(self, request, *args, **kwargs):
+        return arangodb_helpers.get_data_sources(request)

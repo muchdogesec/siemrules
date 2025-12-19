@@ -16,6 +16,7 @@ detection:
 logsource:
     category: file
     product: application
+    definition: File system events and operations
 falsepositives:
 - Legitimate use of the pypotr package version 5.1.1 by developers unaware of its
     origin.
@@ -55,6 +56,7 @@ detection:
 logsource:
     product: application
     service: xz
+    definition: Application logs from compression utilities
 falsepositives:
 - Legitimate updates or patches to the xz library that include test files.
 - Custom builds of xz that include additional test files for development purposes.
@@ -98,6 +100,7 @@ detection:
 logsource:
     category: webserver
     product: wordpress
+    definition: Web server access and error logs
 falsepositives:
 - Legitimate use of data attributes in web pages by authorized users.
 - Custom scripts added by site administrators for functionality.
