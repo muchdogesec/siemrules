@@ -42,6 +42,7 @@ router.register('base-rules', converters.ConvertRuleView, 'convert-base-rules')
 router.register('reports', reports.ReportView, 'reports')
 router.register('identities', IdentityView, "identity-view")
 router.register('profiles', views.ProfileView, "profile-view")
+router.register('data-sources', views.DataSourceView, 'data-sources')
 
 
 # objects

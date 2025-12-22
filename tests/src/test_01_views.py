@@ -314,3 +314,55 @@ def test_healthcheck_service(client, api_schema):
     api_schema["/api/healthcheck/service/"]["GET"].validate_response(
         Transport.get_st_response(resp)
     )
+
+
+class TestDataSourceView:
+    @pytest.fixture(autouse=True)
+    def setup(self):
+        self.url = "/api/v1/data-sources/"
+
+    @pytest.mark.parametrize(
+        ["params", "expected_ids"],
+        [
+            pytest.param(dict(), ["data-source--512ead3c-b0fb-5235-8605-2da7c9b35ac2", "data-source--ab14f1cd-18db-5805-9c75-8d6002e41d9a", "data-source--34ad2f90-179a-567e-8867-e527f5a3219b"], id="no_filter"),
+            pytest.param(dict(product="application"), ["data-source--512ead3c-b0fb-5235-8605-2da7c9b35ac2", "data-source--34ad2f90-179a-567e-8867-e527f5a3219b"], id="product_full"),
+            pytest.param(dict(product="PliCation"), ["data-source--512ead3c-b0fb-5235-8605-2da7c9b35ac2", "data-source--34ad2f90-179a-567e-8867-e527f5a3219b"], id="product_partial_bad_case"),
+            pytest.param(dict(product="app"), ["data-source--512ead3c-b0fb-5235-8605-2da7c9b35ac2", "data-source--34ad2f90-179a-567e-8867-e527f5a3219b"], id="product_partial"),
+            pytest.param(dict(product="wordpress"), ["data-source--ab14f1cd-18db-5805-9c75-8d6002e41d9a"], id="product_wordpress"),
+            pytest.param(dict(product="nonexistent"), [], id="product_no_match"),
+            pytest.param(dict(service="xz"), ["data-source--512ead3c-b0fb-5235-8605-2da7c9b35ac2"], id="service_xz"),
+            pytest.param(dict(service="XZ"), ["data-source--512ead3c-b0fb-5235-8605-2da7c9b35ac2"], id="service_xz_bad_case"),
+            pytest.param(dict(service="x"), ["data-source--512ead3c-b0fb-5235-8605-2da7c9b35ac2"], id="service_partial"),
+            pytest.param(dict(service="nonexistent"), [], id="service_no_match"),
+            pytest.param(dict(category="file"), ["data-source--34ad2f90-179a-567e-8867-e527f5a3219b"], id="category_file"),
+            pytest.param(dict(category="ILe"), ["data-source--34ad2f90-179a-567e-8867-e527f5a3219b"], id="category_bad_case"),
+            pytest.param(dict(category="webserver"), ["data-source--ab14f1cd-18db-5805-9c75-8d6002e41d9a"], id="category_webserver"),
+            pytest.param(dict(category="web"), ["data-source--ab14f1cd-18db-5805-9c75-8d6002e41d9a"], id="category_partial"),
+            pytest.param(dict(category="nonexistent"), [], id="category_no_match"),
+            pytest.param(dict(definition="file system"), ["data-source--34ad2f90-179a-567e-8867-e527f5a3219b"], id="definition_file_system"),
+            pytest.param(dict(definition="logs"), ["data-source--512ead3c-b0fb-5235-8605-2da7c9b35ac2", "data-source--ab14f1cd-18db-5805-9c75-8d6002e41d9a"], id="definition_logs"),
+            pytest.param(dict(definition="web server"), ["data-source--ab14f1cd-18db-5805-9c75-8d6002e41d9a"], id="definition_web_server"),
+            pytest.param(dict(definition="compression"), ["data-source--512ead3c-b0fb-5235-8605-2da7c9b35ac2"], id="definition_compression"),
+            pytest.param(dict(definition="PREss"), ["data-source--512ead3c-b0fb-5235-8605-2da7c9b35ac2"], id="definition_compression_bad_case"),
+            pytest.param(dict(definition="nonexistent"), [], id="definition_no_match"),
+            pytest.param(dict(product="application", service="xz"), ["data-source--512ead3c-b0fb-5235-8605-2da7c9b35ac2"], id="multi_product_service"),
+            pytest.param(dict(product="wordpress", category="webserver"), ["data-source--ab14f1cd-18db-5805-9c75-8d6002e41d9a"], id="multi_product_category"),
+            pytest.param(dict(category="file", definition="file system"), ["data-source--34ad2f90-179a-567e-8867-e527f5a3219b"], id="multi_category_definition"),
+            pytest.param(dict(product="application", service="xz", definition="compression"), ["data-source--512ead3c-b0fb-5235-8605-2da7c9b35ac2"], id="multi_all_fields"),
+            pytest.param(dict(product="application", service="nonexistent"), [], id="multi_conflicting"),
+        ],
+    )
+    def test_filters(self, client, params, expected_ids):
+        """Test data-source filtering with various parameter combinations"""
+        response = client.get(self.url, query_params=params)
+        data_source_ids = [ds["id"] for ds in response.data["data_sources"]]
+        assert set(data_source_ids) == set(expected_ids)
+        assert response.status_code == 200
+
+    def test_list_data_sources(self, client):
+        """Test basic data-source listing"""
+        with patch("siemrules.siemrules.arangodb_helpers.get_data_sources") as mock_get:
+            mock_get.return_value = Response({"data_sources": []})
+            response = client.get(self.url)
+            assert response.status_code == 200
+            mock_get.assert_called_once()

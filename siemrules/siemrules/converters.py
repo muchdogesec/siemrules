@@ -71,7 +71,7 @@ splunk_formats = ["default", "savedsearches"]
         ),
         parameters=[
             OpenApiParameter(
-                "pipeline", enum=list(kusto_pipelines), description="Select the pipeline to use. [Read more about available pipelines here](https://github.com/SigmaHQ/pySigma-backend-elasticsearch?tab=readme-ov-file#pysigma-elasticsearch-backend)."
+                "pipeline", enum=list(elastic_pipelines), description="Select the pipeline to use. [Read more about available pipelines here](https://github.com/SigmaHQ/pySigma-backend-elasticsearch?tab=readme-ov-file#pysigma-elasticsearch-backend)."
             ),
             OpenApiParameter(
                 "backend",

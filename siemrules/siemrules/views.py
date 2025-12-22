@@ -926,11 +926,6 @@ class BaseRuleView(RuleView):
     def modify_base_rule_manual(self, request, *args, indicator_id=None, **kwargs):
         report, indicator, all_objs = arangodb_helpers.get_objects_by_id(indicator_id)
 
-        if not report:
-            raise ParseError(
-                f"cannot find report associated with rule `{indicator_id}`"
-            )
-
         old_detection = yaml_to_detection(
             indicator["pattern"], indicator.get("indicator_types", [])
         )
@@ -1365,7 +1360,7 @@ class CorrelationRuleView(RuleView):
         job_instance = models.Job.objects.create(
             type=models.JobType.CORRELATION_PROMPT,
             data=dict(
-                input_form="ai_prompt", **s.data, correlation_id=str(uuid.uuid4())
+                input_form="ai_prompt", payload=s.data, correlation_id=str(uuid.uuid4())
             ),
         )
         job_s = CorrelationJobSerializer(job_instance)
@@ -1532,3 +1527,56 @@ class HealthCheckView(viewsets.ViewSet):
         from txt2detection.credential_checker import check_statuses
 
         return check_statuses(test_llms=True)
+
+
+@extend_schema_view(
+    list=extend_schema(
+        summary="Search and retrieve Data Sources",
+        description=textwrap.dedent(
+            """
+            This endpoint allows you to search for STIX Data Source objects. Data Sources represent the different types of information that can be collected for security monitoring and detection.
+
+            You can filter Data Sources using wildcard text search on the following fields:
+            * `product`: The product or platform where the data originates (e.g., "windows", "linux", "application")
+            * `category`: The category or collection the data source belongs to
+            * `definition`: The definition or description of the data source
+            * `service`: The specific service that provides the data (e.g., "xz", "sshd")
+
+            All text searches use wildcard matching, so partial matches will be returned.
+            """
+        ),
+        responses={200: OpenApiResponse(description="List of data sources"), 400: DEFAULT_400_ERROR},
+        parameters=[
+            OpenApiParameter(
+                "product",
+                description="Filter by product name using wildcard search. E.g., 'app' will match 'application'.",
+                type=str,
+            ),
+            OpenApiParameter(
+                "category",
+                description="Filter by category using wildcard search.",
+                type=str,
+            ),
+            OpenApiParameter(
+                "definition",
+                description="Filter by definition using wildcard search.",
+                type=str,
+            ),
+            OpenApiParameter(
+                "service",
+                description="Filter by service name using wildcard search.",
+                type=str,
+            ),
+            OpenApiParameter(
+                "sort",
+                description="Sort results by property",
+                enum=arangodb_helpers.DATA_SOURCES_SORT_FIELDS,
+            ),
+        ] + arangodb_helpers.ArangoDBHelper.get_schema_operation_parameters(),
+    ),
+)
+class DataSourceView(viewsets.ViewSet):
+    openapi_tags = ["Objects"]
+
+    def list(self, request, *args, **kwargs):
+        return arangodb_helpers.get_data_sources(request)
