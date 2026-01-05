@@ -220,6 +220,7 @@ SPECTACULAR_SETTINGS = {
         {"name": "Reports", "description": "Search and retrieve Reports created from uploaded files"},
         {"name": "Base Rules", "description": "Search, retrieve and modify Base Rules"},
         {"name": "Correlation Rules", "description": "Search, retrieve and modify Correlation Rules"},
+        {"name": "Data Sources", "description": "Search Data Sources"},
         {"name": "Identities", "description": "Manage the Identities used to create Rules"},
         {"name": "Objects", "description": "Search through all STIX objects"},
         {"name": "Jobs", "description": "Check the status of data retrieval from files"},

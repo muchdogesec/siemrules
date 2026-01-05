@@ -1549,22 +1549,22 @@ class HealthCheckView(viewsets.ViewSet):
         parameters=[
             OpenApiParameter(
                 "product",
-                description="Filter by product name using wildcard search. E.g., 'app' will match 'application'.",
+                description="Filter by product name using wildcard search. e.g., `win` will match `windows`.",
                 type=str,
             ),
             OpenApiParameter(
                 "category",
-                description="Filter by category using wildcard search.",
+                description="Filter by category using wildcard search. e.g., `file` will match `win_file_events`.",
                 type=str,
             ),
             OpenApiParameter(
                 "definition",
-                description="Filter by definition using wildcard search.",
+                description="Filter by definition using wildcard search. e.g. `powershell` will match `Requirements: PowerShell Module Logging must be enabled`",
                 type=str,
             ),
             OpenApiParameter(
                 "service",
-                description="Filter by service name using wildcard search.",
+                description="Filter by service name using wildcard search. e.g., `ssh` will match `sshd`.",
                 type=str,
             ),
             OpenApiParameter(
@@ -1576,7 +1576,7 @@ class HealthCheckView(viewsets.ViewSet):
     ),
 )
 class DataSourceView(viewsets.ViewSet):
-    openapi_tags = ["Objects"]
+    openapi_tags = ["Data Sources"]
 
     def list(self, request, *args, **kwargs):
         return arangodb_helpers.get_data_sources(request)
