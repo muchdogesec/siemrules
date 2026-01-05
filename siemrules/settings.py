@@ -217,7 +217,7 @@ SPECTACULAR_SETTINGS = {
     "VERSION": "1.0.0",
     "TAGS": [
         {"name": "Files", "description": "Upload files and retrieve uploaded files that create Base Rules"},
-        {"name": "Reports", "description": "Search and retrieve Reports created from uploaded files"},
+        {"name": "Reports", "description": "Search and retrieve Reports created from uploaded files (Intel or Prompt mode)"},
         {"name": "Base Rules", "description": "Search, retrieve and modify Base Rules"},
         {"name": "Correlation Rules", "description": "Search, retrieve and modify Correlation Rules"},
         {"name": "Data Sources", "description": "Search Data Sources"},

@@ -73,9 +73,11 @@ def remove_report(report_id: str):
         summary="Search for retrieve created Reports",
         description=textwrap.dedent(
             """
-            During processing, txt2detection creates a STIX Report object to represent the file uploaded. The Report object contains the text the report, and also references all the Rules (STIX Indicator Objects) created from it based on the intelligence it contains.
+            During processing, txt2detection creates a STIX Report object to represent the file uploaded (Intel and Prompt mode). The Report object contains the text the report, and also references all the Rules (STIX Indicator Objects) created from it based on the intelligence it contains.
 
             You can use this endpoint to retrieve them.
+
+            **IMPORTANT:** YML file uploads are only converted into files. No report will exist for YML uploads.
             """
         ),
     ),
