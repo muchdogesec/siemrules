@@ -40,7 +40,7 @@ router.register('correlation-rules', views.CorrelationRuleView, 'correlation-rul
 router.register('base-rules', views.BaseRuleView, 'base-rules')
 router.register('base-rules', converters.ConvertRuleView, 'convert-base-rules')
 router.register('reports', reports.ReportView, 'reports')
-router.register('identities', IdentityView, "identity-view")
+router.register('identities', IdentityView, "dsc-identity-view")
 router.register('profiles', views.ProfileView, "profile-view")
 router.register('data-sources', views.DataSourceView, 'data-sources')
 

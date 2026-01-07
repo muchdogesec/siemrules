@@ -16,7 +16,8 @@ if typing.TYPE_CHECKING:
     from siemrules import settings
 from siemrules.siemrules.correlations.models import AIRuleModel, RuleModel
 from siemrules.siemrules.models import default_identity
-from stix2 import Identity, parse as parse_stix, Relationship
+from stix2 import parse as parse_stix, Relationship
+from dogesec_commons.identity.models import Identity
 import yaml
 
 from llama_index.core import ChatPromptTemplate
@@ -47,16 +48,17 @@ def add_rule_indicator(
 ):
     job_data = job_data or dict()
     base_rule_indicators = base_rule_indicators or []
-    identity = default_identity()
+    identity_id = default_identity()['id']
     # if rule_ids := rule.correlation.rules:
     #     assert len(rule_ids) == len(base_rule_indicators or []), "base rules not passed"
     if rule.author:
         # assumes rule.author must be pre-fetched identity
-        identity = parse_stix(rule.author)
-    elif job_data and job_data.get("identity"):
-        identity = job_data["identity"]
+        identity_id = rule.author
+    elif job_data and job_data.get("identity_id"):
+        identity_id = job_data["identity_id"]
+    rule.author = identity_id
+    identity = Identity.objects.filter(id=identity_id).first().dict
 
-    rule.author = identity["id"]
     job_correlation_id = job_data and job_data.get("correlation_id")
     rule.rule_id = rule.rule_id or job_correlation_id or str(uuid.uuid4())
     rule_str = make_rule(
@@ -74,7 +76,7 @@ def add_rule_indicator(
         "type": "indicator",
         "id": "indicator--" + rule.rule_id,
         "spec_version": "2.1",
-        "created_by_ref": identity["id"],
+        "created_by_ref": identity_id,
         "created": job_data.get("created", rule.date),
         "modified": job_data.get("modified", rule.modified or rule.date),
         "description": rule.description,

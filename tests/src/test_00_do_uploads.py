@@ -29,13 +29,6 @@ from siemrules.worker import tasks
 from tests.src import data as test_data
 from tests.utils import Transport
 
-
-@pytest.fixture(autouse=True)
-def db_access_without_rollback_and_truncate(request, django_db_setup, django_db_blocker):
-    django_db_blocker.unblock()
-    yield
-    django_db_blocker.restore()
-
 @pytest.mark.parametrize(
     ["rule_id", "sigma_yaml"],
     [
@@ -43,12 +36,15 @@ def db_access_without_rollback_and_truncate(request, django_db_setup, django_db_
     ],
 )
 def test_base_yml_upload(client, celery_eager, rule_id, sigma_yaml, api_schema):
-    save_model = FileSigmaYamlSerializer.save
+    s = FileSigmaYamlSerializer.save
+    def save_model(self, *args, **kwargs):
+        kwargs.update(id=rule_id)
+        return s(self, *args, **kwargs)
     with patch.object(
         FileSigmaYamlSerializer,
         "save",
         autospec=True,
-        side_effect=lambda *x, **t: save_model(*x, **{**t, "id": rule_id}),
+        side_effect=save_model,
     ):
         resp = client.post(
             f"/api/v1/files/yml/",
@@ -58,7 +54,7 @@ def test_base_yml_upload(client, celery_eager, rule_id, sigma_yaml, api_schema):
         assert resp.status_code == 201, resp.json()
 
         job_resp = client.get(f"/api/v1/jobs/{resp.data['id']}/")
-        assert job_resp.status_code == 200
+        assert job_resp.status_code == 200, job_resp.content
         assert job_resp.data["state"] == "completed"
 
         version_resp = client.get(f'/api/v1/base-rules/indicator--{rule_id}/versions/')
@@ -92,16 +88,19 @@ def test_base_prompt_upload(client, profile, celery_eager, rule_id, tlp_level, s
                 text_input=f"some prompt;; {detection.description}",
                 profile_id=profile.id,
                 report_id=f"report--{rule_id}",
+                identity_id=detection.author,
             ),
             content_type="application/json",
         )
         assert resp.status_code == 201, resp.json()
 
         job_resp = client.get(f"/api/v1/jobs/{resp.data['id']}/")
-        assert job_resp.status_code == 200
+        assert job_resp.status_code == 200, job_resp.content
         assert job_resp.data["state"] == "completed"
         assert job_resp.data['file_id'] == rule_id
 
+        file_resp = client.get(f'/api/v1/files/{rule_id}/')
+        assert file_resp.json()['identity_id'] == detection.author
 
         version_resp = client.get(f'/api/v1/base-rules/indicator--{rule_id}/versions/')
         api_schema['/api/v1/base-rules/{indicator_id}/versions/'][
@@ -126,7 +125,7 @@ def test_modify_base_rule_manual(
     assert resp.status_code == 201, resp.json()
 
     job_resp = client.get(f"/api/v1/jobs/{resp.data['id']}/")
-    assert job_resp.status_code == 200
+    assert job_resp.status_code == 200, job_resp.content
     assert job_resp.data["state"] == "completed"
 
     resp = client.get(
@@ -159,7 +158,7 @@ def test_upload_correlation(celery_eager, client, rule, api_schema):
             data=rule,
             content_type="application/sigma+yaml",
         )
-        assert job_resp.status_code == 200
+        assert job_resp.status_code == 200, job_resp.content
 
         resp = client.get(correlation_url + f"indicator--{rule_id}/")
         assert resp.status_code == 200
@@ -189,9 +188,9 @@ def test_modify_correlation_manual(celery_eager, client, rule_id, modification, 
         data=modification_yaml,
         content_type="application/sigma+yaml",
     )
-    assert response.status_code == 201
+    assert response.status_code == 201, response.content
     job_resp = client.get(f"/api/v1/jobs/{response.data['id']}/")
-    assert job_resp.status_code == 200
+    assert job_resp.status_code == 200, job_resp.content
     assert job_resp.data["state"] == "completed"
     indicator = client.get(correlation_url + rule_id + "/").data
     if expected_descr := modification.get("description"):
@@ -241,7 +240,7 @@ def test_modify_correlation_rule_from_prompt(
         )
         assert response.status_code == 201
         job_resp = client.get(f"/api/v1/jobs/{response.data['id']}/")
-        assert job_resp.status_code == 200
+        assert job_resp.status_code == 200, job_resp.content
         assert job_resp.data["state"] == "completed", job_resp.data
         indicator = client.get(url + rule_id + "/").data
         rule, _ = yaml_to_rule(indicator["pattern"])
