@@ -15,7 +15,7 @@ from hypothesis import strategies
 from schemathesis.specs.openapi.checks import (
     negative_data_rejection,
     positive_data_acceptance,
-    status_code_conformance
+    status_code_conformance,
 )
 from schemathesis.config import GenerationConfig
 from schemathesis.transport.serialization import (
@@ -35,6 +35,7 @@ def override_transport(monkeypatch):
     ## patch transport.get
     from schemathesis import transport
     from ..utils import Transport
+
     monkeypatch.setattr(transport, "get", lambda _: Transport())
 
 
@@ -45,15 +46,21 @@ def module_setup(db):
         file=None,
         id="65c0335f-9dff-4885-b0fc-62152fe1666b",
         mode="txt",
+        identity_id="identity--a4d70b75-6f4a-5d19-9137-da863edd33d7",
     )
     file2 = File.objects.create(
-        name="test.txt", file=None, id="6b74370b-7cb8-4db7-a687-d8ad82c9c004", mode="md"
+        name="test.txt",
+        file=None,
+        id="6b74370b-7cb8-4db7-a687-d8ad82c9c004",
+        mode="md",
+        identity_id="identity--a4d70b75-6f4a-5d19-9137-da863edd33d7",
     )
     file3 = File.objects.create(
         name="test.txt",
         file=None,
         id="c92f9e37-0402-4d2d-a388-2424606d3c44",
         mode="pdf",
+        identity_id="identity--8ef05850-cb0d-51f7-80be-50e4376dbe63",
     )
     Job.objects.create(file=file, id="6b74370b-7cb8-4db7-a687-d8ad82c9c004")
     Job.objects.create(file=file2, id="6aabb7f4-4a9d-45d7-a013-0848a0e14ca9")
@@ -94,7 +101,9 @@ object_id_samples = [
     "relationship--f5e45557-ced2-5ec6-9af1-699163f5b9a9",
     "relationship--fd32d711-a8f0-5f42-9856-79ecf345c451",
 ]
-indicator_ids = ["indicator--" + str(uuid.uuid4()) for _ in range(3)] + [x for x in object_id_samples if x.startswith("indicator--")]
+indicator_ids = ["indicator--" + str(uuid.uuid4()) for _ in range(3)] + [
+    x for x in object_id_samples if x.startswith("indicator--")
+]
 
 object_ids = strategies.sampled_from(object_id_samples)
 report_ids = strategies.sampled_from(
@@ -108,16 +117,21 @@ report_ids = strategies.sampled_from(
 
 
 @schema.given(
-        indicator_id=strategies.sampled_from(indicator_ids),
+    indicator_id=strategies.sampled_from(indicator_ids),
 )
 @schema.include(path_regex=".*/convert/.*").parametrize()
 @settings(max_examples=30)
 def test_convert(case: schemathesis.Case, indicator_id):
-    if 'indicator_id' in case.path_parameters:
-        case.path_parameters['indicator_id'] = indicator_id
+    if "indicator_id" in case.path_parameters:
+        case.path_parameters["indicator_id"] = indicator_id
     case.call_and_validate(
-        excluded_checks=[negative_data_rejection, positive_data_acceptance, status_code_conformance]
+        excluded_checks=[
+            negative_data_rejection,
+            positive_data_acceptance,
+            status_code_conformance,
+        ]
     )
+
 
 @schema.include(method=["POST", "PATCH"]).parametrize()
 @patch("celery.app.task.Task.run")
@@ -132,11 +146,13 @@ def test_imports(mock, case: schemathesis.Case, **kwargs):
 
 
 @schema.given(
-        report_id=report_ids,
-        indicator_id=strategies.sampled_from(indicator_ids),
-        object_id=object_ids
+    report_id=report_ids,
+    indicator_id=strategies.sampled_from(indicator_ids),
+    object_id=object_ids,
 )
-@schema.exclude(method=["POST", "PATCH"]).exclude(path_regex=".*/convert/.*").parametrize()
+@schema.exclude(method=["POST", "PATCH"]).exclude(
+    path_regex=".*/convert/.*"
+).parametrize()
 @settings(max_examples=30)
 def test_api(case: schemathesis.Case, **kwargs):
     for k, v in kwargs.items():
