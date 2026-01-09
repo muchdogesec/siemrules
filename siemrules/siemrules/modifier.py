@@ -22,6 +22,7 @@ from txt2detection.models import (
     Level,
 )
 import stix2
+from dogesec_commons.identity.models import Identity
 
 from llama_index.core import ChatPromptTemplate
 from llama_index.core.base.llms.types import ChatMessage, MessageRole
@@ -125,7 +126,6 @@ class DRFDetection(DRFBaseModel, ModifierDetection):
 
 class DRFSigmaRule(DRFBaseModel, SigmaRuleDetection):
     drf_config = {"validate_pydantic": True}
-    _identity: dict = None
     tags: list[SigmaTag] = Field(default_factory=list)
 
     @staticmethod
@@ -143,18 +143,8 @@ class DRFSigmaRule(DRFBaseModel, SigmaRuleDetection):
 
         return validate_author(author)
 
-    def model_post_init(self, __context):
-        if self.author:
-            self._identity = json.loads(self.author)
-        return super().model_post_init(__context)
-
-    def clean_author(self):
-        if self.author and self._identity:
-            self.author = self._identity["id"]
-
     def to_file_serializer(self, request_body):
         try:
-            self.clean_author()
             rule = self.make_rule(None)
         except jsonschema.exceptions.ValidationError as e:
             raise validators.ValidationError(
@@ -163,7 +153,7 @@ class DRFSigmaRule(DRFBaseModel, SigmaRuleDetection):
         from siemrules.siemrules.serializers import FileSigmaYamlSerializer
         data = dict(
             name=self.title,
-            identity=self._identity,
+            identity_id=self.author,
             sigma_file=SimpleUploadedFile(
                 f"{slugify(self.title)}.yml",
                 content=request_body,

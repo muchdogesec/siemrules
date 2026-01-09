@@ -162,6 +162,7 @@ def test_get_objects_for_rule(rule_id, ignore_embedded_sro, types):
         assert resp.status_code == 200
         objects = resp.data['objects']
         objects_map = {obj['id']: obj for obj in objects}
+        print(sorted([obj['id'] for obj in objects]))
         assert len(objects_map) == len(objects), "duplicates in output"
         mock_get_single_rule.assert_called_once_with(rule_id, version=version, nokeep=False)
         helper = ArangoDBHelper('', r)
