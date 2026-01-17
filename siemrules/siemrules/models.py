@@ -14,6 +14,7 @@ import stix2
 from siemrules.siemrules.utils import TLP_Levels, TLP_LEVEL_STIX_ID_MAPPING
 from file2txt.parsers.core import BaseParser
 from django.db import models, transaction
+from dogesec_commons.identity.models import Identity
 
 # Create your models here.
 
@@ -38,7 +39,7 @@ def validate_identity(value):
 def upload_to_func(instance: 'File|FileImage', filename):
     if isinstance(instance, FileImage):
         instance = instance.report
-    return os.path.join(str(instance.identity['id']), str(instance.report_id), filename)
+    return os.path.join(str(instance.identity.id), str(instance.report_id), filename)
 
 def validate_file(file: InMemoryUploadedFile, mode: str):
     _, ext = os.path.splitext(file.name)
@@ -102,7 +103,8 @@ class Profile(models.Model):
 class File(models.Model):
     id = models.UUIDField(unique=True, max_length=64, primary_key=True, default=uuid.uuid4)
     name = models.CharField(max_length=256, help_text="This will be assigned to the File and Report object created. Note, the names of each detection rule generated will be automatically. Max 256 characters. This is a txt2detection setting.")
-    identity = models.JSONField(default=default_identity, validators=[validate_identity])
+    identity_json = models.JSONField(default=default_identity, validators=[validate_identity])
+    identity = models.ForeignKey(Identity, on_delete=models.CASCADE, default=None)
     labels = ArrayField(base_field=models.CharField(max_length=256), default=list)
     tlp_level = models.CharField(choices=TLP_Levels.choices, default=TLP_Levels.RED, max_length=128)
     file = models.FileField(max_length=1024, upload_to=upload_to_func)

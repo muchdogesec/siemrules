@@ -232,7 +232,7 @@ def run_txt2detection(file: models.File, sigma_yaml):
 
     bundler: txt2detectionBundler = txt2detection.run_txt2detection(
         name=file.name,
-        identity=parse_stix(file.identity),
+        identity=file.identity.identity,
         tlp_level=file.tlp_level,
         labels=file.labels,
         report_id=file.id,

@@ -32,11 +32,29 @@ tags:
 - attack.t1557
 - attack.t1098
 confidence: 85
-author: '{"type": "identity", "spec_version": "2.1", "id": "identity--a4d70b75-6f4a-5d19-9137-da863edd33d7", "created_by_ref": "identity--9779a2db-f98c-5f4b-8d08-8ee04e02dbb5", "created": "2020-01-01T00:00:00.000Z", "modified": "2020-01-01T00:00:00.000Z", "name": "txt2detection", "description": "https://github.com/muchdogesec/txt2detection", "identity_class": "system", "sectors": ["technology"], "contact_information": "https://www.dogesec.com/contact/", "object_marking_refs": ["marking-definition--94868c89-83c2-464b-929b-a1a8aa3c8487", "marking-definition--97ba4e8b-04f6-57e8-8f6e-3a0f0a7dc0fb"]}'
+author: "identity--a4d70b75-6f4a-5d19-9137-da863edd33d7"
 status: experimental
 date: 2024-05-01
 """,
 )
+
+AUTHOR_1 = {
+    "type": "identity",
+    "spec_version": "2.1",
+    "id": "identity--a4d70b75-6f4a-5d19-9137-da863edd33d7",
+    "created_by_ref": "identity--9779a2db-f98c-5f4b-8d08-8ee04e02dbb5",
+    "created": "2020-01-01T00:00:00.000Z",
+    "modified": "2020-01-01T00:00:00.000Z",
+    "name": "txt2detection",
+    "description": "https://github.com/muchdogesec/txt2detection",
+    "identity_class": "system",
+    "sectors": ["technology"],
+    "contact_information": "https://www.dogesec.com/contact/",
+    "object_marking_refs": [
+        "marking-definition--94868c89-83c2-464b-929b-a1a8aa3c8487",
+        "marking-definition--97ba4e8b-04f6-57e8-8f6e-3a0f0a7dc0fb",
+    ],
+}
 
 SIGMA_RULE_2 = (
     "9e2536b0-988b-598d-8cc3-407f9f13fc61",
@@ -73,7 +91,7 @@ tags:
 - txt2detection.linux
 - attack.t1008
 confidence: 85
-author: identity--a4d70b75-6f4a-5d19-9137-da863edd33d7
+author: identity--8ef05850-cb0d-51f7-80be-50e4376dbe63
 status: experimental
 license: 0BSD
 date: 2025-01-23
@@ -112,7 +130,7 @@ tags:
 - attack.t1070
 - attack.t1591
 confidence: 85
-author: identity--a4d70b75-6f4a-5d19-9137-da863edd33d7
+author: identity--8ef05850-cb0d-51f7-80be-50e4376dbe63
 status: experimental
 references:
 - https://goo.gl/ref1/

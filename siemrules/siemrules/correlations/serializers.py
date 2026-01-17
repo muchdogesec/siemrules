@@ -4,7 +4,7 @@ import json
 
 import jsonschema
 from siemrules.siemrules import models
-from siemrules.siemrules.serializers import STIXIdentityField, validate_model
+from siemrules.siemrules.serializers import IdentityIDField, validate_model
 from siemrules.siemrules.utils import TLP_Levels
 from .models import RuleModel as CorrelationRule, Correlation, BaseRuleModel, RuleModelExtraProperties, set_tlp_level_in_tags, tlp_from_tags
 from drf_pydantic import BaseModel as DRFBaseModel, DrfPydanticSerializer
@@ -40,15 +40,10 @@ class DRFCorrelationRule(DRFBaseModel, CorrelationRule):
 
 
 def to_file_serializer(rule: CorrelationRule, request_body):
-    self = rule
-    _identity = models.default_identity()
-    if self.author:
-        _identity = json.loads(self.author)
-
     from siemrules.siemrules.serializers import FileSigmaYamlSerializer
     data = dict(
         name=rule.title,
-        identity=_identity,
+        identity=rule.author,
         sigma_file=SimpleUploadedFile(
             f"correlation-{slugify(rule.title)}.yml",
             content=request_body,
@@ -56,6 +51,7 @@ def to_file_serializer(rule: CorrelationRule, request_body):
         ),
         type=models.VersionRuleType.CORRELATION_RULE,
         tlp_level=rule.tlp_level.name.replace("-", "+"),
+        identity_id=rule.author,
     )
 
     s = FileSigmaYamlSerializer(data=data)
@@ -107,7 +103,7 @@ class CorrelationRuleSerializer(serializers.Serializer):
     prompt = serializers.CharField()
     ai_provider = serializers.CharField(required=True, validators=[validate_model], help_text="An AI provider and model to be used for rule generation in format `provider:model` e.g. `openai:gpt-4o`. This is a txt2detection setting.")
     created = serializers.DateTimeField(default=lambda: datetime.now(UTC))
-    identity = STIXIdentityField(required=False)
+    identity_id = IdentityIDField(required=True)
     modified = serializers.DateTimeField(default=None)
     tlp_level = serializers.ChoiceField(choices=TLP_Levels.choices, default=TLP_Levels.CLEAR, help_text='If TLP exist in rule, setting a value for this property will overwrite the existing value. When unset, the `tlp.` tag in the report will be turned into a TLP level. Defaults to `clear` if there is no `tlp.` tag in rule.')
 

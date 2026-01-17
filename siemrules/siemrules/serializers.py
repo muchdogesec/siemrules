@@ -1,6 +1,7 @@
 from collections.abc import Mapping
 from enum import StrEnum, auto
 import uuid
+from django.conf import settings
 from django.core.files.uploadedfile import SimpleUploadedFile
 from rest_framework import serializers, validators
 from siemrules.siemrules.models import File, Job, FileImage, Profile, TLP_Levels, Version
@@ -71,26 +72,6 @@ class IndicatorIDField(StixIdField):
     stix_type = "indicator"
 
 
-@extend_schema_field(
-    dict(
-        example={
-            "type": "identity",
-            "spec_version": "2.1",
-            "id": "identity--b1ae1a15-6f4b-431e-b990-1b9678f35e15",
-            "name": "Dummy Identity",
-        },
-        type="object",
-    )
-)
-class STIXIdentityField(serializers.JSONField):
-    def run_validators(self, value):
-        try:
-            identity = stix2.Identity(**value)
-            return json.loads(identity.serialize())
-        except Exception as e:
-            raise validators.ValidationError(e)
-
-
 class CharacterSeparatedField(serializers.ListField):
     def __init__(self, *args, **kwargs):
         self.separator = kwargs.pop("separator", ",")
@@ -134,6 +115,31 @@ class ProfileIDField(serializers.PrimaryKeyRelatedField):
         if isinstance(value, uuid.UUID):
             return value
         return super().to_representation(value)
+    
+class IdentityIDField(serializers.PrimaryKeyRelatedField):
+    def __init__(self, **kwargs):
+        from dogesec_commons.identity.models import Identity
+        super().__init__(
+            queryset=Identity.objects,
+            error_messages={
+                "required": gettext_lazy("This field is required."),
+                "does_not_exist": gettext_lazy(
+                    'Invalid identity with id "{pk_value}" - object does not exist.'
+                ),
+                "incorrect_type": gettext_lazy(
+                    "Incorrect type. Expected identity id (uuid), received {data_type}."
+                ),
+            },
+            **kwargs,
+        )
+
+    def to_internal_value(self, data):
+        return super().to_internal_value(data).pk
+
+    def to_representation(self, value):
+        if isinstance(value, str):
+            return value
+        return super().to_representation(value)
 
 
 class FileSerializer(serializers.ModelSerializer):
@@ -164,8 +170,7 @@ class FileSerializer(serializers.ModelSerializer):
         default=None,
         help_text="By default the `data` and `modified` values in the rule will be used. If no values exist for these, the default behaviour is to use script run time. You can pass  `created` time here which will overwrite `date` and `modified` date in the rule. Pass as `YYYY-MM-DDThh:mm:ssZ` (e.g. `2020-01-01T00:00:00`)",
     )
-    identity = STIXIdentityField(
-        write_only=True,
+    identity_id = IdentityIDField(
         required=False,
         help_text='This will be used as the `created_by_ref` for all created SDOs and SROs. This is a full STIX Identity JSON. e.g. `{"type":"identity","spec_version":"2.1","id":"identity--b1ae1a15-6f4b-431e-b990-1b9678f35e15","name":"Dummy Identity"}`. If no value is passed, [the SIEM Rules identity object will be used](https://raw.githubusercontent.com/muchdogesec/stix4doge/refs/heads/main/objects/identity/siemrules.json). This is a txt2detection setting.',
     )
@@ -198,8 +203,12 @@ class FileSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = File
-        exclude = ["markdown_file", "status", "level", "profile", "txt2detection_data", "pdf_file"]
+        exclude = ["markdown_file", "status", "level", "profile", "txt2detection_data", "pdf_file", "identity"]
         read_only_fields = ["id", "type"]
+
+    def validate(self, attrs):
+        attrs['identity_id'] = attrs.get('identity_id', settings.STIX_IDENTITY['id'])
+        return super().validate(attrs)
 
 
 class ProfileSerializer(serializers.ModelSerializer):
@@ -269,7 +278,7 @@ class FileSigmaYamlSerializer(serializers.ModelSerializer):
     sigma_file = serializers.FileField(source="file", write_only=True)
     name = serializers.CharField(required=False)
     created = serializers.DateTimeField(default=None)
-    identity = STIXIdentityField(write_only=True, required=False)
+    identity_id = IdentityIDField(write_only=True, required=True)
 
     class Meta:
         model = File
@@ -277,6 +286,7 @@ class FileSigmaYamlSerializer(serializers.ModelSerializer):
             "file",
             "markdown_file",
             "mimetype",
+            "identity",
         ]
         read_only_fields = ["id"]
 
@@ -340,9 +350,9 @@ class RuleRevertSerializer(serializers.Serializer):
 
 
 class RuleCloneSerializer(serializers.Serializer):
-    identity = STIXIdentityField(
+    identity_id = IdentityIDField(
         write_only=True,
-        required=False,
+        default=settings.STIX_IDENTITY['id'],
         help_text='This will be used as the `created_by_ref` for all created SDOs and SROs. This is a full STIX Identity JSON. e.g. `{"type":"identity","spec_version":"2.1","id":"identity--b1ae1a15-6f4b-431e-b990-1b9678f35e15","name":"Dummy Identity"}`. If no value is passed, [the Stixify identity object will be used](https://raw.githubusercontent.com/muchdogesec/stix4doge/refs/heads/main/objects/identity/stixify.json). This is a txt2detection setting.',
     )
     tlp_level = serializers.ChoiceField(

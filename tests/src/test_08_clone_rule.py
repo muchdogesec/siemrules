@@ -37,17 +37,12 @@ from siemrules.siemrules.arangodb_helpers import (
         },
         {
             "title": "Cloned Sigma Rule 3",
-            "identity": {
-                "id": "identity--b1ae1a15-abcd-abcd-abcd-1b9678f35e15",
-                "name": "Test Identity",
-                "spec_version": "2.1",
-                "type": "identity",
-            },
+            "identity_id": "identity--b1ae1a15-abcd-431e-b990-1b9678f35e15",
         },
         {"description": "Cloned Description for Sigma Rule 4"},
     ],
 )
-def test_clone(subtests, celery_eager, client: django.test.Client, indicator_id, rule_type, payload):
+def test_clone(subtests, celery_eager, client: django.test.Client, indicator_id, rule_type, payload, identities):
     rule_url = f"/api/v1/{rule_type}/{indicator_id}/"
     orig_rule_resp = client.get(rule_url)
     assert orig_rule_resp.status_code == 200
@@ -55,7 +50,7 @@ def test_clone(subtests, celery_eager, client: django.test.Client, indicator_id,
     clone_resp = client.post(
         rule_url + "clone/", data=payload, content_type="application/json"
     )
-    assert clone_resp.status_code == 201
+    assert clone_resp.status_code == 201, clone_resp.content
     clone_job_resp = client.get(f"/api/v1/jobs/{clone_resp.data['id']}/")
     assert clone_job_resp.status_code == 200
     assert clone_job_resp.data["state"] == "completed"
@@ -112,9 +107,9 @@ def test_clone(subtests, celery_eager, client: django.test.Client, indicator_id,
             assert set(orig_detection.tags) == set(cloned_detection.tags)
 
     with subtests.test("identity"):
-        identity = payload.get("identity", settings.STIX_IDENTITY)
-        assert identity["id"] == cloned_indicator["created_by_ref"]
-        assert identity["id"] in cloned_detection.author  # author is a json string
+        identity_id = payload.get("identity_id", settings.STIX_IDENTITY['id'])
+        assert identity_id == cloned_indicator["created_by_ref"]
+        assert identity_id == cloned_detection.author  # author is a json string
 
     assert cloned_detection.date == parse_date(cloned_indicator["created"]).date(), "rule.date match indicator.created"
     assert (

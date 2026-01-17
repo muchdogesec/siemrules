@@ -45,12 +45,12 @@ tags:
         assert job.data["input_form"] == "sigma"
         assert "correlation_id" in job.data
 
-
-def rule_model():
+@pytest.fixture
+def mocked_rule(identities):
     return correlations.models.RuleModel(
         title="Test title",
         description="Test description",
-        author='{"type":"identity","spec_version":"2.1","id":"identity--b1ae1a15-abcd-431e-b990-1b9678f35e15","name":"Test Identity"}',
+        author="identity--b1ae1a15-abcd-431e-b990-1b9678f35e15",
         tags=["tlp.green"],
         correlation=correlations.models.Correlation(
             type="event_count",
@@ -66,7 +66,7 @@ def rule_model():
     ["author", "job_data", "expected_identity"],
     [
         pytest.param(
-            '{"type":"identity","spec_version":"2.1","id":"identity--b1ae1a15-abcd-431e-b990-1b9678f35e15","name":"Test Identity"}',
+            "identity--b1ae1a15-abcd-431e-b990-1b9678f35e15",
             None,
             "identity--b1ae1a15-abcd-431e-b990-1b9678f35e15",
             id="rule.author set",
@@ -80,20 +80,15 @@ def rule_model():
         pytest.param(
             None,
             {
-                "identity": {
-                    "type": "identity",
-                    "spec_version": "2.1",
-                    "id": "identity--a1ae1a15-abcd-ef12-b990-1b9678f35e15",
-                    "name": "Test Identity 2",
-                }
+                "identity_id": "identity--7b7c3431-429b-45c2-b4e8-9ceb8d2678a9"
             },
-            "identity--a1ae1a15-abcd-ef12-b990-1b9678f35e15",
+            "identity--7b7c3431-429b-45c2-b4e8-9ceb8d2678a9",
             id="identity object passed",
         ),
     ],
 )
-def test_add_rule_indicator_identity_in_objects(author, job_data, expected_identity):
-    rule = rule_model()
+def test_add_rule_indicator_identity_in_objects(author, job_data, expected_identity, mocked_rule):
+    rule = mocked_rule.copy()
     rule.author = author
 
     objects = correlations.correlations.add_rule_indicator(rule, job_data=job_data)
@@ -107,8 +102,8 @@ def test_add_rule_indicator_identity_in_objects(author, job_data, expected_ident
     assert rule.author == expected_identity, "author must be replaced with identity.id"
 
 
-def test_add_rule_indicator_relationships_in_objects():
-    rule = rule_model()
+def test_add_rule_indicator_relationships_in_objects(mocked_rule):
+    rule = mocked_rule.copy()
 
     related_indicators = [
         dict(
@@ -181,8 +176,8 @@ def test_add_rule_indicator_relationships_in_objects():
         ),
     ],
 )
-def test_add_rule_indicator_correlation_indicator(rule, job_data, expected_dict):
-    rule = rule_model().model_copy(update=rule or {})
+def test_add_rule_indicator_correlation_indicator(rule, job_data, expected_dict, mocked_rule):
+    rule = mocked_rule.copy().model_copy(update=rule or {})
     related_indicators = []
 
     with patch(
@@ -231,17 +226,12 @@ def test_add_rule_indicator_correlation_indicator(rule, job_data, expected_dict)
             "prompt": "create a tempral correlation",
             "ai_provider": "openai",
             "created": "2025-03-02T14:36:52.663Z",
-            "identity": {
-                "type": "identity",
-                "spec_version": "2.1",
-                "id": "identity--b1ae1a15-abcd-431e-b990-1b9678f35e15",
-                "name": "Test Identity",
-            },
+            "identity_id": "identity--b1ae1a15-abcd-431e-b990-1b9678f35e15",
             "modified": "2025-04-17T14:36:52.663Z",
         }
     ],
 )
-def test_correlation_create__prompt(client: django.test.Client, rule_payload: dict):
+def test_correlation_create__prompt(client: django.test.Client, rule_payload: dict, identities):
 
     with patch("siemrules.worker.tasks.new_correlation_task") as mock_task:
         response = client.post(
