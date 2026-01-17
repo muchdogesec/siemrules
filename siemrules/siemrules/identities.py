@@ -110,28 +110,30 @@ def delete_identity_cleanup_callback(sender, instance: Identity, **kwargs):
 
 @extend_schema_view(
     destroy=extend_schema(
-        summary="Delete all objects associated with identity",
+        summary="Delete an Identity and all its Files and Rules",
         description=textwrap.dedent(
             """
-            This endpoint will delete all Files, Reports, Rules and any other STIX objects created using this identity. It will also delete the Identity object selected.
+            Delete an Identity object and ALL Files and Rules linked to it
 
-            It will not delete any Profiles using the Identity selected. This ensures a Profile being used by other Identities is not removed. Use the Delete Profile endpoint to delete a Profile..
+            IMPORTANT: make sure this is the request you want to run. It will delete all data related to the Identity ID, including the Identity object, all Rules belonging to the Identity object, and all Files belonging to the Identity.
             """
         ),
     ),
     list=extend_schema(
-        summary="Search identity objects",
+        summary="List Identities",
         description=textwrap.dedent(
             """
-            This endpoint will allow you to search for all identities that exist.
+            List all STIX Identity objects that can be used to create rules.
+
+            You can create an Identity using the POST Identities endpoint.
             """
         ),
     ),
     retrieve=extend_schema(
-        summary="GET identity object by STIX ID",
+        summary="Retrieve an Identity",
         description=textwrap.dedent(
             """
-            This endpoint will allow you to GET an identity object by its STIX ID.
+            Retrieve a STIX Identity object by its ID.
             """
         ),
     ),
