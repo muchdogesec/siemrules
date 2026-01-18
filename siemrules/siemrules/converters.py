@@ -42,7 +42,7 @@ elastic_backends: dict[
 ] = dict(elastalert=ElastalertBackend, esql=ESQLBackend, lucene=LuceneBackend, eql=EqlBackend)
 
 
-
+elastic_formats = ["default", "dsl_lucene", "kibana_ndjson", "eql"]
 splunk_formats = ["default", "savedsearches"]
 @extend_schema_view(
     convert_kusto=extend_schema(
@@ -78,6 +78,16 @@ splunk_formats = ["default", "savedsearches"]
                 enum=list(elastic_backends),
                 description="Select the backend to use. [Read more about available backends here](https://github.com/SigmaHQ/pySigma-backend-elasticsearch?tab=readme-ov-file#pysigma-elasticsearch-backend).",
                 required=True,
+            ),
+            OpenApiParameter(
+                "output_format",
+                enum=elastic_formats,
+                description=textwrap.dedent("""
+                    - `default`: Lucene queries.
+                    - `dsl_lucene`: DSL with embedded Lucene queries.
+                    - `kibana_ndjson`: Elastic Event Query Language queries.
+                    - `eql`: Kibana NDJSON with Lucene queries.
+                """),
             ),
         ],
     ),
@@ -155,6 +165,14 @@ class ConvertRuleView(viewsets.GenericViewSet):
                 f"unsupported splunk output format: {output_format}"
             )
         return output_format
+    
+    def get_elastic_output_format(self):
+        output_format = self.request.query_params.get("output_format") or "default"
+        if output_format not in elastic_formats:
+            raise validators.ValidationError(
+                f"unsupported elastic output format: {output_format}"
+            )
+        return output_format
 
     @decorators.action(methods=["GET"], detail=True, url_path="convert/kusto")
     def convert_kusto(self, request, *args, indicator_id=None, **kwargs):
@@ -179,6 +197,7 @@ class ConvertRuleView(viewsets.GenericViewSet):
         out = self.convert(
             backend_cls(processing_pipeline=self.get_pipeline(elastic_pipelines)),
             self.get_rule(indicator_id),
+            output_format=self.get_elastic_output_format(),
         )
         return HttpResponse(content=out, content_type="plain/text")
     
@@ -189,3 +208,5 @@ class ConvertRuleView(viewsets.GenericViewSet):
             return converted
         except SigmaTransformationError as e:
             raise ParseError({"error": str(e)})
+        except Exception as e:
+            raise ParseError({"error": "unknown error during conversion: " + str(e)})
