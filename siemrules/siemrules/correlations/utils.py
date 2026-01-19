@@ -12,6 +12,8 @@ from django.conf import settings
 if typing.TYPE_CHECKING:
     from siemrules import settings
 from siemrules.siemrules.models import default_identity
+from dogesec_commons.identity.models import Identity as CommonIdentity
+from dogesec_commons.identity.serializers import IdentitySerializer
 
 
 from dogesec_commons.objects.helpers import ArangoDBHelper
@@ -36,30 +38,23 @@ def get_stix_object(stix_id):
 
 def  validate_author(author: str):
     if not author:
-        return None
-    if author == 'identity--8ef05850-cb0d-51f7-80be-50e4376dbe63':
-        author = default_identity()
-    if isinstance(author, dict):
-        author = json.dumps(author)
+        author = 'identity--8ef05850-cb0d-51f7-80be-50e4376dbe63'
+    if not isinstance(author, str):
+        raise ValueError('author must be a string in format identity--<uuid>')
+    if not author.startswith('identity--'):
+        identity = make_identity(author)
+        author = identity.id
+        matched_identity = CommonIdentity.objects.filter(id=author)
+        if not matched_identity.exists():
+            s = IdentitySerializer(data=json.loads(identity.serialize()))
+            s.is_valid(raise_exception=True)
+            s.save()
+        return author
 
-    if author.startswith('{'):
-        try:
-            author = stix2.Identity(**json.loads(author))
-        except Exception as e:
-            raise ValueError(f'invalid stix identity object: {e}')
-    elif author.startswith('identity--'):
-        _, _, _uuid = author.rpartition('--')
-        try:
-            uuid.UUID(_uuid)
-        except:
-            raise ValueError(f'invalid STIX id `{author}`')
-        identities = get_stix_object(author)
-        if len(identities) != 1:
-            raise ValueError(f'identity `{author}` does not exist')
-        author = stix2.parse(identities[0])
-    else:
-        author = make_identity(author)
-    return author.serialize(sort_keys=False, indent=0)
+    matched_identity = CommonIdentity.objects.filter(id=author)
+    if not matched_identity.exists():
+        raise ValueError(f'No identity found with id {author}')
+    return author
 
 def make_identity(name):
     return stix2.Identity(id='identity--'+str(uuid.uuid5(settings.STIX_NAMESPACE, f"txt2detection+{name}")), name=name, created_by_ref=default_identity()['id'], created=datetime(2020, 1, 1), modified=datetime(2020, 1, 1))

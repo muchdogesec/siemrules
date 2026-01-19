@@ -24,6 +24,7 @@ def job(profile):
             "test.txt", b"dummy content", content_type="text/plain"
         ),
         profile=profile,
+        identity_id="identity--8ef05850-cb0d-51f7-80be-50e4376dbe63",
     )
     return Job.objects.create(file=file)
 
@@ -40,3 +41,28 @@ def api_schema():
     from siemrules.asgi import application
 
     yield schemathesis.openapi.from_asgi("/api/schema/?format=json", application)
+
+
+@pytest.fixture
+def identities():
+    from dogesec_commons.identity.models import Identity
+
+    id1, _ = Identity.objects.get_or_create(
+        id="identity--b1ae1a15-abcd-431e-b990-1b9678f35e15",
+        defaults={
+            'stix': {
+                'name': 'Test Identity',
+                'identity_class': 'organization',
+            }
+        }
+    )
+    id2, _ = Identity.objects.get_or_create(
+        id="identity--7b7c3431-429b-45c2-b4e8-9ceb8d2678a9",
+        defaults={
+            'stix': {
+                'name': 'Test Identity 2',
+                'identity_class': 'organization',
+            }
+        }
+    )
+    return [id1, id2]

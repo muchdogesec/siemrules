@@ -11,3 +11,18 @@ def default_profile(db):
         is_default=True,
         ai_provider="openai",
     )
+
+@pytest.fixture(autouse=True, scope="session")
+def db_access_without_rollback_and_truncate(request, django_db_setup, django_db_blocker):
+    django_db_blocker.unblock()
+
+    from dogesec_commons.identity.serializers import IdentitySerializer
+    from tests.src import data as test_data
+    identity_s = IdentitySerializer(
+        data=test_data.AUTHOR_1
+    )
+    identity_s.is_valid(raise_exception=True)
+    identity = identity_s.save()
+    identity.refresh_from_db()
+    yield
+    django_db_blocker.restore()

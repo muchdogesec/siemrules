@@ -8,7 +8,7 @@ from django.conf import settings
 import typing
 from stix2.serialization import serialize as stix2_serialize
 from dogesec_commons.objects.helpers import OBJECT_TYPES
-
+from dogesec_commons.identity.models import Identity
 from siemrules.siemrules.correlations import correlations
 from siemrules.siemrules.correlations.correlations import yaml_to_rule
 from siemrules.siemrules.modifier import yaml_to_detection
@@ -449,8 +449,11 @@ def make_clone(indicator_id: str, new_uuid: str, data: dict):
     rule["id"] = "indicator--" + new_uuid
     old_pattern, other_documents = indicator_to_rule(rule)
     author_ref = old_pattern.author
-    identity = data.get("identity", settings.STIX_IDENTITY.copy())
-    author_ref = identity["id"]
+    if 'identity_id' in data:
+        author_ref = data['identity_id']
+    else:
+        author_ref = settings.STIX_IDENTITY['id']
+    identity = Identity.objects.filter(id=author_ref).first().dict
 
     tlp_level = old_pattern.tlp_level
     if l := data.get("tlp_level"):

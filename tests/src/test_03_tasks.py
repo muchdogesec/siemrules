@@ -181,14 +181,17 @@ def report():
 
 
 def test_run_txt2detection(job, report, profile):
+    from dogesec_commons.identity.models import Identity
+    id2 = Identity.objects.create(
+        id="identity--"+str(uuid.uuid4()),
+        stix={
+            'name': 'Test Identity',
+            'identity_class': 'individual',
+        }
+    )
     mock_file = File.objects.create(
         name="test_file",
-        identity={
-            "type": "identity",
-            "id": "identity--" + str(uuid.uuid4()),
-            "name": "random identity",
-            "identity_class": "organization",
-        },
+        identity=id2,
         tlp_level="TLP:WHITE",
         id="2724bc7d-db7d-49a0-9583-469d2cf2e8fa",
         markdown_file=SimpleUploadedFile(
@@ -211,16 +214,12 @@ def test_run_txt2detection(job, report, profile):
     with mock.patch(
         "siemrules.worker.tasks.parse_ai_model"
     ) as mock_parse_ai_model, mock.patch(
-        "siemrules.worker.tasks.parse_stix"
-    ) as mock_parse_stix, mock.patch(
         "txt2detection.run_txt2detection"
     ) as mock_run_txt2detection:
 
         mock_ai_provider = mock.Mock()
         mock_parse_ai_model.return_value = mock_ai_provider
 
-        mock_stix_identity = stix2.Identity(**mock_file.identity)
-        mock_parse_stix.return_value = mock_stix_identity
 
         mock_bundler = mock.Mock()
         mock_bundler.report = report
@@ -246,10 +245,9 @@ def test_run_txt2detection(job, report, profile):
         result = run_txt2detection(mock_file_copy, None)
         ##########
         mock_parse_ai_model.assert_called_once_with(profile.ai_provider)
-        mock_parse_stix.assert_called_once_with(mock_file_copy.identity)
         mock_run_txt2detection.assert_called_once_with(
             name=mock_file.name,
-            identity=mock_stix_identity,
+            identity=id2.identity,
             tlp_level=mock_file.tlp_level,
             report_id=mock_file.id,
             ai_provider=mock_ai_provider,

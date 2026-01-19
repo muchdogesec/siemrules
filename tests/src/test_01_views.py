@@ -19,7 +19,7 @@ class TestFileView:
     @pytest.fixture(autouse=True)
     def setup(self, profile):
         self.file = models.File.objects.create(
-            name="test_file.txt", mimetype="text/plain", profile=profile
+            name="test_file.txt", mimetype="text/plain", profile=profile, identity_id="identity--8ef05850-cb0d-51f7-80be-50e4376dbe63"
         )
         self.url = "/api/v1/files/"
 
@@ -100,7 +100,8 @@ class TestJobView:
     @pytest.fixture(autouse=True)
     def setup(self):
         self.file = models.File.objects.create(
-            name="test_file.txt", mimetype="text/plain"
+            name="test_file.txt", mimetype="text/plain",
+            identity_id="identity--8ef05850-cb0d-51f7-80be-50e4376dbe63",
         )
         self.job = models.Job.objects.create(file=self.file)
         self.url = "/api/v1/jobs/"
@@ -245,7 +246,7 @@ def test_retrieve_profile(profile, client):
 
 
 def test_default_profile():
-    file = models.File.objects.create(name="test_file.txt", mimetype="text/plain")
+    file = models.File.objects.create(name="test_file.txt", mimetype="text/plain", identity_id="identity--8ef05850-cb0d-51f7-80be-50e4376dbe63")
     assert file.profile == file.profile.default_profile()
 
 
@@ -254,7 +255,7 @@ def test_regular_profile_does_not_use_default_profile(profile, default_profile):
     default_profile.save()
 
     file = models.File.objects.create(
-        name="test_file.txt", mimetype="text/plain", profile=profile
+        name="test_file.txt", mimetype="text/plain", profile=profile, identity_id="identity--8ef05850-cb0d-51f7-80be-50e4376dbe63"
     )
     assert file.profile == profile
 
