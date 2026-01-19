@@ -130,7 +130,6 @@ class SchemaViewCached(SpectacularAPIView):
             * `author`: all rules in SIEM Rules are tied to a STIX Identity object. If the rule contains;
                 * a string, that does not start with `identity--`, SIEM Rules will attempt to identify if an Identity already exists for this object (identity ID is generated using UUIDv5, namespace `8ef05850-cb0d-51f7-80be-50e4376dbe63` and the value used is the `author`). If it does, that ID will be used. If not, a new Identity object will be created using the same logic.
                 * a string that starts with `identity--`, SIEM Rules will attempt to identify if an Identity already exists for this object. If it does, that identity will be used. If not, you will recieve an error
-                * a JSON object with a valid STIX Identity ID, the Identity ID will be validated. If ID already exists, that will be used to create the rule. If ID does not exist, the Identity payload will be used to create an Identity object and that will be used.
 
             If no value passed for the following values, please note the default behaviour that can potentially modify the rule created:
 
@@ -158,7 +157,7 @@ class SchemaViewCached(SpectacularAPIView):
             * `name` (required): This will be assigned to the File and Report object created. Note, the names of each detection rule generated will be automatically. Max 256 characters. This is a txt2detection setting.
             * `created` (optional) by default all object created times will take the time the script was run. If you want to explicitly set these times you can do so using this flag. Pass the value in the format `YYYY-MM-DDThh:mm:ss` e.g. `2020-01-01T00:00:00`. This is a txt2detection setting.
             * `report_id` (optional): Pass a full STIX Report ID in the format `report--<UUID>` (e.g. `report--3fa85f64-5717-4562-b3fc-2c963f66afa6`. It will be use to generate the STIX Report ID generated to capture the file uploaded (the Indicator ID for the Rule will be different). If not passed, this value will be randomly generated for this file. Must be unique. This is a txt2detection setting.
-            * `identity` (optional): This will be used as the `created_by_ref` for all created SDOs and SROs and as the `author` value in the Base Rule. This is a full STIX Identity JSON. e.g. `{"type":"identity","spec_version":"2.1","id":"identity--b1ae1a15-6f4b-431e-b990-1b9678f35e15","name":"Dummy Identity"}`. If no value is passed, the [SIEM Rules identity object](https://raw.githubusercontent.com/muchdogesec/stix4doge/refs/heads/main/objects/identity/siemrules.json) will be used. This is a txt2detection setting.
+            * `identity` (optional, Identity ID): This will be used as the `created_by_ref` for all created SDOs and SROs and as the `author` value in the Base Rule. This should be a Identity ID that already exists (see GET Identity objects). If no value is passed the default will be used. This is a txt2detection setting.
             * `labels` (optional): Will be added to the `labels` of the Report and Indicator SDOs created, and `tags` in the Rule itself. Must pass in format `namespace.value`. This is a txt2detection setting. **NOTE**: you cannot use the reserved `tlp`. Use the `tlp_level` setting to set this. **NOTE**: you cannot use reserved namespaces `cve.` and `attack.`. The AI will add these based on the rule content.
             * `tlp_level` (optional): This will be assigned to all SDOs and SROs created and added to the Base Rule as a tag (e.g. `tlp.red`). SIEM Rules uses TLPv2. This is a txt2detection setting. Either `clear`, `green`, `amber`, `amber+strict`, `red`. If not passed default is `clear`. 
              * `license` (optional): [License of the rule according the SPDX ID specification](https://spdx.org/licenses/) (e.g. `MIT`). Will be added to the Rule. This is a txt2detection setting.
@@ -796,7 +795,7 @@ class RuleView(viewsets.GenericViewSet):
 
             This body requires the following values:
 
-            * `identity` (optional): This will be used as the `created_by_ref` for all created SDOs and SROs. This is a full STIX Identity JSON. e.g. `{"type":"identity","spec_version":"2.1","id":"identity--b1ae1a15-6f4b-431e-b990-1b9678f35e15","name":"Dummy Identity"}`. If no value is passed, the SIEM Rules identity object will be used.
+            * `identity` (optional, Identity ID): This will be used as the `created_by_ref` for the rule as the `author` value in the Base Rule. This should be a Identity ID that already exists (see GET Identity objects).  If not passed, the SIEM Rules Identity object will be used.
             * `title` (optional): The `title` of the rule. If none passed, the current `title` of the rule will be used.
             * `description` (optional): The `description` of the rule. If none passed, the current `description` of the rule will be used.
             * `tlp_level` (optional, dictionary): either `clear`, `green`, `amber`, `amber+strict`, `red`. If none passed, the current TLP level of the rule will be used.
@@ -1035,7 +1034,7 @@ class BaseRuleView(RuleView):
 
             This body requires the following values:
 
-            * `identity` (optional): This will be used as the `created_by_ref` for all created SDOs and SROs. This is a full STIX Identity JSON. e.g. `{"type":"identity","spec_version":"2.1","id":"identity--b1ae1a15-6f4b-431e-b990-1b9678f35e15","name":"Dummy Identity"}`. If no value is passed, the SIEM Rules identity object will be used.
+            * `identity` (optional, Identity ID): This will be used as the `created_by_ref` for the rule as the `author` value in the Base Rule. This should be a Identity ID that already exists (see GET Identity objects).  If not passed, the SIEM Rules Identity object will be used.
             * `title` (optional): The `title` of the rule. If none passed, the current `title` of the rule will be used.
             * `description` (optional): The `description` of the rule. If none passed, the current `description` of the rule will be used.
             * `tlp_level` (optional, dictionary): either `clear`, `green`, `amber`, `amber+strict`, `red`. If none passed, the current TLP level of the rule will be used.
@@ -1160,7 +1159,7 @@ class BaseRuleView(RuleView):
 
             * `title` (required): used as the rule `title`
             * `description` (optional) used as the rule `description`
-            * `author` (optional): A full STIX 2.1 identity object (make sure to properly escape). Will be validated by the STIX2 library. The ID is used to create the Indicator STIX object, and is used as the `author` property in the Sigma Correlation Rule. If not passed, the SIEM Rules Identity object will be used. e.g. `{"type":"identity","spec_version":"2.1","id":"identity--b1ae1a15-6f4b-431e-b990-1b9678f35e15","name":"Dummy Identity"}`
+            * `author` (optional, Identity ID): This will be used as the `created_by_ref` for the rule as the `author` value in the Base Rule. This should be a Identity ID that already exists (see GET Identity objects).  If not passed, the SIEM Rules Identity object will be used.
             * `date` (optional, date): will be used at the `created` time in the Indicator object generated and `date` value in the Sigma Correlation Rule. Default is now. Must be lower than `date`. In format `YYYY-MM-DD` (e.g. `2000-01-31`).
             * `modified` (optional, date): will be used at the `modified` time in the Indicator object generated and `modified` value in the Sigma Correlation Rule. Default is now. Must be higher than `date`. In format `YYYY-MM-DD` (e.g. `2000-01-31`).
             * `tags` (`tlp.` required): in format `NAMESPACE.TAG` (e.g. `threat-actor.someone`). Cannot use the reserved namespaces `attack.`, `cve.` If you wish to use reserved tags `attack.` or `cve,`, update one of the Base Rules used in this Correlation Rule with the desired tag.
@@ -1202,7 +1201,7 @@ class BaseRuleView(RuleView):
                 * creating Correlation from a single rule; `create a Sigma correlation when this Sigma rule with ID <ID> is triggered 5 times over a 10 minute period`
                 * creating a Correlation from multiple rules; `create a Sigma correlation when the Sigma rule with ID <ID> is triggered followed by the Sigma rule with ID <ID> being triggered within a 2 minute period.
             * `ai_provider` (required): An AI provider and model to be used for rule generation in format `provider:model` e.g. `openai:gpt-4o`. This is a txt2detection setting.
-            * `identity` (optional): A full STIX 2.1 identity object (make sure to properly escape). Will be validated by the STIX2 library. The ID is used to create the Indicator STIX object, and is used as the `author` property in the Sigma Correlation Rule. If not passed, the SIEM Rules Identity object will be used. e.g. `{"type":"identity","spec_version":"2.1","id":"identity--b1ae1a15-6f4b-431e-b990-1b9678f35e15","name":"Dummy Identity"}`
+            * `identity` (optional, Identity ID): This will be used as the `created_by_ref` for the rule as the `author` value in the Base Rule. This should be a Identity ID that already exists (see GET Identity objects).  If not passed, the SIEM Rules Identity object will be used.
             * `date` (optional): will be used at the `created` time in the Indicator object generated and `date` value in the Sigma Correlation Rule. Default is now. Must be lower than `date`. In format `YYYY-MM-DD` (e.g. `2000-01-31`).
             * `modified`: will be used at the `modified` time in the Indicator object generated and `modified` value in the Sigma Correlation Rule. Default is now. Must be higher than `date`. In format `YYYY-MM-DD` (e.g. `2000-01-31`).
             * `tlp_level` (optional): TLP level assigned to the Indicator object and in the `tags` of the Sigma Correlation Rule. Either `clear`, `green`, `amber`, `amber+strict`, or `red`. Default if not passed is `clear`.
