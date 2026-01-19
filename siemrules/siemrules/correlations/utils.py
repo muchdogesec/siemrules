@@ -12,6 +12,8 @@ from django.conf import settings
 if typing.TYPE_CHECKING:
     from siemrules import settings
 from siemrules.siemrules.models import default_identity
+from dogesec_commons.identity.models import Identity as CommonIdentity
+from dogesec_commons.identity.serializers import IdentitySerializer
 
 
 from dogesec_commons.objects.helpers import ArangoDBHelper
@@ -34,12 +36,21 @@ def get_stix_object(stix_id):
     """
     return helper.execute_query(query, bind_vars=binds, paginate=False)
 
-def  validate_author(author: str):    
+def  validate_author(author: str):
     if not author:
         author = 'identity--8ef05850-cb0d-51f7-80be-50e4376dbe63'
     if not isinstance(author, str):
         raise ValueError('author must be a string in format identity--<uuid>')
-    from dogesec_commons.identity.models import Identity as CommonIdentity
+    if not author.startswith('identity--'):
+        identity = make_identity(author)
+        author = identity.id
+        matched_identity = CommonIdentity.objects.filter(id=author)
+        if not matched_identity.exists():
+            s = IdentitySerializer(data=json.loads(identity.serialize()))
+            s.is_valid(raise_exception=True)
+            s.save()
+        return author
+
     matched_identity = CommonIdentity.objects.filter(id=author)
     if not matched_identity.exists():
         raise ValueError(f'No identity found with id {author}')
