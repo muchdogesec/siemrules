@@ -13,7 +13,11 @@ from dogesec_commons.identity.models import Identity
 from siemrules.siemrules.correlations import correlations
 from siemrules.siemrules.correlations.correlations import yaml_to_rule
 from siemrules.siemrules.modifier import yaml_to_detection
-from siemrules.siemrules.utils import TLP_LEVEL_STIX_ID_MAPPING, TLP_Levels, format_datetime
+from siemrules.siemrules.utils import (
+    TLP_LEVEL_STIX_ID_MAPPING,
+    TLP_Levels,
+    format_datetime,
+)
 
 from txt2detection.models import TLP_LEVEL as T2D_TLP_LEVEL, SigmaRuleDetection
 from siemrules.siemrules.correlations.models import RuleModel, set_tlp_level_in_tags
@@ -184,9 +188,18 @@ def get_single_rule_versions(indicator_id, rule_type):
 def get_objects_for_rule(
     indicator_id, request, version=None, rule_type=None, with_limit=True
 ):
-    return _get_rule_bundle(indicator_id, request, version=version, rule_type=rule_type, with_limit=with_limit)[1]
-    
-def _get_rule_bundle(indicator_id, request, version=None, rule_type=None, with_limit=True):
+    return _get_rule_bundle(
+        indicator_id,
+        request,
+        version=version,
+        rule_type=rule_type,
+        with_limit=with_limit,
+    )[1]
+
+
+def _get_rule_bundle(
+    indicator_id, request, version=None, rule_type=None, with_limit=True
+):
     rule = get_single_rule(indicator_id, version=version, nokeep=False).data
 
     helper = ArangoDBHelper(settings.VIEW_NAME, request)
@@ -376,20 +389,24 @@ def delete_rule(indicator_id):
                 correlations=correlation_rels,
             )
         )
-    
+
     # get all SCOs that are only linked to this rule
-    scos_to_delete = {d.get('_to') for d in rels}
+    scos_to_delete = {d.get("_to") for d in rels}
     sco_to_keep = helper.execute_query(
         """
             FOR doc IN siemrules_edge_collection
             FILTER doc._to IN @sco_ids AND doc._from NOT IN @rule_ids
             RETURN doc._to
     """,
-        bind_vars=dict(sco_ids=list(scos_to_delete), rule_ids=[obj["_id"] for obj in rules]),
+        bind_vars=dict(
+            sco_ids=list(scos_to_delete), rule_ids=[obj["_id"] for obj in rules]
+        ),
         paginate=False,
     )
     scos_to_delete.difference_update(sco_to_keep)
-    scos_to_delete = [sco.split("/")[1] for sco in scos_to_delete if 'report--' not in sco]
+    scos_to_delete = [
+        sco.split("/")[1] for sco in scos_to_delete if "report--" not in sco
+    ]
 
     # perform deletion
     helper.execute_query(
@@ -410,14 +427,22 @@ def delete_rule(indicator_id):
             RETURN {vertex_deletions, edge_deletions}
             
     """,
-        bind_vars=dict(keys=[obj["_key"] for obj in rules + rels] + list(scos_to_delete)),
+        bind_vars=dict(
+            keys=[obj["_key"] for obj in rules + rels] + list(scos_to_delete)
+        ),
         paginate=False,
     )
 
     # remove rule from report
     if report:
-        objects_to_remove = [indicator_id] + [obj["id"] for obj in rules] + [r.split("/")[1].split('+')[0] for r in scos_to_delete]
-        report['object_refs'] = list(set(report['object_refs']).difference(objects_to_remove))
+        objects_to_remove = (
+            [indicator_id]
+            + [obj["id"] for obj in rules]
+            + [r.split("+")[0] for r in scos_to_delete]
+        )
+        report["object_refs"] = list(
+            set(report["object_refs"]).difference(objects_to_remove)
+        )
 
         helper.execute_query(
             "UPDATE {_key: @report_key} WITH @report_update IN siemrules_vertex_collection",
@@ -436,13 +461,13 @@ def delete_rule(indicator_id):
 def indicator_to_rule(
     indicator: dict,
 ) -> tuple[RuleModel | SigmaRuleDetection, list[dict]]:
-    match indicator['x_sigma_type']:
-        case 'base':
+    match indicator["x_sigma_type"]:
+        case "base":
             return yaml_to_detection(indicator["pattern"]), []
-        case 'correlation':
+        case "correlation":
             return yaml_to_rule(indicator["pattern"])
         case _:
-            raise ParseError("unable to determine rule type")   
+            raise ParseError("unable to determine rule type")
 
 
 def make_clone(indicator_id: str, new_uuid: str, data: dict):
@@ -462,10 +487,10 @@ def make_clone(indicator_id: str, new_uuid: str, data: dict):
     rule["id"] = "indicator--" + new_uuid
     old_pattern, other_documents = indicator_to_rule(rule)
     author_ref = old_pattern.author
-    if 'identity_id' in data:
-        author_ref = data['identity_id']
+    if "identity_id" in data:
+        author_ref = data["identity_id"]
     else:
-        author_ref = settings.STIX_IDENTITY['id']
+        author_ref = settings.STIX_IDENTITY["id"]
     identity = Identity.objects.filter(id=author_ref).first().dict
 
     tlp_level = old_pattern.tlp_level
@@ -635,21 +660,20 @@ def get_data_sources(request: request.Request, paginate=True):
     filters = []
 
     if product := helper.query.get("product"):
-        binds["product"] = "%" + product.lower().replace('%', r'\%') + "%"
+        binds["product"] = "%" + product.lower().replace("%", r"\%") + "%"
         filters.append("FILTER doc.product LIKE @product")
 
     if category := helper.query.get("category"):
-        binds["category"] = "%" + category.lower().replace('%', r'\%') + "%"
+        binds["category"] = "%" + category.lower().replace("%", r"\%") + "%"
         filters.append("FILTER doc.category LIKE @category")
 
     if definition := helper.query.get("definition"):
-        binds["definition"] = "%" + definition.lower().replace('%', r'\%') + "%"
+        binds["definition"] = "%" + definition.lower().replace("%", r"\%") + "%"
         filters.append("FILTER LOWER(doc.definition) LIKE @definition")
 
     if service := helper.query.get("service"):
-        binds["service"] = "%" + service.lower().replace('%', r'\%') + "%"
+        binds["service"] = "%" + service.lower().replace("%", r"\%") + "%"
         filters.append("FILTER doc.service LIKE @service")
-
 
     query = """
 FOR doc IN siemrules_vertex_collection
@@ -659,7 +683,9 @@ FILTER doc.type == 'data-source' AND doc._is_latest
 @sort_stmt
 #LIMIT
 RETURN KEEP(doc, KEYS(doc, TRUE))
-""".replace("@filters", "\n".join(filters)).replace(
+""".replace(
+        "@filters", "\n".join(filters)
+    ).replace(
         "@sort_stmt",
         helper.get_sort_stmt(
             DATA_SOURCES_SORT_FIELDS,
@@ -670,5 +696,5 @@ RETURN KEEP(doc, KEYS(doc, TRUE))
     if paginate:
         limit_str = "LIMIT @offset, @count"
     query = query.replace("#LIMIT", limit_str)
-    
+
     return helper.execute_query(query, bind_vars=binds, paginate=paginate)
