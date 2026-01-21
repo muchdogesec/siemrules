@@ -417,9 +417,7 @@ def delete_rule(indicator_id):
     # remove rule from report
     if report:
         objects_to_remove = [indicator_id] + [obj["id"] for obj in rules] + [r.split("/")[1].split('+')[0] for r in scos_to_delete]
-        for obj_id in objects_to_remove:
-            with contextlib.suppress(Exception):
-                report["object_refs"].remove(obj_id)
+        report['object_refs'] = list(set(report['object_refs']).difference(objects_to_remove))
 
         helper.execute_query(
             "UPDATE {_key: @report_key} WITH @report_update IN siemrules_vertex_collection",
