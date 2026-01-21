@@ -1,3 +1,4 @@
+from collections import defaultdict
 import contextlib
 from datetime import UTC, datetime
 import json
@@ -375,6 +376,20 @@ def delete_rule(indicator_id):
                 correlations=correlation_rels,
             )
         )
+    
+    # get all SCOs that are only linked to this rule
+    scos_to_delete = {d.get('_to') for d in rels}
+    sco_to_keep = helper.execute_query(
+        """
+            FOR doc IN siemrules_edge_collection
+            FILTER doc._to IN @sco_ids AND doc._from NOT IN @rule_ids
+            RETURN doc._to
+    """,
+        bind_vars=dict(sco_ids=list(scos_to_delete), rule_ids=[obj["_id"] for obj in rules]),
+        paginate=False,
+    )
+    scos_to_delete.difference_update(sco_to_keep)
+    scos_to_delete = [sco.split("/")[1] for sco in scos_to_delete if 'report--' not in sco]
 
     # perform deletion
     helper.execute_query(
@@ -395,16 +410,16 @@ def delete_rule(indicator_id):
             RETURN {vertex_deletions, edge_deletions}
             
     """,
-        bind_vars=dict(keys=[obj["_key"] for obj in rules + rels]),
+        bind_vars=dict(keys=[obj["_key"] for obj in rules + rels] + list(scos_to_delete)),
         paginate=False,
     )
 
     # remove rule from report
     if report:
-        report["object_refs"].remove(indicator_id)
-        for obj in rules:
+        objects_to_remove = [indicator_id] + [obj["id"] for obj in rules] + [r.split("/")[1].split('+')[0] for r in scos_to_delete]
+        for obj_id in objects_to_remove:
             with contextlib.suppress(Exception):
-                report["object_refs"].remove(obj["id"])
+                report["object_refs"].remove(obj_id)
 
         helper.execute_query(
             "UPDATE {_key: @report_key} WITH @report_update IN siemrules_vertex_collection",
