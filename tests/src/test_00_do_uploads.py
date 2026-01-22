@@ -85,7 +85,7 @@ def test_base_prompt_upload(client, profile, celery_eager, rule_id, tlp_level, s
             data=dict(
                 name=detection.title,
                 tlp_level=tlp_level,
-                text_input=f"some prompt;; {detection.description}",
+                text_input=f"some prompt;; {detection.description} ;;" + "==="*200,
                 profile_id=profile.id,
                 report_id=f"report--{rule_id}",
                 identity_id=detection.author,
