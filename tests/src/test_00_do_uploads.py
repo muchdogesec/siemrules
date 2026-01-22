@@ -235,7 +235,7 @@ def test_modify_correlation_rule_from_prompt(
     ) as mock_ai_call:
         response = client.post(
             url + f"{rule_id}/modify/prompt/",
-            data={"ai_provider": "openai", "prompt": "some prompt"},
+            data={"ai_provider": "openai", "prompt": "some prompt" + "==="*200},
             content_type="application/json",
         )
         assert response.status_code == 201
