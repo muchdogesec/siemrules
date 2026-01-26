@@ -225,6 +225,7 @@ def test_modify_correlation_rule_from_prompt(
     celery_eager, client, rule_id, modification, api_schema
 ):
     url = correlation_url
+    prompt_text = "some prompt" + "==="*200
     indicator = client.get(url + rule_id + "/").data
     rule, _ = yaml_to_rule(indicator["pattern"])
     ai_modification = rule.model_copy(update=modification)
@@ -235,7 +236,7 @@ def test_modify_correlation_rule_from_prompt(
     ) as mock_ai_call:
         response = client.post(
             url + f"{rule_id}/modify/prompt/",
-            data={"ai_provider": "openai", "prompt": "some prompt" + "==="*200},
+            data={"ai_provider": "openai", "prompt": prompt_text},
             content_type="application/json",
         )
         assert response.status_code == 201
@@ -258,4 +259,4 @@ def test_modify_correlation_rule_from_prompt(
     api_schema['/api/v1/correlation-rules/{indicator_id}/versions/'][
     "GET"
     ].validate_response(Transport.get_st_response(version_resp))
-    assert {'modified': version_resp.data[0]['modified'], 'action': 'modify', 'type': 'prompt', "prompt": "some prompt"} in version_resp.data
+    assert {'modified': version_resp.data[0]['modified'], 'action': 'modify', 'type': 'prompt', "prompt": prompt_text} in version_resp.data
