@@ -55,8 +55,8 @@ def test_clone(subtests, celery_eager, client: django.test.Client, indicator_id,
     assert clone_job_resp.status_code == 200
     assert clone_job_resp.data["state"] == "completed"
     new_indicator_id = clone_job_resp.data['extra']['indicator_id']
-    cloned_resp = client.get(f"/api/v1/{rule_type}/{new_indicator_id}/")
     time.sleep(1)
+    cloned_resp = client.get(f"/api/v1/{rule_type}/{new_indicator_id}/")
     cloned_indicator = cloned_resp.json()
     cloned_detection = rule_to_detection(cloned_indicator)
     orig_detection = rule_to_detection(orig_indicator)
