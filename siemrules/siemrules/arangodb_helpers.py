@@ -603,6 +603,8 @@ def make_clone(indicator_id: str, new_uuid: str, data: dict):
             "_from",
             "_id",
             "_key",
+            "_is_latest",
+            "_taxii",
         ]:
             obj.pop(k, None)
         obj["_is_latest"] = True

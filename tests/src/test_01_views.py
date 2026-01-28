@@ -53,7 +53,7 @@ class TestFileView:
             assert job.profile == profile
 
     def test_file_create__text(self, client: django.test.Client, profile):
-        mock_file_content = b"dummy content"
+        mock_file_content = b"dummy content" + b"\n== more =="*50
         file_data = dict(
             text_input=mock_file_content.decode(),
             ai_provider="openai",

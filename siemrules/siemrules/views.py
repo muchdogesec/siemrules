@@ -153,7 +153,7 @@ class SchemaViewCached(SpectacularAPIView):
 
             The following key / values are accepted in the body of the request:
 
-            * `text_input` (required): this is a string of text that will be passed to the AI to create the rule. Generally this should take the form of a prompt; e.g. `write a detection rule that identified failed logins`, `write a detection rule that detects 1.1.1.1 or 2.2.2.2`, etc.
+            * `text_input` (required, minimum 256 characters): this is a string of text that will be passed to the AI to create the rule. Generally this should take the form of a prompt; e.g. `write a detection rule that identified failed logins`, `write a detection rule that detects 1.1.1.1 or 2.2.2.2`, etc.
             * `name` (required): This will be assigned to the File and Report object created. Note, the names of each detection rule generated will be automatically. Max 256 characters. This is a txt2detection setting.
             * `created` (optional) by default all object created times will take the time the script was run. If you want to explicitly set these times you can do so using this flag. Pass the value in the format `YYYY-MM-DDThh:mm:ss` e.g. `2020-01-01T00:00:00`. This is a txt2detection setting.
             * `report_id` (optional): Pass a full STIX Report ID in the format `report--<UUID>` (e.g. `report--3fa85f64-5717-4562-b3fc-2c963f66afa6`. It will be use to generate the STIX Report ID generated to capture the file uploaded (the Indicator ID for the Rule will be different). If not passed, this value will be randomly generated for this file. Must be unique. This is a txt2detection setting.
