@@ -315,7 +315,7 @@ packaging==24.2
     #   transformers
 pandas==3.0.0
     # via file2txt
-pillow==12.1.0
+pillow==12.1.1
     # via
     #   file2txt
     #   llama-index-core
