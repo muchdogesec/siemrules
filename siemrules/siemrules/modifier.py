@@ -1,10 +1,12 @@
-from datetime import UTC, datetime, date as dt_date
+from datetime import UTC, datetime
 import io
-import json
 from types import SimpleNamespace
 from typing import Optional
+import typing
+import uuid
+from django.conf import settings
 import jsonschema.exceptions
-from pydantic import Field, HttpUrl, computed_field, field_validator
+from pydantic import Field, HttpUrl, field_validator
 import yaml
 from txt2detection.ai_extractor.utils import (
     ParserWithLogging,
@@ -22,7 +24,6 @@ from txt2detection.models import (
     Level,
 )
 import stix2
-from dogesec_commons.identity.models import Identity
 
 from llama_index.core import ChatPromptTemplate
 from llama_index.core.base.llms.types import ChatMessage, MessageRole
@@ -38,10 +39,13 @@ from txt2detection.models import (
     set_tlp_level_in_tags,
 )
 
+if typing.TYPE_CHECKING:
+    from .. import settings
+
 
 def modify_indicator(report, indicator: dict, detection: BaseDetection):
     labels = []
-    report_id = indicator['id'].replace("indicator--", "")
+    report_id = indicator["id"].replace("indicator--", "")
     if report:
         labels = report.get("labels", [])
         report_id = report["id"].replace("report--", "")
@@ -58,8 +62,7 @@ def modify_indicator(report, indicator: dict, detection: BaseDetection):
         indicator["created"],
         report_id=report_id,
         modified=datetime.now(UTC),
-        external_refs=[
-        ],
+        external_refs=[],
     )
     bundler.report.external_references.clear()
     bundler.report.object_marking_refs.clear()
@@ -151,6 +154,7 @@ class DRFSigmaRule(DRFBaseModel, SigmaRuleDetection):
                 f"validation with schema failed: {e.json_path}: {e.message}"
             )
         from siemrules.siemrules.serializers import FileSigmaYamlSerializer
+
         data = dict(
             name=self.title,
             identity_id=self.author,
@@ -160,6 +164,7 @@ class DRFSigmaRule(DRFBaseModel, SigmaRuleDetection):
                 content_type="application/sigma+yaml",
             ),
             tlp_level=self.tlp_level.name.replace("-", "+"),
+            id=uuid.uuid5(settings.STIX_NAMESPACE, f"{self.id}+{self.author}"),
         )
 
         s = FileSigmaYamlSerializer(data=data)

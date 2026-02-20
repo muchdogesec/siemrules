@@ -1,10 +1,14 @@
+from django.conf import settings
 import pytest
 from siemrules.siemrules.correlations.utils import validate_author
 from siemrules.siemrules.serializers import validate_label, validators, validate_model, ReportIDField
 from unittest.mock import patch
+import uuid, typing
+if typing.TYPE_CHECKING:
+    from siemrules import settings
 
 
-def test_validate_model():
+def tesdate_model():
     model_name = 'some-model'
     with patch('siemrules.siemrules.serializers.parse_ai_model') as mock_parse_ai_model:
         r = validate_model(model_name)
@@ -104,3 +108,41 @@ def test_validate_author_creates_valid_id(name, expected_id, client):
         "modified": "2020-01-01T00:00:00.000Z",
         "name": name,
     }
+
+
+def test_validate_author_creates_valid_id_duplicate(client):
+    name = "My test identity"
+    expected_id = "identity--86450c4b-5eff-507e-863c-6643168c0cd9"
+    author = validate_author(name)
+    assert author == expected_id
+
+    # Call validate_author again with the same name, should not create a new identity
+    author2 = validate_author(name)
+    assert author2 == expected_id
+
+    # Check that only one identity was created in the database
+    resp = client.get(f'/api/v1/identities/{expected_id}/')
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data == {
+        "type": "identity",
+        "spec_version": "2.1",
+        "id": expected_id,
+        "created_by_ref": "identity--8ef05850-cb0d-51f7-80be-50e4376dbe63",
+        "created": "2020-01-01T00:00:00.000Z",
+        "modified": "2020-01-01T00:00:00.000Z",
+        "name": name,
+    }
+
+
+def test_yaml_upload_uses_deterministic_id(client, identities):
+    from tests.src.data import SIGMA_RULE_2
+    with patch('siemrules.siemrules.views.tasks.new_task') as mock_new_task:
+        resp = client.post(
+            f"/api/v1/files/yml/",
+            data=SIGMA_RULE_2[2],
+            content_type="application/sigma+yaml",
+        )
+        assert resp.status_code == 201, resp.content
+        data = resp.json()
+        assert data['file_id'] == "becf453d-35f1-5453-b11a-6030951c06bd" # UUID5 (9e2536b0-988b-598d-8cc3-407f9f13fc61+identity--8ef05850-cb0d-51f7-80be-50e4376dbe63)
