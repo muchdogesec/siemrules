@@ -273,7 +273,7 @@ class FilePromptSerializer(FileDocumentSerializer):
 class FileSigmaYamlSerializer(serializers.ModelSerializer):
     type_label = "siemrules.sigma"
     mode = serializers.HiddenField(default="sigma")
-    id = serializers.UUIDField(required=True)
+    id = serializers.UUIDField(default=uuid.uuid4)
     tlp_level = serializers.CharField(required=True)
     sigma_file = serializers.FileField(source="file", write_only=True)
     name = serializers.CharField(required=False)
