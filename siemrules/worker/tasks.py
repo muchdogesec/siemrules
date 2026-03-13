@@ -199,8 +199,8 @@ def modify_base_rule(job_id, indicator, report, new_rule_data):
         version_kwargs["base_version"] = job.data['base_version']
         version_type = models.VersionTypes.REVERT
     
-
-    new_rule.tlp_level = old_detection.tlp_level.name
+    if not new_rule.tlp_level:
+        new_rule.tlp_level = old_detection.tlp_level.name
     new_objects = base_rule_modifier.modify_indicator(report, indicator, new_rule)
     arangodb_helpers.modify_rule(
         indicator["id"],

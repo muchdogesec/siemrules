@@ -56,7 +56,7 @@ def modify_indicator(report, indicator: dict, detection: BaseDetection):
     bundler = Bundler(
         "name",
         fake_identity,
-        "red",
+        detection.tlp_level.name,
         "description",
         labels,
         indicator["created"],
