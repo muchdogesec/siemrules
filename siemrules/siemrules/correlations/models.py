@@ -94,8 +94,8 @@ class Correlation(BaseModel):
     
 
 class BaseRuleModel(BaseModel):
-    title: str = Field(min_length=3, description="Title of the Sigma rule")
-    description: str = Field(min_length=10, description="Description of the Sigma rule")
+    title: str = Field(min_length=3, description="Title of the Sigma Correlation rule")
+    description: Optional[str] = Field(default=None, description="Description of the Sigma Correlation rule")
     correlation: 'Correlation' = Field(..., description="Correlation configuration for the rule")
     falsepositives: Optional[list[str]] = Field(description="False positives", default=None)
     status: Optional[Statuses] = None
