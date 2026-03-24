@@ -41,7 +41,6 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
-            DJANGO_DEBUG=False
             R2_ACCESS_KEY=44f0712f873f98acbedb81bfe7ed2e89
             R2_BUCKET_NAME=siemrules-web-core-production
       - name: Generate artifact attestation
