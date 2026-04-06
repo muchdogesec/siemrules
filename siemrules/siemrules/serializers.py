@@ -273,7 +273,15 @@ class FilePromptSerializer(FileDocumentSerializer):
 class FileSigmaYamlSerializer(serializers.ModelSerializer):
     type_label = "siemrules.sigma"
     mode = serializers.HiddenField(default="sigma")
-    id = serializers.UUIDField(default=uuid.uuid4)
+    id = serializers.UUIDField(
+        default=uuid.uuid4,
+        validators=[
+            validators.UniqueValidator(
+                queryset=File.objects.all(),
+                message="rule/file with id already exists, please use modify endpoint or change id",
+            )
+        ],
+    )
     tlp_level = serializers.CharField(required=True)
     sigma_file = serializers.FileField(source="file", write_only=True)
     name = serializers.CharField(required=False)
