@@ -257,7 +257,7 @@ class FilePromptSerializer(FileDocumentSerializer):
     type_label = "siemrules.text"
 
     file = serializers.HiddenField(default="")
-    text_input = serializers.CharField(write_only=True, min_length=256)
+    text_input = serializers.CharField(write_only=True, min_length=124)
     mode = serializers.HiddenField(default="txt")
     # extract_text_from_image = serializers.HiddenField(default=False)
 
