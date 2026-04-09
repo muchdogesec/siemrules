@@ -19,7 +19,10 @@ class TestFileView:
     @pytest.fixture(autouse=True)
     def setup(self, profile):
         self.file = models.File.objects.create(
-            name="test_file.txt", mimetype="text/plain", profile=profile, identity_id="identity--8ef05850-cb0d-51f7-80be-50e4376dbe63"
+            name="test_file.txt",
+            mimetype="text/plain",
+            profile=profile,
+            identity_id="identity--8ef05850-cb0d-51f7-80be-50e4376dbe63",
         )
         self.url = "/api/v1/files/"
 
@@ -53,7 +56,7 @@ class TestFileView:
             assert job.profile == profile
 
     def test_file_create__text(self, client: django.test.Client, profile):
-        mock_file_content = b"dummy content" + b"\n== more =="*50
+        mock_file_content = b"dummy content" + b"\n== more ==" * 50
         file_data = dict(
             text_input=mock_file_content.decode(),
             ai_provider="openai",
@@ -100,22 +103,98 @@ class TestJobView:
     @pytest.fixture(autouse=True)
     def setup(self):
         self.file = models.File.objects.create(
-            name="test_file.txt", mimetype="text/plain",
+            name="test_file.txt",
+            mimetype="text/plain",
             identity_id="identity--8ef05850-cb0d-51f7-80be-50e4376dbe63",
         )
-        self.job = models.Job.objects.create(file=self.file)
+        self.jobs = [
+            models.Job.objects.create(
+                file=self.file,
+                id="80e1cdc6-0877-4853-823e-6b1b12fe3581",
+                type=models.JobType.FILE_SIGMA,
+                state=models.JobState.COMPLETED,
+            ),
+            models.Job.objects.create(
+                id="9e0d79ed-94d9-42a3-aa41-4772ae922176",
+                type=models.JobType.FILE_SIGMA,
+                state=models.JobState.PENDING,
+            ),
+            models.Job.objects.create(
+                id="2583d09b-6535-4f15-9fd1-5dcb55230f08",
+                type=models.JobType.FILE_FILE,
+                state=models.JobState.PROCESSING,
+            ),
+            models.Job.objects.create(
+                id="0014c5a1-7a5e-408f-88ea-83ec5a1b8af1",
+                type=models.JobType.FILE_TEXT,
+                state=models.JobState.FAILED,
+            ),
+            models.Job.objects.create(
+                id="a1b2c3d4-5e6f-7890-abcd-ef1234567890",
+                type=models.JobType.CORRELATION_SIGMA,
+                state=models.JobState.COMPLETED,
+            ),
+        ]
         self.url = "/api/v1/jobs/"
 
     def test_list_jobs(self, client):
         response = client.get(self.url)
         assert response.status_code == status.HTTP_200_OK
         assert isinstance(response.data["jobs"], list)
-        assert len(response.data["jobs"]) == 1
+        assert len(response.data["jobs"]) == 5
 
     def test_retrieve_job(self, client):
+        self.job = self.jobs[0]
         response = client.get(f"{self.url}{self.job.id}/")
         assert response.status_code == status.HTTP_200_OK
         assert response.data["id"] == str(self.job.id)
+
+    @pytest.mark.parametrize(
+        "states,expected_ids",
+        [
+            (["pending"], {"9e0d79ed-94d9-42a3-aa41-4772ae922176"}),
+            (["processing"], {"2583d09b-6535-4f15-9fd1-5dcb55230f08"}),
+            (
+                ["pending", "processing"],
+                {
+                    "9e0d79ed-94d9-42a3-aa41-4772ae922176",
+                    "2583d09b-6535-4f15-9fd1-5dcb55230f08",
+                },
+            ),
+            (["failed"], {"0014c5a1-7a5e-408f-88ea-83ec5a1b8af1"}),
+            (
+                ["completed"],
+                {
+                    "a1b2c3d4-5e6f-7890-abcd-ef1234567890",
+                    "80e1cdc6-0877-4853-823e-6b1b12fe3581",
+                },
+            ),
+            (
+                [],
+                {
+                    "9e0d79ed-94d9-42a3-aa41-4772ae922176",
+                    "2583d09b-6535-4f15-9fd1-5dcb55230f08",
+                    "0014c5a1-7a5e-408f-88ea-83ec5a1b8af1",
+                    "a1b2c3d4-5e6f-7890-abcd-ef1234567890",
+                    "80e1cdc6-0877-4853-823e-6b1b12fe3581",
+                },
+            ),
+        ],
+    )
+    @pytest.mark.django_db
+    def test_jobs_filter_by_multiple_states(
+        self, client, api_schema, states, expected_ids
+    ):
+
+        resp = client.get(f"/api/v1/jobs/?state={','.join(states)}")
+        assert resp.status_code == 200
+
+        returned = {item["id"] for item in resp.data["jobs"]}
+        assert returned == expected_ids
+
+        api_schema["/api/v1/jobs/"]["GET"].validate_response(
+            Transport.get_st_response(resp)
+        )
 
 
 class TestBaseRuleView:
@@ -164,9 +243,7 @@ class TestBaseRuleView:
         rule_id = "indicator--2683daab-aa64-52ff-a001-3ea5aee9dd72"
         rule_url = f"{self.url}{rule_id}/"
 
-        versions_resp = arangodb_helpers.get_single_rule_versions(
-            rule_id, 'base'
-        )
+        versions_resp = arangodb_helpers.get_single_rule_versions(rule_id, "base")
         assert versions_resp.status_code == 200, versions_resp.json()
         versions_before_revert = list(versions_resp.data)
         revert_version = random.choice(versions_before_revert[1:])
@@ -185,9 +262,7 @@ class TestBaseRuleView:
             versions_before_revert
         ), "object_after_revert must be newer than all previously existing objects"
 
-        versions_resp = arangodb_helpers.get_single_rule_versions(
-            rule_id, 'base'
-        )
+        versions_resp = arangodb_helpers.get_single_rule_versions(rule_id, "base")
         assert versions_resp.status_code == 200, versions_resp.json()
         versions_after_revert = list(versions_resp.data)
         assert (
@@ -198,22 +273,24 @@ class TestBaseRuleView:
         ), "versions_after_revert must be a superset of versions_before_revert"
 
         for k in object_before_revert.keys():
-            if k in ["external_references", "modified", 'pattern']:
+            if k in ["external_references", "modified", "pattern"]:
                 continue
             assert object_before_revert[k] == object_after_revert[k]
 
-
         ## test revert in list
         versions_resp = client.get(rule_url + "versions/")
-        assert {'action': 'modify', 'modified': object_after_revert['modified'], 'base_version': object_before_revert['modified'], 'type': 'revert'} in versions_resp.data
+        assert {
+            "action": "modify",
+            "modified": object_after_revert["modified"],
+            "base_version": object_before_revert["modified"],
+            "type": "revert",
+        } in versions_resp.data
 
     def test_revert_to_latest(self, client: django.test.Client):
         rule_id = "indicator--2683daab-aa64-52ff-a001-3ea5aee9dd72"
         rule_url = f"{self.url}{rule_id}/"
 
-        versions_resp = arangodb_helpers.get_single_rule_versions(
-            rule_id, 'base'
-        )
+        versions_resp = arangodb_helpers.get_single_rule_versions(rule_id, "base")
         assert versions_resp.status_code == 200, versions_resp.json()
         versions_before_revert = list(versions_resp.data)
         revert_version = versions_before_revert[0]  # latest version
@@ -246,7 +323,11 @@ def test_retrieve_profile(profile, client):
 
 
 def test_default_profile():
-    file = models.File.objects.create(name="test_file.txt", mimetype="text/plain", identity_id="identity--8ef05850-cb0d-51f7-80be-50e4376dbe63")
+    file = models.File.objects.create(
+        name="test_file.txt",
+        mimetype="text/plain",
+        identity_id="identity--8ef05850-cb0d-51f7-80be-50e4376dbe63",
+    )
     assert file.profile == file.profile.default_profile()
 
 
@@ -255,7 +336,10 @@ def test_regular_profile_does_not_use_default_profile(profile, default_profile):
     default_profile.save()
 
     file = models.File.objects.create(
-        name="test_file.txt", mimetype="text/plain", profile=profile, identity_id="identity--8ef05850-cb0d-51f7-80be-50e4376dbe63"
+        name="test_file.txt",
+        mimetype="text/plain",
+        profile=profile,
+        identity_id="identity--8ef05850-cb0d-51f7-80be-50e4376dbe63",
     )
     assert file.profile == profile
 
@@ -274,7 +358,7 @@ def test_create_profile(client):
     )
     assert resp.status_code == 201, resp.content
     data = resp.json()
-    del data['created']
+    del data["created"]
     assert data == {
         "id": "cf51da4a-296f-5b4d-adc9-a80a26990cd4",
         "ai_provider": "anthropic:claude-sonnet-4-5",
@@ -325,32 +409,136 @@ class TestDataSourceView:
     @pytest.mark.parametrize(
         ["params", "expected_ids"],
         [
-            pytest.param(dict(), ["data-source--512ead3c-b0fb-5235-8605-2da7c9b35ac2", "data-source--ab14f1cd-18db-5805-9c75-8d6002e41d9a", "data-source--34ad2f90-179a-567e-8867-e527f5a3219b"], id="no_filter"),
-            pytest.param(dict(product="application"), ["data-source--512ead3c-b0fb-5235-8605-2da7c9b35ac2", "data-source--34ad2f90-179a-567e-8867-e527f5a3219b"], id="product_full"),
-            pytest.param(dict(product="PliCation"), ["data-source--512ead3c-b0fb-5235-8605-2da7c9b35ac2", "data-source--34ad2f90-179a-567e-8867-e527f5a3219b"], id="product_partial_bad_case"),
-            pytest.param(dict(product="app"), ["data-source--512ead3c-b0fb-5235-8605-2da7c9b35ac2", "data-source--34ad2f90-179a-567e-8867-e527f5a3219b"], id="product_partial"),
-            pytest.param(dict(product="wordpress"), ["data-source--ab14f1cd-18db-5805-9c75-8d6002e41d9a"], id="product_wordpress"),
+            pytest.param(
+                dict(),
+                [
+                    "data-source--512ead3c-b0fb-5235-8605-2da7c9b35ac2",
+                    "data-source--ab14f1cd-18db-5805-9c75-8d6002e41d9a",
+                    "data-source--34ad2f90-179a-567e-8867-e527f5a3219b",
+                ],
+                id="no_filter",
+            ),
+            pytest.param(
+                dict(product="application"),
+                [
+                    "data-source--512ead3c-b0fb-5235-8605-2da7c9b35ac2",
+                    "data-source--34ad2f90-179a-567e-8867-e527f5a3219b",
+                ],
+                id="product_full",
+            ),
+            pytest.param(
+                dict(product="PliCation"),
+                [
+                    "data-source--512ead3c-b0fb-5235-8605-2da7c9b35ac2",
+                    "data-source--34ad2f90-179a-567e-8867-e527f5a3219b",
+                ],
+                id="product_partial_bad_case",
+            ),
+            pytest.param(
+                dict(product="app"),
+                [
+                    "data-source--512ead3c-b0fb-5235-8605-2da7c9b35ac2",
+                    "data-source--34ad2f90-179a-567e-8867-e527f5a3219b",
+                ],
+                id="product_partial",
+            ),
+            pytest.param(
+                dict(product="wordpress"),
+                ["data-source--ab14f1cd-18db-5805-9c75-8d6002e41d9a"],
+                id="product_wordpress",
+            ),
             pytest.param(dict(product="nonexistent"), [], id="product_no_match"),
-            pytest.param(dict(service="xz"), ["data-source--512ead3c-b0fb-5235-8605-2da7c9b35ac2"], id="service_xz"),
-            pytest.param(dict(service="XZ"), ["data-source--512ead3c-b0fb-5235-8605-2da7c9b35ac2"], id="service_xz_bad_case"),
-            pytest.param(dict(service="x"), ["data-source--512ead3c-b0fb-5235-8605-2da7c9b35ac2"], id="service_partial"),
+            pytest.param(
+                dict(service="xz"),
+                ["data-source--512ead3c-b0fb-5235-8605-2da7c9b35ac2"],
+                id="service_xz",
+            ),
+            pytest.param(
+                dict(service="XZ"),
+                ["data-source--512ead3c-b0fb-5235-8605-2da7c9b35ac2"],
+                id="service_xz_bad_case",
+            ),
+            pytest.param(
+                dict(service="x"),
+                ["data-source--512ead3c-b0fb-5235-8605-2da7c9b35ac2"],
+                id="service_partial",
+            ),
             pytest.param(dict(service="nonexistent"), [], id="service_no_match"),
-            pytest.param(dict(category="file"), ["data-source--34ad2f90-179a-567e-8867-e527f5a3219b"], id="category_file"),
-            pytest.param(dict(category="ILe"), ["data-source--34ad2f90-179a-567e-8867-e527f5a3219b"], id="category_bad_case"),
-            pytest.param(dict(category="webserver"), ["data-source--ab14f1cd-18db-5805-9c75-8d6002e41d9a"], id="category_webserver"),
-            pytest.param(dict(category="web"), ["data-source--ab14f1cd-18db-5805-9c75-8d6002e41d9a"], id="category_partial"),
+            pytest.param(
+                dict(category="file"),
+                ["data-source--34ad2f90-179a-567e-8867-e527f5a3219b"],
+                id="category_file",
+            ),
+            pytest.param(
+                dict(category="ILe"),
+                ["data-source--34ad2f90-179a-567e-8867-e527f5a3219b"],
+                id="category_bad_case",
+            ),
+            pytest.param(
+                dict(category="webserver"),
+                ["data-source--ab14f1cd-18db-5805-9c75-8d6002e41d9a"],
+                id="category_webserver",
+            ),
+            pytest.param(
+                dict(category="web"),
+                ["data-source--ab14f1cd-18db-5805-9c75-8d6002e41d9a"],
+                id="category_partial",
+            ),
             pytest.param(dict(category="nonexistent"), [], id="category_no_match"),
-            pytest.param(dict(definition="file system"), ["data-source--34ad2f90-179a-567e-8867-e527f5a3219b"], id="definition_file_system"),
-            pytest.param(dict(definition="logs"), ["data-source--512ead3c-b0fb-5235-8605-2da7c9b35ac2", "data-source--ab14f1cd-18db-5805-9c75-8d6002e41d9a"], id="definition_logs"),
-            pytest.param(dict(definition="web server"), ["data-source--ab14f1cd-18db-5805-9c75-8d6002e41d9a"], id="definition_web_server"),
-            pytest.param(dict(definition="compression"), ["data-source--512ead3c-b0fb-5235-8605-2da7c9b35ac2"], id="definition_compression"),
-            pytest.param(dict(definition="PREss"), ["data-source--512ead3c-b0fb-5235-8605-2da7c9b35ac2"], id="definition_compression_bad_case"),
+            pytest.param(
+                dict(definition="file system"),
+                ["data-source--34ad2f90-179a-567e-8867-e527f5a3219b"],
+                id="definition_file_system",
+            ),
+            pytest.param(
+                dict(definition="logs"),
+                [
+                    "data-source--512ead3c-b0fb-5235-8605-2da7c9b35ac2",
+                    "data-source--ab14f1cd-18db-5805-9c75-8d6002e41d9a",
+                ],
+                id="definition_logs",
+            ),
+            pytest.param(
+                dict(definition="web server"),
+                ["data-source--ab14f1cd-18db-5805-9c75-8d6002e41d9a"],
+                id="definition_web_server",
+            ),
+            pytest.param(
+                dict(definition="compression"),
+                ["data-source--512ead3c-b0fb-5235-8605-2da7c9b35ac2"],
+                id="definition_compression",
+            ),
+            pytest.param(
+                dict(definition="PREss"),
+                ["data-source--512ead3c-b0fb-5235-8605-2da7c9b35ac2"],
+                id="definition_compression_bad_case",
+            ),
             pytest.param(dict(definition="nonexistent"), [], id="definition_no_match"),
-            pytest.param(dict(product="application", service="xz"), ["data-source--512ead3c-b0fb-5235-8605-2da7c9b35ac2"], id="multi_product_service"),
-            pytest.param(dict(product="wordpress", category="webserver"), ["data-source--ab14f1cd-18db-5805-9c75-8d6002e41d9a"], id="multi_product_category"),
-            pytest.param(dict(category="file", definition="file system"), ["data-source--34ad2f90-179a-567e-8867-e527f5a3219b"], id="multi_category_definition"),
-            pytest.param(dict(product="application", service="xz", definition="compression"), ["data-source--512ead3c-b0fb-5235-8605-2da7c9b35ac2"], id="multi_all_fields"),
-            pytest.param(dict(product="application", service="nonexistent"), [], id="multi_conflicting"),
+            pytest.param(
+                dict(product="application", service="xz"),
+                ["data-source--512ead3c-b0fb-5235-8605-2da7c9b35ac2"],
+                id="multi_product_service",
+            ),
+            pytest.param(
+                dict(product="wordpress", category="webserver"),
+                ["data-source--ab14f1cd-18db-5805-9c75-8d6002e41d9a"],
+                id="multi_product_category",
+            ),
+            pytest.param(
+                dict(category="file", definition="file system"),
+                ["data-source--34ad2f90-179a-567e-8867-e527f5a3219b"],
+                id="multi_category_definition",
+            ),
+            pytest.param(
+                dict(product="application", service="xz", definition="compression"),
+                ["data-source--512ead3c-b0fb-5235-8605-2da7c9b35ac2"],
+                id="multi_all_fields",
+            ),
+            pytest.param(
+                dict(product="application", service="nonexistent"),
+                [],
+                id="multi_conflicting",
+            ),
         ],
     )
     def test_filters(self, client, params, expected_ids):
