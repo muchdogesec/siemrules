@@ -17,6 +17,7 @@ from schemathesis.specs.openapi.checks import (
     positive_data_acceptance,
     status_code_conformance,
 )
+from datetime import datetime, date
 from schemathesis.config import GenerationConfig
 from schemathesis.transport.serialization import (
     serialize_binary,
@@ -29,6 +30,8 @@ schema = schemathesis.openapi.from_wsgi("/api/schema/?format=json", wsgi_app)
 schema.config.base_url = "http://localhost:8008/"
 schema.config.generation = GenerationConfig(allow_x00=False)
 
+schemathesis.openapi.format("date-time", strategies.datetimes(max_value=datetime(2050, 1, 1), min_value=datetime(1970, 1, 1)).map(str))
+schemathesis.openapi.format("date", strategies.dates(max_value=date(2050, 1, 1), min_value=date(1970, 1, 1)).map(str))
 
 @pytest.fixture(autouse=True)
 def override_transport(monkeypatch):
