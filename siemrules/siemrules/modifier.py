@@ -63,8 +63,8 @@ def modify_indicator(report, indicator: dict, detection: BaseDetection):
         report_id=report_id,
         modified=datetime.now(UTC),
         external_refs=[],
+        reference_urls=detection.references,
     )
-    bundler.report.external_references.clear()
     bundler.report.object_marking_refs.clear()
     bundler.report.external_references.extend(
         [
