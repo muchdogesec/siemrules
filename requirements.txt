@@ -83,7 +83,7 @@ click-repl==0.3.0
     # via celery
 colorama==0.4.6
     # via griffecli
-cryptography==46.0.6
+cryptography==46.0.7
     # via google-auth
 cssselect==1.4.0
     # via readability-lxml
