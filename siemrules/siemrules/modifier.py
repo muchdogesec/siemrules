@@ -109,6 +109,7 @@ class DRFDetection(DRFBaseModel, ModifierDetection):
     @staticmethod
     def is_valid(s, initial_data):
         unknown_keys = set(initial_data.keys()) - set(s.fields.keys())
+        unknown_keys = [k for k in unknown_keys if not k.startswith("x_")]
         if unknown_keys:
             raise validators.ValidationError(
                 "Got unexpected fields: {}".format(unknown_keys)
