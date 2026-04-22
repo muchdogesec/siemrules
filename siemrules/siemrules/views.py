@@ -624,6 +624,7 @@ class RuleView(viewsets.GenericViewSet):
         arangodb_helpers.delete_rule(
             indicator_id,
         )
+        models.Version.objects.filter(rule_id=indicator_id).delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
     @decorators.action(methods=["GET"], detail=True)

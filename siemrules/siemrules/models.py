@@ -103,7 +103,6 @@ class Profile(models.Model):
 class File(models.Model):
     id = models.UUIDField(unique=True, max_length=64, primary_key=True, default=uuid.uuid4)
     name = models.CharField(max_length=256, help_text="This will be assigned to the File and Report object created. Note, the names of each detection rule generated will be automatically. Max 256 characters. This is a txt2detection setting.")
-    identity_json = models.JSONField(default=default_identity, validators=[validate_identity])
     identity = models.ForeignKey(Identity, on_delete=models.CASCADE, default=None)
     labels = ArrayField(base_field=models.CharField(max_length=256), default=list)
     tlp_level = models.CharField(choices=TLP_Levels.choices, default=TLP_Levels.RED, max_length=128)
@@ -252,3 +251,15 @@ def remove_file_on_job_failure(sender, instance: Job, **kwargs):
         return
     if instance.state == JobState.FAILED:
         instance.file.delete()
+
+
+@receiver(post_delete, sender=Version)
+def remove_orphaned_file_on_version_delete(sender, instance: Version, **kwargs):
+    """Automatically delete a file if it has no more versions referencing it."""
+    file_id = instance.file_id
+    # Check if there are any other Version instances referencing this file
+    if file_id and not Version.objects.filter(file_id=file_id).exists():
+        try:
+          File.objects.get(id=file_id).delete()
+        except File.DoesNotExist as e:
+            pass
