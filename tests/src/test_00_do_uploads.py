@@ -29,6 +29,12 @@ from siemrules.worker import tasks
 from tests.src import data as test_data
 from tests.utils import Transport
 
+@pytest.fixture(autouse=True)
+def pdf_converter_patch(monkeypatch):
+    from siemrules.worker import pdf_converter
+    monkeypatch.setattr(pdf_converter, "make_conversion", lambda *args, **kwargs: None)
+    yield
+
 @pytest.mark.parametrize(
     ["rule_id", "sigma_yaml"],
     [
@@ -117,7 +123,7 @@ def test_modify_base_rule_manual(
     base_time = datetime.now(UTC)
     indicator_id = modification["rule_id"]
 
-    resp = client.post(
+    resp = client.patch(
         f"/api/v1/base-rules/{indicator_id}/modify/yml/",
         data=modification["sigma"],
         content_type="application/sigma+yaml",
@@ -182,7 +188,7 @@ def test_upload_correlation(celery_eager, client, rule, api_schema):
 )
 def test_modify_correlation_manual(celery_eager, client, rule_id, modification, api_schema):
     modification_yaml = yaml.safe_dump(modification)
-    response = client.post(
+    response = client.patch(
         correlation_url + f"{rule_id}/modify/yml/",
         format="sigma",
         data=modification_yaml,

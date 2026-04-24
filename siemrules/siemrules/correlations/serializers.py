@@ -37,6 +37,11 @@ class DRFCorrelationRule(DRFBaseModel, CorrelationRule):
         except Exception as e:
             raise ValueError(e)
         
+    @classmethod
+    def get_rule_from_drf(cls, data: dict):
+        rule_s = cls.drf_serializer(data=data)
+        rule_s.is_valid(raise_exception=True)
+        return cls.model_validate(rule_s.data)
 
 
 def to_file_serializer(rule: CorrelationRule, request_body):
@@ -73,7 +78,11 @@ class DRFCorrelationRuleModify(DRFBaseModel, BaseRuleModel, RuleModelExtraProper
                 raise validators.ValidationError("Got unknown fields: {}".format(unknown_keys))
             
     @classmethod
-    def serialize_rule_from(cls, old_rule: CorrelationRule, data: dict):
+    def serialize_rule_from(cls, old_rule: CorrelationRule, data: dict, partial=False):
+        if not partial:
+            rule = cls.replace_detection(old_rule, data)
+            rule.modified = datetime.now(UTC).date()
+            return rule
         data = cls.merge_detection(old_rule, data)
         tlp_level = tlp_from_tags(old_rule.tags)
         set_tlp_level_in_tags(data['tags'], tlp_level.name)
@@ -86,6 +95,25 @@ class DRFCorrelationRuleModify(DRFBaseModel, BaseRuleModel, RuleModelExtraProper
     @classmethod
     def merge_detection(cls, old_detection: CorrelationRule, request_data: dict):
         return {**old_detection.model_dump(exclude=['created', 'modified', 'date', 'author'], exclude_unset=True, exclude_none=True, by_alias=True), **request_data}
+    
+    @classmethod
+    def replace_detection(cls, old_detection: CorrelationRule, request_data: dict):
+        rule = DRFCorrelationRule.get_rule_from_drf(request_data)
+        new_tlp = tlp_from_tags(rule.tags)
+        old_tlp = tlp_from_tags(old_detection.tags)
+        if new_tlp and old_tlp != new_tlp:
+            raise validators.ValidationError(f"TLP level cannot be changed in replacement. Got {new_tlp.name} but expected {old_tlp.name}")
+        bad_substitutions = []
+        for k in ["date", "author", "related"]:
+            v = getattr(rule, k, None)
+            v_old = getattr(old_detection, k, None)
+            if v is not None and v != v_old:
+                bad_substitutions.append(k)
+            else:
+                setattr(rule, k, v_old)
+        if bad_substitutions:
+            raise validators.ValidationError(f"Cannot modify the following properties in replacement: {', '.join(bad_substitutions)}")
+        return rule
 
     
 # class _CorrelationPatch(create_serializer_from_model(Correlation, {"validate_pydantic": True})):
