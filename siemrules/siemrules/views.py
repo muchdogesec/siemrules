@@ -509,6 +509,10 @@ class RuleView(viewsets.GenericViewSet):
         request._request.GET = request.GET.copy()
         request._request.GET["rule_type"] = self.rule_type
         return arangodb_helpers.get_rules(request)
+    
+    def get_object(self):
+        # apparently needed for schemathesis to leave us alone
+        return None
 
     @extend_schema(
         parameters=[
