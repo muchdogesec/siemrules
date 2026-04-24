@@ -267,8 +267,6 @@ def rule_has_changes(old_rule: SigmaRuleDetection, new_rule: SigmaRuleDetection)
             old_value = set(old_value)
             new_value = set(new_value)
         if old_value != new_value:
-            print(f" [=] Change detected in field {attr}: {old_value} != {new_value}")
             return True
-        print(f"No change detected in field {attr}: {old_value} == {new_value}")
     return False
 
