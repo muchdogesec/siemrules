@@ -253,3 +253,20 @@ def get_modification(
     for attr in ai_detection.model_fields_set:
         setattr(retval, attr, getattr(ai_detection, attr))
     return retval
+
+
+def rule_has_changes(old_rule: SigmaRuleDetection, new_rule: SigmaRuleDetection):
+    for attr in set(new_rule.model_fields_set).union(old_rule.model_fields_set):
+        if attr in ["date", "modified", "related"]:
+            continue
+        old_value = getattr(old_rule, attr, None)
+        new_value = getattr(new_rule, attr, None)
+        if not old_value and not new_value:
+            continue
+        if isinstance(old_value, list) or isinstance(new_value, list):
+            old_value = set(old_value)
+            new_value = set(new_value)
+        if old_value != new_value:
+            return True
+    return False
+

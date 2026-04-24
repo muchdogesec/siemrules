@@ -19,6 +19,7 @@ from siemrules.siemrules.modifier import (
     DRFDetection,
     DRFSigmaRule,
     yaml_to_detection,
+    rule_has_changes
 )
 from siemrules.siemrules.serializers import (
     CorrelationJobSerializer,
@@ -977,6 +978,8 @@ class BaseRuleView(RuleView):
             detection = old_detection.model_copy(update=s.data)
             extra_data = s.data
         old_detection.indicator_types = indicator.get("indicator_types", [])
+        if not rule_has_changes(old_detection, detection):
+            raise validators.ValidationError("No changes detected in the rule")
 
         job_instance = models.Job.objects.create(
             type=models.JobType.BASE_MODIFY,
@@ -1348,6 +1351,10 @@ class CorrelationRuleView(RuleView):
                 old_rule, request.data, partial=partial
             )
         )
+        new_rule.author = old_rule.author
+        new_rule.date = old_rule.date
+        if not rule_has_changes(old_rule, new_rule):
+            raise validators.ValidationError("No changes detected in the rule")
         job_instance = models.Job.objects.create(
             type=models.JobType.CORRELATION_MODIFY,
             data=dict(
