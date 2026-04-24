@@ -124,6 +124,29 @@ class DRFDetection(DRFBaseModel, ModifierDetection):
             **request_data,
         }
 
+    @classmethod
+    def replace_detection(cls, old_detection: SigmaRuleDetection, request_data: dict):
+        """Replace detection - used for PUT (full replacement) operations."""
+        rule = DRFSigmaRule.get_rule_from_drf(request_data)
+        new_tlp = tlp_from_tags(rule.tags)
+        old_tlp = tlp_from_tags(old_detection.tags)
+        if new_tlp and old_tlp != new_tlp:
+            raise validators.ValidationError(
+                f"TLP level cannot be changed. Current TLP level is {old_tlp.name}. Please set the TLP level in the tags to {old_tlp.name} or remove any TLP level from the tags."
+            )
+        set_tlp_level_in_tags(rule.tags, new_tlp.name)
+        bad_substitutions = []
+        for k in ["date", "author", "id", "related"]:
+            v = getattr(rule, k, None)
+            v_old = getattr(old_detection, k, None)
+            if v is not None and v != v_old:
+                bad_substitutions.append(k)
+        if bad_substitutions:
+            raise validators.ValidationError(
+                f"Cannot modify the following properties: {', '.join(bad_substitutions)}"
+            )
+        return rule
+
     def to_sigma_rule_detection(self):
         return SigmaRuleDetection.model_validate(self.model_dump())
 
@@ -139,6 +162,13 @@ class DRFSigmaRule(DRFBaseModel, SigmaRuleDetection):
             raise validators.ValidationError(
                 "Got unknown fields: {}".format(unknown_keys)
             )
+        
+    @classmethod
+    def get_rule_from_drf(cls, data: dict):
+        serializer = DRFSigmaRule.drf_serializer(data=data)
+        serializer.is_valid(raise_exception=True)
+        rule = DRFSigmaRule.model_validate(serializer.validated_data)
+        return rule
 
     @field_validator("author", mode="before")
     @classmethod

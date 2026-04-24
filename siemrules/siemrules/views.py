@@ -299,9 +299,7 @@ class FileView(
     )
     def create_from_sigma(self, request: request.Request, *args, **kwargs):
         request_body = request.body
-        serializer = DRFSigmaRule.drf_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        rule = DRFSigmaRule.model_validate(serializer.validated_data)
+        rule = DRFSigmaRule.get_rule_from_drf(request.data)
         file_serializer, sigma_yaml = rule.to_file_serializer(request_body=request_body)
         file_instance = file_serializer.save(mimetype="application/x-yaml")
         job_instance = models.Job.objects.create(
@@ -537,7 +535,12 @@ class RuleView(viewsets.GenericViewSet):
     # def versions2(self, request, *args, indicator_id=None, **kwargs):
     #     return arangodb_helpers.get_single_rule_versions(indicator_id, self.rule_type)
 
-    @decorators.action(methods=["GET"], detail=True, pagination_class=None, serializer_class=serializers.VersionSerializer(many=True))
+    @decorators.action(
+        methods=["GET"],
+        detail=True,
+        pagination_class=None,
+        serializer_class=serializers.VersionSerializer(many=True),
+    )
     def versions(self, request, *args, indicator_id=None, **kwargs):
         q = models.Version.objects.filter(rule_id=indicator_id)
         s = serializers.VersionSerializer(q, many=True)
@@ -862,10 +865,12 @@ class RuleView(viewsets.GenericViewSet):
             """
         ),
     ),
-    modify_base_rule_manual=extend_schema(
-        summary="Modify a Base Rule by modifying the YAML manually",
-        description=textwrap.dedent(
-            """
+    modify_base_rule_manual=[
+        extend_schema(
+            methods=["PATCH"],
+            summary="Modify a Base Rule by modifying the YAML manually",
+            description=textwrap.dedent(
+                """
             Use this endpoint to modify a Base Rule using a Sigma YML input.
 
             You need to enter the entire YML of the rule, with the changes you'd like to make AND the values that should remain unchanged.
@@ -888,8 +893,32 @@ class RuleView(viewsets.GenericViewSet):
 
             [The rule will be validated against the Sigma specification](https://github.com/SigmaHQ/sigma-specification/blob/main/specification/sigma-rules-specification.md). You will receive an error if validation fails. If any part of the validation fails the rule will not be updated.
             """
+            ),
         ),
-    ),
+        extend_schema(
+            methods=["PUT"],
+            summary="Replace the content of a Base Rule by modifying the YAML manually",
+            description=textwrap.dedent(
+                """
+            Use this endpoint to replace a Base Rule using a Sigma YML input.
+
+            You need to enter the entire YML of the rule, with the changes you'd like to make AND the values that should remain unchanged.
+
+            If any properties are not passed, they will be removed from the rule. You must ensure all required properties are passed.
+
+            You should NOT pass the following properties when editing the rule (these are controlled by SIEM Rules). The request will pass BUT the values will remain the same;
+
+            * `id`: is fixed across all versions of the rule
+            * `date`: the `date` value is fixed across all versions of the rule, showing the date the rule was first created
+            * `modified`: the `modified` time will be auto-updated based on the time of this modification
+            * `author`: the `author` value will remain the same. If you wish to use a new `author` value, you must create a new rule. You can do this by cloning this rule using the Clone Rule endpoint.
+            * `tags` (`tlp`): the `tlp.` tag value will remain the same. If you wish to use a new TLP value, you must create a new rule. You can do this by cloning this rule using the Clone Rule endpoint.
+
+            [The rule will be validated against the Sigma specification](https://github.com/SigmaHQ/sigma-specification/blob/main/specification/sigma-rules-specification.md). You will receive an error if validation fails. If any part of the validation fails the rule will not be updated.
+            """
+            ),
+        ),
+    ],
 )
 class BaseRuleView(RuleView):
     rule_type = "base-rule"
@@ -915,30 +944,41 @@ class BaseRuleView(RuleView):
 
     @extend_schema(
         request=DRFDetection.drf_serializer,
-        responses={200: serializers.RuleSerializer, 400: DEFAULT_400_ERROR},
+        responses={200: serializers.JobSerializer, 400: DEFAULT_400_ERROR},
     )
     @decorators.action(
-        methods=["POST"],
+        methods=["PATCH", "PUT"],
         detail=True,
         parser_classes=[SigmaRuleParser],
         url_path="modify/yml",
     )
     def modify_base_rule_manual(self, request, *args, indicator_id=None, **kwargs):
+        """Modify a Base Rule - PATCH for partial update (merge), PUT for full replacement."""
+        partial = request.method == "PATCH"
         report, indicator, all_objs = arangodb_helpers.get_objects_by_id(indicator_id)
 
         old_detection = yaml_to_detection(
             indicator["pattern"], indicator.get("indicator_types", [])
         )
-        merged_data = DRFDetection.merge_detection(old_detection, request.data)
+        if not partial:
+            # PUT: full replacement
+            detection = DRFDetection.replace_detection(old_detection, request.data)
+            extra_data = dict()
+        else:
+            # PATCH: partial update (merge)
+            processed_data = DRFDetection.merge_detection(old_detection, request.data)
+            s = DRFDetection.drf_serializer(data=processed_data)
+            s.is_valid(raise_exception=True)
+            DRFDetection.is_valid(s, request.data)
+            detection = old_detection.model_copy(update=s.data)
+            extra_data = s.data
         old_detection.indicator_types = indicator.get("indicator_types", [])
-        s = DRFDetection.drf_serializer(data=merged_data)
-        s.is_valid(raise_exception=True)
-        DRFDetection.is_valid(s, request.data)
-        detection = old_detection.model_copy(update=s.data)
 
         job_instance = models.Job.objects.create(
             type=models.JobType.BASE_MODIFY,
-            data=dict(modification_method="sigma", indicator_id=indicator_id, **s.data),
+            data=dict(
+                modification_method="sigma", indicator_id=indicator_id, **extra_data
+            ),
         )
         job_s = JobSerializer(job_instance)
         tasks.new_modify_rule_task(
@@ -1090,10 +1130,12 @@ class BaseRuleView(RuleView):
             ),
         ],
     ),
-    modify_correlation_manual=extend_schema(
-        summary="Manually edit a Correlation Rule by STIX ID",
-        description=textwrap.dedent(
-            """
+    modify_correlation_manual=[
+        extend_schema(
+            methods=["PATCH"],
+            summary="Manually edit a Correlation Rule by STIX ID",
+            description=textwrap.dedent(
+                """
             Use this endpoint to modify a Correlation Rule.
 
             You should only enter the parts of the Correlation Rule you wish to change. Any properties not passed will remain unchanged in the existing rule. To delete a value from a property (if optional), pass the property without the value.
@@ -1133,8 +1175,55 @@ class BaseRuleView(RuleView):
 
             If the request is successful, the response will contain a job `id` you can use with the Jobs endpoints.
             """
+            ),
         ),
-    ),
+        extend_schema(
+            methods=["PUT"],
+            summary="Manually replace the contents of a Correlation Rule by STIX ID",
+            description=textwrap.dedent(
+                """
+            Use this endpoint to replace a Correlation Rule.
+
+            You should enter a full Correlation Rule in YML format. Any properties not passed will be removed.
+
+            Enter the properties you want to change in YML format. You can change the following properties of a Correlation rule;
+
+            * `title` (required): cannot be blank. Used as the rule `title`. Will overwrite existing value.
+            * `description` (optional): if passed, used as the rule `description`.  Will overwrite existing value.
+            * `tags` (optional): in format `NAMESPACE.TAG` (e.g. `threat-actor.someone`). Cannot use the reserved namespaces `attack.`, `cve.` or `tlp`. If you wish to use reserved tags `attack.` or `cve,`, update one of the Base Rules used in this Correlation Rule with the desired tag. If you want to change the `tlp` level of the rule, you must delete and recreate or just clone it. If you want to delete all tags list, pass this property as empty (will not delete `tlp.` tags)
+            * `status` (optional, dictionary): the status of the rule, either `stable`, `test`, `experimental`, `deprecated`, `unsupported`. Will overwrite any existing value.
+            * `level` (optional, dictionary): the level of the rule, either `informational`, `low`, `medium`, `high`, `critical`. Will overwrite any existing value.
+            * `falsepositives` (list of strings): the `falsepositives` displayed in the rule. Will append to any existing values. To delete all `falsepositives`, pass this property as empty.
+            * `references` (list of urls): the `references` displayed in the rule. Must be URLs. Will append to any existing values. To delete all `references`, pass this property as empty.
+            * `correlation` (required): [should contain the full correlation part of the rule as defined by the Sigma specification](https://github.com/SigmaHQ/sigma-specification/blob/main/specification/sigma-correlation-rules-specification.md). The properties available are;
+                * `rules` (required, rule ids): This property must contain one or more Sigma Base Rule ID's (e.g. `680c2e5b-3704-47e1-9a0c-4f6746211faf`). Do not include the `indicator--` part. Must be valid, else creation will fail.
+                * `type` (required, dictionary): either `event_count`, `value_count`, `temporal`, `temporal_ordered`
+                * `timespan` (required): defines a time period in which the correlation should be applied. The following format must be used: `number + letter (in lowercase)`. e.g. `90s` (90 seconds), `90m` (90 minutes), `90h` (90 hours), `90d` (90 days)
+                * `condition` (required, dictionary): The condition defines when a correlation matches. Either `gt` (greater than), `gte` (greater than or equal to), `lt` (less than), `lte` (less than or equal to), `eq` (equal to).
+                    * for an `event_count` correlation it defines the event count that must appear within the given time frame to match.
+                    * for a `value_count` correlation it defines the count of distinct values contained in the field specified in the mandatory field attribute.
+                    * for a `temporal` or `temporal_ordered` correlation it specified the count of different event types (Sigma rules matching) in the given time frame.
+                * `aliases` (optional, list of aliases): defines field name aliases that are applied to correlated Sigma rules
+                * `group-by` (optional, list of field names): optionally defines one or multiple fields which should be treated as separate event occurrence scope
+
+            You cannot change the following properties (doing so will result in an error):
+
+            * `id`: is fixed across all versions of the Correlation Rule
+            * `related`: this is controlled by SIEM Rules
+            * `date`: the `date` value will remain the same, showing the date the Correlation Rule was first created
+            * `modified`: the `modified` time will be auto-updated based on the time of this modification
+            * `author`: the `author` value will remain the same. If you wish to use a new `author` value, you must create a new Correlation Rule
+            * `tlp_level`: modifying TLP is considered a major change to the Rule, thus you need to clone the Rule if you wish to change the TLP level
+
+            The Correlation Rule will be validated against the Sigma specification. [You can read the specification here to see available properties and values allowed](https://github.com/SigmaHQ/sigma-specification/blob/main/specification/sigma-correlation-rules-specification.md).
+
+            You will receive an error if validation fails. If any part of the validation fails the Correlation Rule will not be updated.
+
+            If the request is successful, the response will contain a job `id` you can use with the Jobs endpoints.
+            """
+            ),
+        ),
+    ],
     modify_correlation_from_prompt=extend_schema(
         summary="Modify a Correlation Rule using a natural language prompt",
         description=textwrap.dedent(
@@ -1241,17 +1330,18 @@ class CorrelationRuleView(RuleView):
         responses={201: serializers.JobSerializer, 400: DEFAULT_400_ERROR},
     )
     @decorators.action(
-        methods=["POST"],
+        methods=["PATCH", "PUT"],
         detail=True,
         url_path="modify/yml",
         parser_classes=[SigmaRuleParser],
     )
     def modify_correlation_manual(self, request, *args, indicator_id=None, **kwargs):
+        partial = request.method == "PATCH"
         indicator = self.retrieve(request, indicator_id=indicator_id).data
         old_rule, _ = correlations.correlations.yaml_to_rule(indicator["pattern"])
         new_rule = (
             correlations.serializers.DRFCorrelationRuleModify.serialize_rule_from(
-                old_rule, request.data
+                old_rule, request.data, partial=partial
             )
         )
         job_instance = models.Job.objects.create(
@@ -1321,14 +1411,14 @@ class CorrelationRuleView(RuleView):
     )
     def create_from_sigma(self, request, *args, **kwargs):
         request_body = request.body
-        rule_s = DRFCorrelationRule.drf_serializer(data=request.data)
-        rule_s.is_valid(raise_exception=True)
-        rule = DRFCorrelationRule.model_validate(rule_s.data)
+        rule = DRFCorrelationRule.get_rule_from_drf(request.data)
 
         related_indicators = []
         if rule.correlation.rules:
             related_indicators = self.get_rules(rule.correlation.rules)
-        file_serializer = correlations.serializers.to_file_serializer(rule, request_body)
+        file_serializer = correlations.serializers.to_file_serializer(
+            rule, request_body
+        )
         file_instance = file_serializer.save(mimetype="application/x-yaml")
         job_instance = models.Job.objects.create(
             type=models.JobType.CORRELATION_SIGMA,
@@ -1545,7 +1635,10 @@ class HealthCheckView(viewsets.ViewSet):
             All text searches use wildcard matching, so partial matches will be returned.
             """
         ),
-        responses={200: OpenApiResponse(description="List of data sources"), 400: DEFAULT_400_ERROR},
+        responses={
+            200: OpenApiResponse(description="List of data sources"),
+            400: DEFAULT_400_ERROR,
+        },
         parameters=[
             OpenApiParameter(
                 "product",
@@ -1572,7 +1665,8 @@ class HealthCheckView(viewsets.ViewSet):
                 description="Sort results by property",
                 enum=arangodb_helpers.DATA_SOURCES_SORT_FIELDS,
             ),
-        ] + arangodb_helpers.ArangoDBHelper.get_schema_operation_parameters(),
+        ]
+        + arangodb_helpers.ArangoDBHelper.get_schema_operation_parameters(),
     ),
 )
 class DataSourceView(viewsets.ViewSet):
