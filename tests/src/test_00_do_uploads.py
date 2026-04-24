@@ -118,7 +118,7 @@ def test_base_prompt_upload(client, profile, celery_eager, rule_id, tlp_level, s
 
 @pytest.mark.parametrize("modification", [test_data.MODIFY_1, test_data.MODIFY_2])
 def test_modify_base_rule_manual(
-    celery_eager, client: django.test.Client, modification, api_schema
+    celery_eager, client: django.test.Client, modification, api_schema, subtests
 ):
     base_time = datetime.now(UTC)
     indicator_id = modification["rule_id"]
@@ -147,6 +147,17 @@ def test_modify_base_rule_manual(
     "GET"
     ].validate_response(Transport.get_st_response(version_resp))
     assert {'modified': version_resp.data[0]['modified'], 'action': 'modify', 'type': 'sigma'} in version_resp.data
+
+    # send the same modification again and check we get a 400 with the expected message
+    with subtests.test("test modifying with no changes results in 400"):
+        resp = client.patch(
+            f"/api/v1/base-rules/{indicator_id}/modify/yml/",
+            data=modification["sigma"],
+            content_type="application/sigma+yaml",
+        )
+        print(resp.json())
+        assert resp.status_code == 400, resp.content
+        assert "No changes detected in the rule" in str(resp.json())
 
 correlation_url = "/api/v1/correlation-rules/"
 
@@ -186,7 +197,7 @@ def test_upload_correlation(celery_eager, client, rule, api_schema):
         ]
     ],
 )
-def test_modify_correlation_manual(celery_eager, client, rule_id, modification, api_schema):
+def test_modify_correlation_manual(celery_eager, client, rule_id, modification, api_schema, subtests):
     modification_yaml = yaml.safe_dump(modification)
     response = client.patch(
         correlation_url + f"{rule_id}/modify/yml/",
@@ -213,6 +224,18 @@ def test_modify_correlation_manual(celery_eager, client, rule_id, modification, 
     ].validate_response(Transport.get_st_response(version_resp))
     print(version_resp.content)
     assert {'modified': version_resp.data[0]['modified'], 'action': 'modify', 'type': 'sigma'} in version_resp.data
+
+    # send the same modification again and check we get a 400 with the expected message
+    with subtests.test("test modifying with no changes results in 400"):
+        response = client.patch(
+            correlation_url + f"{rule_id}/modify/yml/",
+            format="sigma",
+            data=modification_yaml,
+            content_type="application/sigma+yaml",
+        )
+        print(response.json())
+        assert response.status_code == 400, response.content
+        assert "No changes detected in the rule" in str(response.json())
 
 @pytest.mark.parametrize(
     ["rule_id", "modification"],
