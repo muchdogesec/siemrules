@@ -876,50 +876,67 @@ class RuleView(viewsets.GenericViewSet):
             summary="Modify a Base Rule by modifying the YAML manually",
             description=textwrap.dedent(
                 """
-            Use this endpoint to modify a Base Rule using a Sigma YML input.
+            Use this endpoint to partially modify a Base Rule using a Sigma YML input.
 
-            You need to enter the entire YML of the rule, with the changes you'd like to make AND the values that should remain unchanged.
+            You only need to include the properties you want to modify. Any properties not provided will remain unchanged.
 
-            If any properties are not passed, they will be removed from the rule. You must ensure all required properties are passed.
+            To remove a property, you must explicitly set it to `null`.
 
-            For reference your updated rule MUST contain the following properties;
+            ----
+            After the update, the rule MUST still contain the following required properties:
 
-            * `title` (string): `title` of the rule. Will overwrite any existing value.
-            * `logsource` (valid Sigma logsource): [a valid Sigma `logsource` entry](https://github.com/SigmaHQ/sigma-specification/blob/main/specification/sigma-rules-specification.md)
-            * `detection` (valid Sigma detection): [a valid Sigma `detection` entry](https://github.com/SigmaHQ/sigma-specification/blob/main/specification/sigma-rules-specification.md)
+            * `title` (string): the rule title. If provided, will overwrite the existing value.
+            * `logsource` (valid Sigma logsource): must remain valid after the update.
+            * `detection` (valid Sigma detection): must remain valid after the update.
+            ----
 
-            You should NOT pass the following properties when editing the rule (these are controlled by SIEM Rules). The request will pass BUT the values will remain the same;
+            The following properties are controlled by SIEM Rules and must NOT be modified:
 
-            * `id`: is fixed across all versions of the rule
-            * `date`: the `date` value is fixed across all versions of the rule, showing the date the rule was first created
-            * `modified`: the `modified` time will be auto-updated based on the time of this modification
-            * `author`: the `author` value will remain the same. If you wish to use a new `author` value, you must create a new rule. You can do this by cloning this rule using the Clone Rule endpoint.
-            * `tags` (`tlp`): the `tlp.` tag value will remain the same. If you wish to use a new TLP value, you must create a new rule. You can do this by cloning this rule using the Clone Rule endpoint.
+            * `id`
+            * `date`
+            * `modified`
+            * `author`
+            * `tags` (`tlp`)
 
-            [The rule will be validated against the Sigma specification](https://github.com/SigmaHQ/sigma-specification/blob/main/specification/sigma-rules-specification.md). You will receive an error if validation fails. If any part of the validation fails the rule will not be updated.
+            NOTE:
+            * The `modified` field will always be updated automatically
+
+            The rule will be validated against the Sigma specification. If validation fails, the rule will not be updated.
             """
             ),
         ),
         extend_schema(
+            request=DRFSigmaRule.drf_serializer,
             methods=["PUT"],
             summary="Replace the content of a Base Rule by modifying the YAML manually",
             description=textwrap.dedent(
                 """
-            Use this endpoint to replace a Base Rule using a Sigma YML input.
+            Use this endpoint to fully replace a Base Rule using a Sigma YML input.
 
-            You need to enter the entire YML of the rule, with the changes you'd like to make AND the values that should remain unchanged.
+            You must provide the complete rule. Any properties not included in the request will be removed.
 
-            If any properties are not passed, they will be removed from the rule. You must ensure all required properties are passed.
+            ----
+            The resulting rule MUST contain the following required properties:
 
-            You should NOT pass the following properties when editing the rule (these are controlled by SIEM Rules). The request will pass BUT the values will remain the same;
+            * `title` (string)
+            * `logsource` (valid Sigma logsource)
+            * `detection` (valid Sigma detection)
+            ----
 
-            * `id`: is fixed across all versions of the rule
-            * `date`: the `date` value is fixed across all versions of the rule, showing the date the rule was first created
-            * `modified`: the `modified` time will be auto-updated based on the time of this modification
-            * `author`: the `author` value will remain the same. If you wish to use a new `author` value, you must create a new rule. You can do this by cloning this rule using the Clone Rule endpoint.
-            * `tags` (`tlp`): the `tlp.` tag value will remain the same. If you wish to use a new TLP value, you must create a new rule. You can do this by cloning this rule using the Clone Rule endpoint.
+            The following properties are controlled by SIEM Rules:
 
-            [The rule will be validated against the Sigma specification](https://github.com/SigmaHQ/sigma-specification/blob/main/specification/sigma-rules-specification.md). You will receive an error if validation fails. If any part of the validation fails the rule will not be updated.
+            * `id`
+            * `date`
+            * `modified`
+            * `author`
+            * `tags` (`tlp`)
+
+            These properties may be included in the request, but:
+            * If provided, their values MUST match the existing rule
+            * Any differing values will result in validation failure
+            * The `modified` field will always be updated automatically
+
+            The rule will be validated against the Sigma specification. If validation fails, the rule will not be updated.
             """
             ),
         ),
@@ -1143,88 +1160,98 @@ class BaseRuleView(RuleView):
             summary="Manually edit a Correlation Rule by STIX ID",
             description=textwrap.dedent(
                 """
-            Use this endpoint to modify a Correlation Rule.
+            Use this endpoint to partially modify a Correlation Rule.
 
-            You should only enter the parts of the Correlation Rule you wish to change. Any properties not passed will remain unchanged in the existing rule. To delete a value from a property (if optional), pass the property without the value.
+            You should only include the properties you wish to change. Any properties not provided will remain unchanged in the existing rule.
 
-            Enter the properties you want to change in YML format. You can change the following properties of a Correlation rule;
+            To remove a value from a property:
+            * Set the property to `null` to remove it
+            * For list fields, pass an empty list to clear all values (where supported)
+
+            ----
+            Enter the properties you want to change in YML format. You can modify the following properties of a Correlation rule;
 
             * `title` (optional): if passed, cannot be blank. Used as the rule `title`. Will overwrite existing value.
-            * `description` (optional): if passed, used as the rule `description`.  Will overwrite existing value.
-            * `tags` (optional): in format `NAMESPACE.TAG` (e.g. `threat-actor.someone`). Cannot use the reserved namespaces `attack.`, `cve.` or `tlp`. If you wish to use reserved tags `attack.` or `cve,`, update one of the Base Rules used in this Correlation Rule with the desired tag. If you want to change the `tlp` level of the rule, you must delete and recreate or just clone it. If you want to delete all tags list, pass this property as empty (will not delete `tlp.` tags)
-            * `status` (optional, dictionary): the status of the rule, either `stable`, `test`, `experimental`, `deprecated`, `unsupported`. Will overwrite any existing value.
-            * `level` (optional, dictionary): the level of the rule, either `informational`, `low`, `medium`, `high`, `critical`. Will overwrite any existing value.
-            * `falsepositives` (list of strings): the `falsepositives` displayed in the rule. Will append to any existing values. To delete all `falsepositives`, pass this property as empty.
-            * `references` (list of urls): the `references` displayed in the rule. Must be URLs. Will append to any existing values. To delete all `references`, pass this property as empty.
-            * `correlation` (optional): if passed, [should contain the full correlation part of the rule as defined by the Sigma specification](https://github.com/SigmaHQ/sigma-specification/blob/main/specification/sigma-correlation-rules-specification.md). The properties available are;
-                * `rules` (required, rule ids): This property must contain one or more Sigma Base Rule ID's (e.g. `680c2e5b-3704-47e1-9a0c-4f6746211faf`). Do not include the `indicator--` part. Must be valid, else creation will fail.
-                * `type` (required, dictionary): either `event_count`, `value_count`, `temporal`, `temporal_ordered`
-                * `timespan` (required): defines a time period in which the correlation should be applied. The following format must be used: `number + letter (in lowercase)`. e.g. `90s` (90 seconds), `90m` (90 minutes), `90h` (90 hours), `90d` (90 days)
-                * `condition` (required, dictionary): The condition defines when a correlation matches. Either `gt` (greater than), `gte` (greater than or equal to), `lt` (less than), `lte` (less than or equal to), `eq` (equal to).
-                    * for an `event_count` correlation it defines the event count that must appear within the given time frame to match.
-                    * for a `value_count` correlation it defines the count of distinct values contained in the field specified in the mandatory field attribute.
-                    * for a `temporal` or `temporal_ordered` correlation it specified the count of different event types (Sigma rules matching) in the given time frame.
-                * `aliases` (optional, list of aliases): defines field name aliases that are applied to correlated Sigma rules
-                * `group-by` (optional, list of field names): optionally defines one or multiple fields which should be treated as separate event occurrence scope
+            * `description` (optional): if passed, used as the rule `description`. Will overwrite existing value.
+            * `tags` (optional): in format `NAMESPACE.TAG` (e.g. `threat-actor.someone`). Cannot use the reserved namespaces `attack.`, `cve.` or `tlp`. If you want to delete all non-TLP tags, pass an empty list (will not delete `tlp.` tags).
+            * `status` (optional): either `stable`, `test`, `experimental`, `deprecated`, `unsupported`. Will overwrite any existing value.
+            * `level` (optional): either `informational`, `low`, `medium`, `high`, `critical`. Will overwrite any existing value.
+            * `falsepositives` (optional, list of strings): will append to existing values. To delete all values, pass an empty list.
+            * `references` (optional, list of URLs): will append to existing values. To delete all values, pass an empty list.
+            * `correlation` (optional): if passed, must contain the full correlation definition as defined by the Sigma specification:
+                * `rules` (required): one or more Sigma Base Rule IDs
+                * `type` (required): `event_count`, `value_count`, `temporal`, `temporal_ordered`
+                * `timespan` (required): e.g. `90s`, `90m`, `90h`, `90d`
+                * `condition` (required): `gt`, `gte`, `lt`, `lte`, `eq`
+                * `aliases` (optional)
+                * `group-by` (optional)
 
-            You cannot change the following properties (doing so will result in an error):
+            ----
 
-            * `id`: is fixed across all versions of the Correlation Rule
-            * `related`: this is controlled by SIEM Rules
-            * `date`: the `date` value will remain the same, showing the date the Correlation Rule was first created
-            * `modified`: the `modified` time will be auto-updated based on the time of this modification
-            * `author`: the `author` value will remain the same. If you wish to use a new `author` value, you must create a new Correlation Rule
-            * `tlp_level`: modifying TLP is considered a major change to the Rule, thus you need to clone the Rule if you wish to change the TLP level
+            The following properties are controlled by SIEM Rules and must NOT be modified:
 
-            The Correlation Rule will be validated against the Sigma specification. [You can read the specification here to see available properties and values allowed](https://github.com/SigmaHQ/sigma-specification/blob/main/specification/sigma-correlation-rules-specification.md).
+            * `id`
+            * `related`
+            * `date`
+            * `modified`
+            * `author`
+            * `tlp_level`
 
-            You will receive an error if validation fails. If any part of the validation fails the Correlation Rule will not be updated.
+            NOTE:
+            * The `modified` field will always be updated automatically
+
+            The Correlation Rule will be validated against the Sigma specification. If validation fails, the rule will not be updated.
 
             If the request is successful, the response will contain a job `id` you can use with the Jobs endpoints.
             """
             ),
         ),
         extend_schema(
+            request=DRFCorrelationRule.drf_serializer,
             methods=["PUT"],
             summary="Manually replace the contents of a Correlation Rule by STIX ID",
             description=textwrap.dedent(
                 """
-            Use this endpoint to replace a Correlation Rule.
+            Use this endpoint to fully replace a Correlation Rule.
 
-            You should enter a full Correlation Rule in YML format. Any properties not passed will be removed.
+            You must provide the full Correlation Rule in YML format. Any properties not provided will be removed.
 
-            Enter the properties you want to change in YML format. You can change the following properties of a Correlation rule;
+            The resulting rule MUST be valid after replacement.
 
-            * `title` (required): cannot be blank. Used as the rule `title`. Will overwrite existing value.
-            * `description` (optional): if passed, used as the rule `description`.  Will overwrite existing value.
-            * `tags` (optional): in format `NAMESPACE.TAG` (e.g. `threat-actor.someone`). Cannot use the reserved namespaces `attack.`, `cve.` or `tlp`. If you wish to use reserved tags `attack.` or `cve,`, update one of the Base Rules used in this Correlation Rule with the desired tag. If you want to change the `tlp` level of the rule, you must delete and recreate or just clone it. If you want to delete all tags list, pass this property as empty (will not delete `tlp.` tags)
-            * `status` (optional, dictionary): the status of the rule, either `stable`, `test`, `experimental`, `deprecated`, `unsupported`. Will overwrite any existing value.
-            * `level` (optional, dictionary): the level of the rule, either `informational`, `low`, `medium`, `high`, `critical`. Will overwrite any existing value.
-            * `falsepositives` (list of strings): the `falsepositives` displayed in the rule. Will append to any existing values. To delete all `falsepositives`, pass this property as empty.
-            * `references` (list of urls): the `references` displayed in the rule. Must be URLs. Will append to any existing values. To delete all `references`, pass this property as empty.
-            * `correlation` (required): [should contain the full correlation part of the rule as defined by the Sigma specification](https://github.com/SigmaHQ/sigma-specification/blob/main/specification/sigma-correlation-rules-specification.md). The properties available are;
-                * `rules` (required, rule ids): This property must contain one or more Sigma Base Rule ID's (e.g. `680c2e5b-3704-47e1-9a0c-4f6746211faf`). Do not include the `indicator--` part. Must be valid, else creation will fail.
-                * `type` (required, dictionary): either `event_count`, `value_count`, `temporal`, `temporal_ordered`
-                * `timespan` (required): defines a time period in which the correlation should be applied. The following format must be used: `number + letter (in lowercase)`. e.g. `90s` (90 seconds), `90m` (90 minutes), `90h` (90 hours), `90d` (90 days)
-                * `condition` (required, dictionary): The condition defines when a correlation matches. Either `gt` (greater than), `gte` (greater than or equal to), `lt` (less than), `lte` (less than or equal to), `eq` (equal to).
-                    * for an `event_count` correlation it defines the event count that must appear within the given time frame to match.
-                    * for a `value_count` correlation it defines the count of distinct values contained in the field specified in the mandatory field attribute.
-                    * for a `temporal` or `temporal_ordered` correlation it specified the count of different event types (Sigma rules matching) in the given time frame.
-                * `aliases` (optional, list of aliases): defines field name aliases that are applied to correlated Sigma rules
-                * `group-by` (optional, list of field names): optionally defines one or multiple fields which should be treated as separate event occurrence scope
+            ----
+            You can define the following properties:
 
-            You cannot change the following properties (doing so will result in an error):
+            * `title` (required): cannot be blank.
+            * `description` (optional)
+            * `tags` (optional): in format `NAMESPACE.TAG` (e.g. `threat-actor.someone`). Cannot use reserved namespaces `attack.`, `cve.` or `tlp`.
+            * `status` (optional): `stable`, `test`, `experimental`, `deprecated`, `unsupported`
+            * `level` (optional): `informational`, `low`, `medium`, `high`, `critical`
+            * `falsepositives` (optional, list of strings): will append to existing values. To delete all values, pass an empty list.
+            * `references` (optional, list of URLs): will append to existing values. To delete all values, pass an empty list.
+            * `correlation` (required): full correlation definition as defined by the Sigma specification:
+                * `rules` (required)
+                * `type` (required)
+                * `timespan` (required)
+                * `condition` (required)
+                * `aliases` (optional)
+                * `group-by` (optional)
 
-            * `id`: is fixed across all versions of the Correlation Rule
-            * `related`: this is controlled by SIEM Rules
-            * `date`: the `date` value will remain the same, showing the date the Correlation Rule was first created
-            * `modified`: the `modified` time will be auto-updated based on the time of this modification
-            * `author`: the `author` value will remain the same. If you wish to use a new `author` value, you must create a new Correlation Rule
-            * `tlp_level`: modifying TLP is considered a major change to the Rule, thus you need to clone the Rule if you wish to change the TLP level
+            ----
+            The following properties are controlled by SIEM Rules:
 
-            The Correlation Rule will be validated against the Sigma specification. [You can read the specification here to see available properties and values allowed](https://github.com/SigmaHQ/sigma-specification/blob/main/specification/sigma-correlation-rules-specification.md).
+            * `id`
+            * `related`
+            * `date`
+            * `modified`
+            * `author`
+            * `tlp_level`
 
-            You will receive an error if validation fails. If any part of the validation fails the Correlation Rule will not be updated.
+            These properties may be included in the request, but:
+            * If provided, their values MUST match the existing rule
+            * Any differing values will result in validation failure
+            * The `modified` field will always be updated automatically
+
+            The Correlation Rule will be validated against the Sigma specification. If validation fails, the rule will not be updated.
 
             If the request is successful, the response will contain a job `id` you can use with the Jobs endpoints.
             """
