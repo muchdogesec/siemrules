@@ -522,7 +522,8 @@ def make_clone(indicator_id: str, new_uuid: str, data: dict):
             "FOR report IN siemrules_vertex_collection FILTER report.id == @report_id RETURN report",
             bind_vars=dict(report_id=rule["_stixify_report_id"]),
             paginate=False,
-        )[0]
+        )
+        report = (report and report[0]) or None
 
     rels: list[dict] = helper.execute_query(
         """

@@ -229,8 +229,8 @@ def get_modification(
     )
     assert isinstance(old_detection, BaseDetection), "rule must be of type detection"
     detections = DetectionContainer(success=True, detections=[old_detection])
-    ai_detection = LLMTextCompletionProgram.from_defaults(
-        output_parser=ParserWithLogging(SigmaRuleDetection),
+    ai_detection: DetectionContainer = LLMTextCompletionProgram.from_defaults(
+        output_parser=ParserWithLogging(DetectionContainer),
         prompt=ChatPromptTemplate(
             prompts.SIEMRULES_PROMPT.message_templates
             + [
@@ -248,6 +248,9 @@ def get_modification(
         old_rule=detections.model_dump(mode="json", exclude=["date", "modified"]),
         correction_prompt=prompt,
     )
+    if not ai_detection.success:
+        raise ValueError("modification failed due to: " + ai_detection.fail_reason)
+    ai_detection = ai_detection.detections[0]
 
     retval = old_detection.model_copy()
     for attr in ai_detection.model_fields_set:
