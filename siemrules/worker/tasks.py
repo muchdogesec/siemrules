@@ -32,6 +32,7 @@ from rest_framework import validators
 from stix2 import parse as parse_stix, Bundle
 from stix2.serialization import serialize as stix2_serialize
 from dogesec_commons.objects import db_view_creator
+from dogesec_commons.objects.kb_sync import sync as kb_sync
 
 
 import tempfile
@@ -116,6 +117,32 @@ def clone_rule(job_id):
     indicator = arangodb_helpers.make_clone(job.data["cloned_from"], new_indicator_uuid, job.data)
     add_versions(job_id, models.VersionAction.CREATE, type=models.VersionTypes.CLONE, objects=[indicator], cloned_from=job.data["cloned_from"])
 
+
+@shared_task
+def update_knowledgebase(job_id):
+    job = models.Job.objects.get(pk=job_id)
+    state = models.JobState.COMPLETED
+    job.data.update(
+        processed_items=0,
+        updated_items=0,
+    )
+    job.state = models.JobState.PROCESSING
+    job.save(update_fields=["data", "state"])
+    try:
+        collection_name = settings.ARANGODB_COLLECTION + '_vertex_collection'
+        print(f"Processing {collection_name}")
+        update_time = datetime.now(UTC).isoformat()
+        processed_count, updated_count = kb_sync.run_on_kb_and_collection(collection_name, job.data['knowledgebase'], update_time=update_time)
+        if job:
+            job.data['processed_items'] += processed_count
+            job.data['updated_items'] += updated_count
+            job.save(update_fields=["data"])
+    except Exception as e:
+        job.error = e
+        job.save(update_fields=["error"])
+        state = models.JobState.FAILED
+    job.state = state
+    job.save(update_fields=["state"])
 
 
 @shared_task

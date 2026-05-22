@@ -43,6 +43,7 @@ router.register('reports', reports.ReportView, 'reports')
 router.register('identities', IdentityView, "dsc-identity-view")
 router.register('profiles', views.ProfileView, "profile-view")
 router.register('data-sources', views.DataSourceView, 'data-sources')
+router.register('tasks', views.TasksView, 'tasks-view')
 
 
 # objects

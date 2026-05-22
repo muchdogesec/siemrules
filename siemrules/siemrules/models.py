@@ -180,6 +180,8 @@ class JobType(models.TextChoices):
     BASE_MODIFY        = "base.modify"
     CORRELATION_MODIFY = "correlation.modify"
     DUPLICATE_RULE     = "duplicate-rule"
+    SYNC_KNOWLEDGEBASE = "sync-knowledgebase"
+    
 
 
 class Job(models.Model):
