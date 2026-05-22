@@ -47,14 +47,7 @@ POLL_INTERVAL = 1
 
 def new_task(job: Job, **kwargs):
     task: Task = process_report.s(job.file.file.name, job.id, **kwargs)
-
-    task.apply_async(
-        countdown=POLL_INTERVAL,
-        root_id=str(job.id),
-        task_id=str(job.id),
-        link=job_completed.si(job.id),
-        link_error=job_failed.s(job_id=job.id),
-    )
+    _apply_task(task, job.id)
 
 
 def new_correlation_task(job: Job, correlation: RuleModel, related_indicators, data):
@@ -74,13 +67,7 @@ def new_correlation_task(job: Job, correlation: RuleModel, related_indicators, d
         case _:
             raise validators.ValidationError("Unknown job type")
     # process_correlation(job.id, correlation.model_dump(by_alias=True), related_indicators)
-    task.apply_async(
-        countdown=POLL_INTERVAL,
-        root_id=str(job.id),
-        task_id=str(job.id),
-        link=job_completed.si(job.id),
-        link_error=job_failed.s(job_id=job.id),
-    )
+    _apply_task(task, job.id)
 
 
 def new_modify_rule_task(job: Job, old_indicator, new_rule_data, report=None):
@@ -90,24 +77,22 @@ def new_modify_rule_task(job: Job, old_indicator, new_rule_data, report=None):
             task = modify_base_rule.s(job.id, old_indicator, report, new_rule_data)
         case JobType.CORRELATION_MODIFY:
             task = modify_correlation.s(job.id, old_indicator, new_rule_data)
+    _apply_task(task, job.id)
+
+
+def _apply_task(task, job_id):
     task.apply_async(
         countdown=POLL_INTERVAL,
-        root_id=str(job.id),
-        task_id=str(job.id),
-        link=job_completed.si(job.id),
-        link_error=job_failed.s(job_id=job.id),
+        root_id=str(job_id),
+        task_id=str(job_id),
+        link=job_completed.si(job_id),
+        link_error=job_failed.s(job_id=job_id),
     )
 
 
 def new_clone_rule_task(job):
     task: Task = clone_rule.si(job.id)
-    task.apply_async(
-        countdown=POLL_INTERVAL,
-        root_id=str(job.id),
-        task_id=str(job.id),
-        link=job_completed.si(job.id),
-        link_error=job_failed.s(job_id=job.id),
-    )
+    _apply_task(task, job.id)
 
 
 @shared_task
@@ -121,28 +106,19 @@ def clone_rule(job_id):
 @shared_task
 def update_knowledgebase(job_id):
     job = models.Job.objects.get(pk=job_id)
-    state = models.JobState.COMPLETED
     job.data.update(
         processed_items=0,
         updated_items=0,
     )
     job.state = models.JobState.PROCESSING
     job.save(update_fields=["data", "state"])
-    try:
-        collection_name = settings.ARANGODB_COLLECTION + '_vertex_collection'
-        print(f"Processing {collection_name}")
-        update_time = datetime.now(UTC).isoformat()
-        processed_count, updated_count = kb_sync.run_on_kb_and_collection(collection_name, job.data['knowledgebase'], update_time=update_time)
-        if job:
-            job.data['processed_items'] += processed_count
-            job.data['updated_items'] += updated_count
-            job.save(update_fields=["data"])
-    except Exception as e:
-        job.error = e
-        job.save(update_fields=["error"])
-        state = models.JobState.FAILED
-    job.state = state
-    job.save(update_fields=["state"])
+    collection_name = settings.ARANGODB_COLLECTION + '_vertex_collection'
+    print(f"Processing {collection_name}")
+    update_time = datetime.now(UTC).isoformat()
+    processed_count, updated_count = kb_sync.run_on_kb_and_collection(collection_name, job.data['knowledgebase'], update_time=update_time)
+    job.data['processed_items'] += processed_count
+    job.data['updated_items'] += updated_count
+    job.save(update_fields=["data"])
 
 
 @shared_task

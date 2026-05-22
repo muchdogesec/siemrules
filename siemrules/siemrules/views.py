@@ -1770,7 +1770,7 @@ class TasksView(viewsets.GenericViewSet):
             data=dict(knowledgebase=kb)
         )
         t = tasks.update_knowledgebase.si(job.id)
-        t.apply_async()
+        tasks._apply_task(t, job.id)
         self.kwargs.update(job_id=job.id)
         obj = models.Job.objects.get(id=job.id)
         s = serializers.JobSerializer(obj)

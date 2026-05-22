@@ -196,7 +196,7 @@ class Job(models.Model):
 
     def save(self, *args, **kwargs) -> None:
         assert self.profile != None
-        if not self.completion_time and self.state == JobState.COMPLETED:
+        if not self.completion_time and self.state in [JobState.COMPLETED, JobState.FAILED]:
             self.completion_time = datetime.now(UTC)
         return super().save(*args, **kwargs)
     

@@ -134,8 +134,11 @@ class TestTasksView:
             resp = client.patch("/api/v1/tasks/sync-knowledgebases/cve/")
             assert resp.status_code == 201
             mock_kbsync.assert_called_once_with('siemrules_vertex_collection', 'cve', update_time=mock_kbsync.call_args[1]['update_time'])
-            assert resp.json()['state'] == models.JobState.COMPLETED
-
+            job = models.Job.objects.get(pk=resp.json()['id'])
+            assert job.state == models.JobState.COMPLETED
+            assert job.data['processed_items'] == 150
+            assert job.data['updated_items'] == 25
+            assert job.completion_time != None
     
     def test_update__calls_kbsync__fails(self, client, celery_eager):
         with patch('siemrules.worker.tasks.kb_sync.run_on_kb_and_collection') as mock_kbsync:
@@ -144,3 +147,5 @@ class TestTasksView:
             assert resp.status_code == 201
             mock_kbsync.assert_called_once_with('siemrules_vertex_collection', 'enterprise-attack', update_time=mock_kbsync.call_args[1]['update_time'])
             assert resp.json()['state'] == models.JobState.FAILED
+            job = models.Job.objects.get(pk=resp.json()['id'])
+            assert job.completion_time != None
