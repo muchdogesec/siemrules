@@ -106,3 +106,46 @@ class TestRuleDelete:
         
         # Rule 2 version should still exist
         assert models.Version.objects.filter(rule_id=indicator_id_2).count() == 1
+
+
+class TestTasksView:
+    def test_update__returns_job(self, client):
+        resp = client.patch("/api/v1/tasks/sync-knowledgebases/cve/")
+        assert resp.status_code == 201
+        data = resp.json()
+        assert data['type'] == 'sync-knowledgebase'
+        assert data['extra']['knowledgebase'] == 'cve'
+        ####
+
+        resp = client.patch("/api/v1/tasks/sync-knowledgebases/enterprise-attack/")
+        assert resp.status_code == 201
+        data = resp.json()
+        assert data['type'] == 'sync-knowledgebase'
+        assert data['extra']['knowledgebase'] == 'enterprise-attack'
+        ####
+
+    def test_update__fails_on_bad_knowledgebase(self, client):
+        resp = client.patch("/api/v1/tasks/sync-knowledgebases/capec/")
+        assert resp.status_code == 404
+
+    def test_update__calls_kbsync__sucess(self, client, celery_eager):
+        with patch('siemrules.worker.tasks.kb_sync.run_on_kb_and_collection') as mock_kbsync:
+            mock_kbsync.return_value = 150, 25
+            resp = client.patch("/api/v1/tasks/sync-knowledgebases/cve/")
+            assert resp.status_code == 201
+            mock_kbsync.assert_called_once_with('siemrules_vertex_collection', 'cve', update_time=mock_kbsync.call_args[1]['update_time'])
+            job = models.Job.objects.get(pk=resp.json()['id'])
+            assert job.state == models.JobState.COMPLETED
+            assert job.data['processed_items'] == 150
+            assert job.data['updated_items'] == 25
+            assert job.completion_time != None
+    
+    def test_update__calls_kbsync__fails(self, client, celery_eager):
+        with patch('siemrules.worker.tasks.kb_sync.run_on_kb_and_collection') as mock_kbsync:
+            mock_kbsync.side_effect = ValueError('dies')
+            resp = client.patch("/api/v1/tasks/sync-knowledgebases/enterprise-attack/")
+            assert resp.status_code == 201
+            mock_kbsync.assert_called_once_with('siemrules_vertex_collection', 'enterprise-attack', update_time=mock_kbsync.call_args[1]['update_time'])
+            assert resp.json()['state'] == models.JobState.FAILED
+            job = models.Job.objects.get(pk=resp.json()['id'])
+            assert job.completion_time != None

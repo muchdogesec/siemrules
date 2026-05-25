@@ -32,6 +32,7 @@ from rest_framework import validators
 from stix2 import parse as parse_stix, Bundle
 from stix2.serialization import serialize as stix2_serialize
 from dogesec_commons.objects import db_view_creator
+from dogesec_commons.objects.kb_sync import sync as kb_sync
 
 
 import tempfile
@@ -46,14 +47,7 @@ POLL_INTERVAL = 1
 
 def new_task(job: Job, **kwargs):
     task: Task = process_report.s(job.file.file.name, job.id, **kwargs)
-
-    task.apply_async(
-        countdown=POLL_INTERVAL,
-        root_id=str(job.id),
-        task_id=str(job.id),
-        link=job_completed.si(job.id),
-        link_error=job_failed.s(job_id=job.id),
-    )
+    _apply_task(task, job.id)
 
 
 def new_correlation_task(job: Job, correlation: RuleModel, related_indicators, data):
@@ -73,13 +67,7 @@ def new_correlation_task(job: Job, correlation: RuleModel, related_indicators, d
         case _:
             raise validators.ValidationError("Unknown job type")
     # process_correlation(job.id, correlation.model_dump(by_alias=True), related_indicators)
-    task.apply_async(
-        countdown=POLL_INTERVAL,
-        root_id=str(job.id),
-        task_id=str(job.id),
-        link=job_completed.si(job.id),
-        link_error=job_failed.s(job_id=job.id),
-    )
+    _apply_task(task, job.id)
 
 
 def new_modify_rule_task(job: Job, old_indicator, new_rule_data, report=None):
@@ -89,24 +77,22 @@ def new_modify_rule_task(job: Job, old_indicator, new_rule_data, report=None):
             task = modify_base_rule.s(job.id, old_indicator, report, new_rule_data)
         case JobType.CORRELATION_MODIFY:
             task = modify_correlation.s(job.id, old_indicator, new_rule_data)
+    _apply_task(task, job.id)
+
+
+def _apply_task(task, job_id):
     task.apply_async(
         countdown=POLL_INTERVAL,
-        root_id=str(job.id),
-        task_id=str(job.id),
-        link=job_completed.si(job.id),
-        link_error=job_failed.s(job_id=job.id),
+        root_id=str(job_id),
+        task_id=str(job_id),
+        link=job_completed.si(job_id),
+        link_error=job_failed.s(job_id=job_id),
     )
 
 
 def new_clone_rule_task(job):
     task: Task = clone_rule.si(job.id)
-    task.apply_async(
-        countdown=POLL_INTERVAL,
-        root_id=str(job.id),
-        task_id=str(job.id),
-        link=job_completed.si(job.id),
-        link_error=job_failed.s(job_id=job.id),
-    )
+    _apply_task(task, job.id)
 
 
 @shared_task
@@ -116,6 +102,23 @@ def clone_rule(job_id):
     indicator = arangodb_helpers.make_clone(job.data["cloned_from"], new_indicator_uuid, job.data)
     add_versions(job_id, models.VersionAction.CREATE, type=models.VersionTypes.CLONE, objects=[indicator], cloned_from=job.data["cloned_from"])
 
+
+@shared_task
+def update_knowledgebase(job_id):
+    job = models.Job.objects.get(pk=job_id)
+    job.data.update(
+        processed_items=0,
+        updated_items=0,
+    )
+    job.state = models.JobState.PROCESSING
+    job.save(update_fields=["data", "state"])
+    collection_name = settings.ARANGODB_COLLECTION + '_vertex_collection'
+    print(f"Processing {collection_name}")
+    update_time = datetime.now(UTC).isoformat()
+    processed_count, updated_count = kb_sync.run_on_kb_and_collection(collection_name, job.data['knowledgebase'], update_time=update_time)
+    job.data['processed_items'] += processed_count
+    job.data['updated_items'] += updated_count
+    job.save(update_fields=["data"])
 
 
 @shared_task

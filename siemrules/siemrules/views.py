@@ -1712,3 +1712,66 @@ class DataSourceView(viewsets.ViewSet):
 
     def list(self, request, *args, **kwargs):
         return arangodb_helpers.get_data_sources(request)
+
+
+
+@extend_schema_view(
+    update_any=extend_schema(
+        summary="Update local vulnerabilities",
+        description=textwrap.dedent(
+            """
+            Connect to remote vulmatch/ctibutler server and update all values from specified knowledgebase
+            """
+        ),
+        request=None,
+        responses={
+            201: JobSerializer,
+            404: DEFAULT_404_ERROR,
+        },
+    ),
+)
+class TasksView(viewsets.GenericViewSet):
+    serializer_class = JobSerializer
+    openapi_tags = ["Tasks"]
+    lookup_url_kwarg = "task_id"
+    filter_backends = [DjangoFilterBackend, Ordering]
+    ordering_fields = ["created"]
+    ordering = "created_descending"
+    pagination_class = Pagination("jobs")
+    valid_knowledge_bases = [
+        "cve",
+        "enterprise-attack",
+    ]
+    openapi_path_params = [
+        OpenApiParameter(
+            name="knowledgebase",
+            type=OpenApiTypes.STR,
+            location=OpenApiParameter.PATH,
+            enum=valid_knowledge_bases,
+            required=True,
+        )
+    ]
+    
+    @decorators.action(
+        methods=["PATCH"],
+        detail=False,
+        url_path=r"sync-knowledgebases/(?P<knowledgebase>(cve|enterprise-attack))",
+    )
+    def update_any(self, request, *args, knowledgebase=None, **kwargs):
+        return self._sync_kb(knowledgebase)
+
+    def _sync_kb(self, kb):
+        if kb not in self.valid_knowledge_bases:
+            raise exceptions.NotFound({"error": "unknown knowledgebase"})
+        job = models.Job.objects.create(
+            id=uuid.uuid4(),
+            type=models.JobType.SYNC_KNOWLEDGEBASE,
+            state=models.JobState.PENDING,
+            data=dict(knowledgebase=kb)
+        )
+        t = tasks.update_knowledgebase.si(job.id)
+        tasks._apply_task(t, job.id)
+        self.kwargs.update(job_id=job.id)
+        obj = models.Job.objects.get(id=job.id)
+        s = serializers.JobSerializer(obj)
+        return Response(s.data, status=status.HTTP_201_CREATED)
