@@ -35,7 +35,7 @@ attrs==25.4.0
     #   aiohttp
     #   jsonschema
     #   referencing
-banks==2.4.1
+banks==2.4.2
     # via llama-index-core
 beautifulsoup4==4.14.3
     # via
