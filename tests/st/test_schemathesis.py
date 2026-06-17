@@ -1,16 +1,11 @@
-import json
 import random
-import time
 from unittest.mock import patch
-from urllib.parse import urlencode
 import uuid
 import schemathesis
 import pytest
-from schemathesis.core.transport import Response as SchemathesisResponse
 from siemrules.siemrules.models import File, Job
 from siemrules.wsgi import application as wsgi_app
-from rest_framework.response import Response as DRFResponse
-from hypothesis import given, settings
+from hypothesis import settings
 from hypothesis import strategies
 from schemathesis.specs.openapi.checks import (
     negative_data_rejection,
@@ -19,11 +14,11 @@ from schemathesis.specs.openapi.checks import (
 )
 from schemathesis.config import GenerationConfig
 from schemathesis.transport.serialization import (
-    serialize_binary,
-    serialize_json,
-    serialize_xml,
     serialize_yaml,
 )
+# restrict date and datetime generation to reasonable ranges to avoid issues with database limits
+schemathesis.openapi.format("date-time", strategies.datetimes(max_value=datetime(2050, 1, 1), min_value=datetime(1970, 1, 1)).map(lambda dt: dt.replace(tzinfo=dt.tzinfo or UTC).isoformat()))
+schemathesis.openapi.format("date", strategies.dates(max_value=date(2050, 1, 1), min_value=date(1970, 1, 1)).map(date.isoformat))
 
 schema = schemathesis.openapi.from_wsgi("/api/schema/?format=json", wsgi_app)
 schema.config.base_url = "http://localhost:8008/"
