@@ -239,7 +239,7 @@ jmespath==1.1.0
     #   botocore
 joblib==1.5.3
     # via nltk
-json-repair==0.58.0
+json-repair==0.60.1
     # via txt2detection
 jsonschema==4.26.0
     # via
