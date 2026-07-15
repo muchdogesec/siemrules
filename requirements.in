@@ -1,5 +1,5 @@
 ## core
-django>=5.2.14,<6.0.0
+django>=5.2.15,<6.0.0
 django-cors-headers>=4.7.0
 django-cleanup>=9.0.0
 django-filter>=25.1
@@ -10,7 +10,7 @@ drf-spectacular>=0.28.0
 celery>=5.5.3
 psycopg2-binary>=2.9.10
 hyperlink>=21.0.0
-mistune>=3.2.1
+mistune>=3.3.0
 redis>=6.2.0
 stix2>=3.0.1
 python-arango>=8.1.7
