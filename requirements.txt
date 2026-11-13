@@ -127,7 +127,7 @@ djangorestframework==3.17.1
     #   dogesec-commons
     #   drf-pydantic
     #   drf-spectacular
-dnspython==2.8.0
+dnspython==2.9.2
     # via email-validator
 docstring-parser==0.18.0
     # via anthropic
